@@ -1,0 +1,5 @@
+# Global owner
+* @jpfreeley
+
+# Enforce review for all infrastructure changes
+/infra/ @jpfreeley
