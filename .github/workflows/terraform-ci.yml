@@ -33,7 +33,9 @@ jobs:
         run: tflint --init
 
       - name: Run TFLint
-        run: tflint -f compact --recursive infra/
+        run: |
+          cd infra
+          tflint -f compact
 
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@master
