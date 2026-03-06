@@ -1,3 +1,15 @@
+# S3 Secure Bucket Module
+
+This module creates an S3 bucket with enforced security best practices:
+
+- **SSE-KMS Encryption**: Uses a customer-managed KMS key.
+- **Versioning**: Enabled to protect against accidental deletes.
+- **Public Access Block**: Blocks all public access by default.
+- **Lifecycle Policy**: Expires non-current versions and aborts incomplete multipart uploads.
+- **Access Logging**: Optional logging to a target bucket.
+- **Event Notifications**: Optional event notifications to Lambda, SNS, or SQS.
+- **Cross-Region Replication**: Optional replication to a destination bucket.
+
 ## Usage
 
 ~~~hcl
