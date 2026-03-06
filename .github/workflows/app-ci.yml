@@ -32,5 +32,5 @@ jobs:
       - name: Basic HTML Lint
         run: |
           # Using standard grep to ensure basic tags exist
-          grep -q "<html>" app/src/index.html
-          grep -q "<body>" app/src/index.html
+          grep -Ei "<html[ >]" app/src/index.html
+          grep -Ei "<body[ >]" app/src/index.html
