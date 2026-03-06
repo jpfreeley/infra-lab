@@ -27,8 +27,20 @@ jobs:
       - name: Terraform Format Check
         run: terraform fmt -check -recursive infra/
 
-      # Checkov is the industry standard for IAC security (Palo Alto Networks)
-      - name: Run Checkov
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.50.0
+
+      - name: Init TFLint
+        run: tflint --init
+
+      - name: Run TFLint
+        run: |
+          cd infra
+          tflint -f compact
+
+      - name: Run  Checkov
         uses: bridgecrewio/checkov-action@master
         with:
           directory: infra/
