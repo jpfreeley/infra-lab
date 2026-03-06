@@ -1,26 +1,29 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-added-large-files
+      - id: detect-private-key
 
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: c0f51014b8ec51c4455a7dac40697be15e285668
+    rev: v1.105.0
     hooks:
       - id: terraform_fmt
       - id: terraform_tflint
       - id: terraform_validate
-      - id: terraform_checkov
-        args:
-          - --quiet
-          - --compact
-          - --soft-fail
 
   - repo: local
     hooks:
+      - id: checkov
+        name: checkov
+        entry: checkov
+        args: [-d, ., --soft-fail]
+        language: system
+        pass_filenames: false
+
       - id: gitleaks
         name: gitleaks
         entry: gitleaks detect --verbose
