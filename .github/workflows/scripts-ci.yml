@@ -1,0 +1,32 @@
+name: "Scripts CI"
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/scripts-ci.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'scripts/**'
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: "ShellCheck"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck
+        run: |
+          shellcheck -x scripts/*.sh
