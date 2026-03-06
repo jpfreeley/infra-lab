@@ -28,7 +28,7 @@ jobs:
           reporter: github-pr-review
           level: warning
           filter_mode: added
-          fail_on_error: false
+          fail_level: error   # Fail only on errors, not warnings or suggestions
           shellcheck_flags: "-x"
           path: scripts/
           pattern: "*.sh"
