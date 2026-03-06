@@ -1,0 +1,30 @@
+name: "Scripts CI"
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/scripts-ci.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'scripts/**'
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: "ShellCheck"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: koalaman/shellcheck-github-action@v2
+        with:
+          path: scripts/
+          pattern: "*.sh"
+          severity: warning
