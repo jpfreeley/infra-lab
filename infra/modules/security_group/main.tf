@@ -1,4 +1,5 @@
 resource "aws_security_group" "this" {
+  # checkov:skip=CKV2_AWS_5: "Security Group is a library module; attachment occurs in the implementation layer"
   name        = var.name
   description = var.description
   vpc_id      = var.vpc_id
