@@ -28,6 +28,12 @@
 
 * **aws-cli**: AWS command line interface.
 
+## Local Paths
+
+* **Downloads Directory**: `~/Downloads`
+
+* **Repository Root**: `~/Documents/git/public/jpfreeley/infra-lab/`
+
 ## AWS Environment Context
 
 * **Organization Management Account ID**: `551452024305`
@@ -85,8 +91,6 @@
 * **High Availability**: Cross-region replication enabled (Primary: `us-east-1`, Replica: `us-west-2`).
 
 * **S3 Hardening**: All buckets have public access blocks and ownership controls enabled.
-
-* **S3 Standards**: All Terraform buckets must include event notifications, access logging, and cross-region replication features with appropriate variables and documentation.
 
 * **Validation**: Pre-commit hooks integrated (Terraform fmt, lint, Checkov, Gitleaks).
 
