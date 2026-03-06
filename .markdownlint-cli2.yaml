@@ -1,3 +1,3 @@
 config:
-  MD013: false
-  MD024: false
+  MD013: false # LINE TOO LONG
+  # MD024: false # DUPLICATE SECTION HEADERS
