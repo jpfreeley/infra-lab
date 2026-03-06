@@ -125,6 +125,11 @@ resource "aws_s3_bucket_notification" "log_bucket_logs_notification" {
   bucket = aws_s3_bucket.log_bucket_logs.id
 }
 
+resource "aws_s3_bucket_notification" "log_bucket_logs_replica_notification" {
+  provider = aws.replica
+  bucket   = aws_s3_bucket.log_bucket_logs_replica.id
+}
+
 # Replica bucket for log_bucket_logs in us-west-2
 resource "aws_s3_bucket" "log_bucket_logs_replica" {
   provider = aws.replica
@@ -301,6 +306,11 @@ resource "aws_s3_bucket_notification" "log_bucket_notification" {
   bucket = aws_s3_bucket.log_bucket.id
 }
 
+resource "aws_s3_bucket_notification" "log_bucket_replica_notification" {
+  provider = aws.replica
+  bucket   = aws_s3_bucket.log_bucket_replica.id
+}
+
 # Replica bucket for log_bucket in us-west-2
 resource "aws_s3_bucket" "log_bucket_replica" {
   provider = aws.replica
@@ -470,6 +480,11 @@ resource "aws_s3_bucket_public_access_block" "terraform_state_public_access" {
 
 resource "aws_s3_bucket_notification" "terraform_state_notification" {
   bucket = aws_s3_bucket.terraform_state.id
+}
+
+resource "aws_s3_bucket_notification" "terraform_state_replica_notification" {
+  provider = aws.replica
+  bucket   = aws_s3_bucket.terraform_state_replica.id
 }
 
 # Replica bucket for terraform_state in us-west-2
