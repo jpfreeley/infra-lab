@@ -1,0 +1,41 @@
+name: "Docs CI"
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - '.github/workflows/docs-ci.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: "Lint Markdown"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Markdownlint-cli2 is the standard for MD linting
+      - name: Markdown Lint
+        uses: davidanson/markdownlint-cli2-action@v16
+        with:
+          globs: |
+            **/*.md
+            !node_modules/**
+
+      # Basic check to ensure no "TODO" or "FIXME" remains in docs
+      - name: Check for placeholders
+        run: |
+          if grep -rEi "TODO|FIXME" docs/ README.md; then
+            echo "Error: Found TODO or FIXME in documentation."
+            exit 1
+          fi
