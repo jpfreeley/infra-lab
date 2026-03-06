@@ -20,13 +20,6 @@ repos:
           - --args=--framework terraform
   - repo: local
     hooks:
-      - id: checkov
-        name: checkov
-        entry: checkov
-        args: [-d, ., --soft-fail]
-        language: system
-        pass_filenames: false
-
       - id: gitleaks
         name: gitleaks
         entry: gitleaks detect --verbose
