@@ -1,3 +1,4 @@
+
 # MEMORY.md
 
 ## User Profile & Preferences
@@ -33,9 +34,10 @@
 
 ## Project Backlog
 - **Master Backlog File**: `backlog_granular.json`
+- **Backlog URL**: [http://ypgmedia.com/infra_lab/backlog_granular.json](http://ypgmedia.com/infra_lab/backlog_granular.json)
 - **Source of Truth**: This file contains the full list of Epics and Stories used to drive the project.
 - **Current Epic**: E02
-- **Current Story**: S004
+- **Current Story**: S003
 
 ## Repository & Workflow
 - **Repository Name**: `infra-lab` (Private).
