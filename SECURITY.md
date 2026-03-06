@@ -11,9 +11,16 @@ We currently provide security updates for the following versions:
 
 ## Reporting a Vulnerability
 
-Please do not open public issues for security vulnerabilities.
-Contact the repository owner for private reporting.
+**Do not open a GitHub issue for security vulnerabilities.**
 
-## Supported Versions
+If you discover a potential security vulnerability in this project, please report it by following these steps:
 
-Only the default branch is supported.
+1. Email the maintainer at [jpfreeley@users.noreply.github.com](mailto:jpfreeley@users.noreply.github.com).
+2. Provide a detailed description of the vulnerability.
+3. Include steps to reproduce the issue.
+
+We will acknowledge your report within 48 hours and provide a timeline for a fix.
+
+## Disclosure Policy
+
+We follow a coordinated disclosure policy. We ask that you do not share the vulnerability publicly until we have had an opportunity to address it.
