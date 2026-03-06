@@ -81,12 +81,47 @@ resource "aws_s3_bucket" "log_bucket_logs" {
   lifecycle {
     prevent_destroy = true
   }
+
+  versioning {
+    enabled = true
+  }
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        kms_master_key_id = aws_kms_key.s3.arn
+        sse_algorithm     = "aws:kms"
+      }
+    }
+  }
+
+  lifecycle_rule {
+    id      = "expire-logs"
+    enabled = true
+
+    expiration {
+      days = 90
+    }
+
+    prefix = ""
+  }
 }
 
-# ACL for log_bucket_logs
 resource "aws_s3_bucket_acl" "log_bucket_logs_acl" {
   bucket = aws_s3_bucket.log_bucket_logs.id
   acl    = "log-delivery-write"
+}
+
+resource "aws_s3_bucket_public_access_block" "log_bucket_logs_public_access" {
+  bucket                  = aws_s3_bucket.log_bucket_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_notification" "log_bucket_logs_notification" {
+  bucket = aws_s3_bucket.log_bucket_logs.id
 }
 
 # S3 bucket for Terraform state logs with access logging enabled
@@ -97,16 +132,51 @@ resource "aws_s3_bucket" "log_bucket" {
     prevent_destroy = true
   }
 
+  versioning {
+    enabled = true
+  }
+
   logging {
     target_bucket = aws_s3_bucket.log_bucket_logs.id
     target_prefix = "log-bucket-logs/"
   }
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        kms_master_key_id = aws_kms_key.s3.arn
+        sse_algorithm     = "aws:kms"
+      }
+    }
+  }
+
+  lifecycle_rule {
+    id      = "expire-logs"
+    enabled = true
+
+    expiration {
+      days = 90
+    }
+
+    prefix = ""
+  }
 }
 
-# ACL for log_bucket
 resource "aws_s3_bucket_acl" "log_bucket_acl" {
   bucket = aws_s3_bucket.log_bucket.id
   acl    = "log-delivery-write"
+}
+
+resource "aws_s3_bucket_public_access_block" "log_bucket_public_access" {
+  bucket                  = aws_s3_bucket.log_bucket.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_notification" "log_bucket_notification" {
+  bucket = aws_s3_bucket.log_bucket.id
 }
 
 # S3 bucket for Terraform state with KMS encryption and access logging
@@ -115,6 +185,10 @@ resource "aws_s3_bucket" "terraform_state" {
 
   lifecycle {
     prevent_destroy = true
+  }
+
+  versioning {
+    enabled = true
   }
 
   logging {
@@ -130,6 +204,29 @@ resource "aws_s3_bucket" "terraform_state" {
       }
     }
   }
+
+  lifecycle_rule {
+    id      = "expire-logs"
+    enabled = true
+
+    expiration {
+      days = 90
+    }
+
+    prefix = ""
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "terraform_state_public_access" {
+  bucket                  = aws_s3_bucket.terraform_state.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_notification" "terraform_state_notification" {
+  bucket = aws_s3_bucket.terraform_state.id
 }
 
 # DynamoDB table for Terraform state locking with PITR and KMS encryption
@@ -156,10 +253,15 @@ resource "aws_dynamodb_table" "terraform_locks" {
 # S3 bucket for cross-region replication of terraform state
 resource "aws_s3_bucket" "terraform_state_replica" {
   bucket = "infra-lab-tf-state-replica-${data.aws_caller_identity.current.account_id}"
-  acl    = "private"
 
   lifecycle {
     prevent_destroy = true
+  }
+
+  acl = "private"
+
+  versioning {
+    enabled = true
   }
 
   server_side_encryption_configuration {
@@ -170,12 +272,34 @@ resource "aws_s3_bucket" "terraform_state_replica" {
       }
     }
   }
+
+  lifecycle_rule {
+    id      = "expire-logs"
+    enabled = true
+
+    expiration {
+      days = 90
+    }
+
+    prefix = ""
+  }
 }
 
-# ACL for terraform_state_replica
 resource "aws_s3_bucket_acl" "terraform_state_replica_acl" {
   bucket = aws_s3_bucket.terraform_state_replica.id
   acl    = "private"
+}
+
+resource "aws_s3_bucket_public_access_block" "terraform_state_replica_public_access" {
+  bucket                  = aws_s3_bucket.terraform_state_replica.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_notification" "terraform_state_replica_notification" {
+  bucket = aws_s3_bucket.terraform_state_replica.id
 }
 
 # IAM role for S3 replication
@@ -249,13 +373,4 @@ resource "aws_s3_bucket_replication_configuration" "terraform_state_replication"
       prefix = ""
     }
   }
-}
-
-# S3 event notifications for log buckets (placeholder)
-resource "aws_s3_bucket_notification" "log_bucket_logs_notification" {
-  bucket = aws_s3_bucket.log_bucket_logs.id
-}
-
-resource "aws_s3_bucket_notification" "log_bucket_notification" {
-  bucket = aws_s3_bucket.log_bucket.id
 }
