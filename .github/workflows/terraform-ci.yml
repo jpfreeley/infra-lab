@@ -2,11 +2,14 @@ name: "Terraform CI"
 
 on:
   pull_request:
-    branches:
-      - main
-    paths:
-      - 'infra/**'
-      - '.github/workflows/terraform-ci.yml'
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+# Explicitly set minimal permissions for the GITHUB_TOKEN
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
   terraform:
@@ -37,9 +40,10 @@ jobs:
           cd infra
           tflint -f compact
 
-      - name: Run Checkov
+      - name: Run  Checkov
         uses: bridgecrewio/checkov-action@master
         with:
           directory: infra/
           quiet: true
           framework: terraform
+          output_format: cli
