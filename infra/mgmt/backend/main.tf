@@ -1,29 +1,105 @@
 data "aws_caller_identity" "current" {}
 
-# KMS key for DynamoDB encryption
+# KMS key for DynamoDB encryption with rotation and policy
 resource "aws_kms_key" "dynamodb" {
   description             = "KMS key for DynamoDB table encryption"
   deletion_window_in_days = 10
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Allow administration of the key"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow use of the key"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 }
 
-# KMS key for S3 bucket encryption
+# KMS key for S3 bucket encryption with rotation and policy
 resource "aws_kms_key" "s3" {
   description             = "KMS key for S3 bucket encryption"
   deletion_window_in_days = 10
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Allow administration of the key"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow use of the key"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 }
 
-# S3 bucket for Terraform state logs (access logging target)
-resource "aws_s3_bucket" "log_bucket" {
-  bucket = "infra-lab-tf-state-logs-${data.aws_caller_identity.current.account_id}"
+# S3 bucket for logs of the log bucket (access logging target)
+resource "aws_s3_bucket" "log_bucket_logs" {
+  bucket = "infra-lab-tf-state-log-bucket-logs-${data.aws_caller_identity.current.account_id}"
   acl    = "log-delivery-write"
 
-  # Optional: prevent accidental deletion of logs bucket
   lifecycle {
     prevent_destroy = true
   }
 }
 
-# S3 bucket for Terraform state
+# S3 bucket for Terraform state logs with access logging enabled
+resource "aws_s3_bucket" "log_bucket" {
+  bucket = "infra-lab-tf-state-logs-${data.aws_caller_identity.current.account_id}"
+  acl    = "log-delivery-write"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  logging {
+    target_bucket = aws_s3_bucket.log_bucket_logs.id
+    target_prefix = "log-bucket-logs/"
+  }
+}
+
+# S3 bucket for Terraform state with KMS encryption and access logging
 resource "aws_s3_bucket" "terraform_state" {
   bucket = "infra-lab-tf-state-${data.aws_caller_identity.current.account_id}"
 
@@ -46,7 +122,7 @@ resource "aws_s3_bucket" "terraform_state" {
   }
 }
 
-# DynamoDB table for Terraform state locking
+# DynamoDB table for Terraform state locking with PITR and KMS encryption
 resource "aws_dynamodb_table" "terraform_locks" {
   name         = "infra-lab-tf-state-locks"
   billing_mode = "PAY_PER_REQUEST"
