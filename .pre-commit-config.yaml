@@ -14,7 +14,10 @@ repos:
       - id: terraform_fmt
       - id: terraform_tflint
       - id: terraform_validate
-
+      - id: terraform_checkov
+        args:
+          - --args=--quiet
+          - --args=--framework terraform
   - repo: local
     hooks:
       - id: checkov
