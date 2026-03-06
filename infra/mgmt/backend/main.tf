@@ -76,7 +76,7 @@ resource "aws_kms_key" "s3" {
 
 # Dedicated access log bucket for log_bucket_logs
 resource "aws_s3_bucket" "log_bucket_logs_access_logs" {
-  bucket = "infra-lab-tf-state-log-bucket-logs-access-logs-${data.aws_caller_identity.current.account_id}"
+  bucket = "infra-lab-tf-log-bucket-access-logs-${data.aws_caller_identity.current.account_id}"
 
   lifecycle {
     prevent_destroy = true
@@ -149,7 +149,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "log_bucket_logs_access_logs_li
 # Replica bucket for log_bucket_logs_access_logs
 resource "aws_s3_bucket" "log_bucket_logs_access_logs_replica" {
   provider = aws.replica
-  bucket   = "infra-lab-tf-state-log-bucket-logs-access-logs-replica-${data.aws_caller_identity.current.account_id}"
+  bucket   = "infra-lab-tf-log-bucket-access-logs-rep-${data.aws_caller_identity.current.account_id}"
 
   lifecycle {
     prevent_destroy = true
@@ -299,7 +299,7 @@ resource "aws_s3_bucket_replication_configuration" "log_bucket_logs_access_logs_
 
 # S3 bucket for logs of the log bucket (access logging target)
 resource "aws_s3_bucket" "log_bucket_logs" {
-  bucket = "infra-lab-tf-state-log-bucket-logs-${data.aws_caller_identity.current.account_id}"
+  bucket = "infra-lab-tf-log-bucket-logs-${data.aws_caller_identity.current.account_id}"
 
   lifecycle {
     prevent_destroy = true
@@ -372,7 +372,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "log_bucket_logs_lifecycle" {
 # Replica bucket for log_bucket_logs in us-west-2
 resource "aws_s3_bucket" "log_bucket_logs_replica" {
   provider = aws.replica
-  bucket   = "infra-lab-tf-state-log-bucket-logs-replica-${data.aws_caller_identity.current.account_id}"
+  bucket   = "infra-lab-tf-log-bucket-logs-rep-${data.aws_caller_identity.current.account_id}"
 
   lifecycle {
     prevent_destroy = true
