@@ -78,14 +78,16 @@ resource "aws_kms_key" "s3" {
 resource "aws_s3_bucket" "log_bucket_logs_access_logs" {
   bucket = "infra-lab-tf-log-bucket-access-logs-${data.aws_caller_identity.current.account_id}"
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
-resource "aws_s3_bucket_acl" "log_bucket_logs_access_logs_acl" {
+resource "aws_s3_bucket_ownership_controls" "log_bucket_logs_access_logs_ownership" {
   bucket = aws_s3_bucket.log_bucket_logs_access_logs.id
-  acl    = "log-delivery-write"
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "log_bucket_logs_access_logs_public_access" {
@@ -151,15 +153,17 @@ resource "aws_s3_bucket" "log_bucket_logs_access_logs_replica" {
   provider = aws.replica
   bucket   = "infra-lab-tf-log-bucket-access-logs-rep-${data.aws_caller_identity.current.account_id}"
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
-resource "aws_s3_bucket_acl" "log_bucket_logs_access_logs_replica_acl" {
+resource "aws_s3_bucket_ownership_controls" "log_bucket_logs_access_logs_replica_ownership" {
   provider = aws.replica
   bucket   = aws_s3_bucket.log_bucket_logs_access_logs_replica.id
-  acl      = "private"
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "log_bucket_logs_access_logs_replica_public_access" {
@@ -179,9 +183,11 @@ resource "aws_s3_bucket_notification" "log_bucket_logs_access_logs_replica_notif
 resource "aws_s3_bucket_logging" "log_bucket_logs_access_logs_replica_logging" {
   provider      = aws.replica
   bucket        = aws_s3_bucket.log_bucket_logs_access_logs_replica.id
-  target_bucket = aws_s3_bucket.log_bucket_logs_access_logs.id
-  target_prefix = "replica-logs/"
+  target_bucket = aws_s3_bucket.log_bucket_logs_access_logs_replica.id
+  target_prefix = "self-logs/"
 }
+
+
 
 resource "aws_s3_bucket_versioning" "log_bucket_logs_access_logs_replica_versioning" {
   provider = aws.replica
@@ -285,6 +291,10 @@ resource "aws_s3_bucket_replication_configuration" "log_bucket_logs_access_logs_
     id     = "replicate-all"
     status = "Enabled"
 
+    delete_marker_replication {
+      status = "Enabled"
+    }
+
     destination {
       bucket        = aws_s3_bucket.log_bucket_logs_access_logs_replica.arn
       storage_class = "STANDARD"
@@ -301,14 +311,16 @@ resource "aws_s3_bucket_replication_configuration" "log_bucket_logs_access_logs_
 resource "aws_s3_bucket" "log_bucket_logs" {
   bucket = "infra-lab-tf-log-bucket-logs-${data.aws_caller_identity.current.account_id}"
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
-resource "aws_s3_bucket_acl" "log_bucket_logs_acl" {
+resource "aws_s3_bucket_ownership_controls" "log_bucket_logs_ownership" {
   bucket = aws_s3_bucket.log_bucket_logs.id
-  acl    = "log-delivery-write"
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "log_bucket_logs_public_access" {
@@ -374,15 +386,17 @@ resource "aws_s3_bucket" "log_bucket_logs_replica" {
   provider = aws.replica
   bucket   = "infra-lab-tf-log-bucket-logs-rep-${data.aws_caller_identity.current.account_id}"
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
-resource "aws_s3_bucket_acl" "log_bucket_logs_replica_acl" {
+resource "aws_s3_bucket_ownership_controls" "log_bucket_logs_replica_ownership" {
   provider = aws.replica
   bucket   = aws_s3_bucket.log_bucket_logs_replica.id
-  acl      = "private"
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "log_bucket_logs_replica_public_access" {
@@ -402,9 +416,11 @@ resource "aws_s3_bucket_notification" "log_bucket_logs_replica_notification" {
 resource "aws_s3_bucket_logging" "log_bucket_logs_replica_logging" {
   provider      = aws.replica
   bucket        = aws_s3_bucket.log_bucket_logs_replica.id
-  target_bucket = aws_s3_bucket.log_bucket_logs_access_logs.id
-  target_prefix = "log-bucket-logs-replica-logs/"
+  target_bucket = aws_s3_bucket.log_bucket_logs_replica.id
+  target_prefix = "self-logs/"
 }
+
+
 
 resource "aws_s3_bucket_versioning" "log_bucket_logs_replica_versioning" {
   provider = aws.replica
@@ -510,6 +526,10 @@ resource "aws_s3_bucket_replication_configuration" "log_bucket_logs_replication"
     id     = "replicate-all"
     status = "Enabled"
 
+    delete_marker_replication {
+      status = "Enabled"
+    }
+
     destination {
       bucket        = aws_s3_bucket.log_bucket_logs_replica.arn
       storage_class = "STANDARD"
@@ -530,9 +550,11 @@ resource "aws_s3_bucket" "log_bucket" {
   }
 }
 
-resource "aws_s3_bucket_acl" "log_bucket_acl" {
+resource "aws_s3_bucket_ownership_controls" "log_bucket_ownership" {
   bucket = aws_s3_bucket.log_bucket.id
-  acl    = "log-delivery-write"
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "log_bucket_public_access" {
@@ -603,10 +625,12 @@ resource "aws_s3_bucket" "log_bucket_replica" {
   }
 }
 
-resource "aws_s3_bucket_acl" "log_bucket_replica_acl" {
+resource "aws_s3_bucket_ownership_controls" "log_bucket_replica_ownership" {
   provider = aws.replica
   bucket   = aws_s3_bucket.log_bucket_replica.id
-  acl      = "private"
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "log_bucket_replica_public_access" {
@@ -626,8 +650,8 @@ resource "aws_s3_bucket_notification" "log_bucket_replica_notification" {
 resource "aws_s3_bucket_logging" "log_bucket_replica_logging" {
   provider      = aws.replica
   bucket        = aws_s3_bucket.log_bucket_replica.id
-  target_bucket = aws_s3_bucket.log_bucket_logs.id
-  target_prefix = "log-bucket-replica-logs/"
+  target_bucket = aws_s3_bucket.log_bucket_replica.id
+  target_prefix = "self-logs/"
 }
 
 resource "aws_s3_bucket_versioning" "log_bucket_replica_versioning" {
@@ -734,6 +758,10 @@ resource "aws_s3_bucket_replication_configuration" "log_bucket_replication" {
     id     = "replicate-all"
     status = "Enabled"
 
+    delete_marker_replication {
+      status = "Enabled"
+    }
+
     destination {
       bucket        = aws_s3_bucket.log_bucket_replica.arn
       storage_class = "STANDARD"
@@ -754,9 +782,11 @@ resource "aws_s3_bucket" "terraform_state" {
   }
 }
 
-resource "aws_s3_bucket_acl" "terraform_state_acl" {
+resource "aws_s3_bucket_ownership_controls" "terraform_state_ownership" {
   bucket = aws_s3_bucket.terraform_state.id
-  acl    = "private"
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "terraform_state_public_access" {
@@ -827,10 +857,12 @@ resource "aws_s3_bucket" "terraform_state_replica" {
   }
 }
 
-resource "aws_s3_bucket_acl" "terraform_state_replica_acl" {
+resource "aws_s3_bucket_ownership_controls" "terraform_state_replica_ownership" {
   provider = aws.replica
   bucket   = aws_s3_bucket.terraform_state_replica.id
-  acl      = "private"
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "terraform_state_replica_public_access" {
@@ -850,9 +882,11 @@ resource "aws_s3_bucket_notification" "terraform_state_replica_notification" {
 resource "aws_s3_bucket_logging" "terraform_state_replica_logging" {
   provider      = aws.replica
   bucket        = aws_s3_bucket.terraform_state_replica.id
-  target_bucket = aws_s3_bucket.log_bucket.id
-  target_prefix = "terraform-state-replica-logs/"
+  target_bucket = aws_s3_bucket.terraform_state_replica.id
+  target_prefix = "self-logs/"
 }
+
+
 
 resource "aws_s3_bucket_versioning" "terraform_state_replica_versioning" {
   provider = aws.replica
@@ -957,6 +991,10 @@ resource "aws_s3_bucket_replication_configuration" "terraform_state_replication"
   rule {
     id     = "replicate-all"
     status = "Enabled"
+
+    delete_marker_replication {
+      status = "Enabled"
+    }
 
     destination {
       bucket        = aws_s3_bucket.terraform_state_replica.arn
