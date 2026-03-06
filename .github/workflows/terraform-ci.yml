@@ -37,7 +37,7 @@ jobs:
           cd infra
           tflint -f compact
 
-      - name: Run Checkov
+      - name: Run  Checkov
         uses: bridgecrewio/checkov-action@master
         with:
           directory: infra/
