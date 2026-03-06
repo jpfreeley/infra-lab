@@ -1,0 +1,36 @@
+name: "App CI"
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'app/**'
+      - '.github/workflows/app-ci.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-lint:
+    name: "Lint and Validate App"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Directory Structure
+        run: |
+          if [ ! -d "app/src" ]; then
+            echo "Error: app/src directory missing"
+            exit 1
+          fi
+
+      - name: Basic HTML Lint
+        run: |
+          # Using standard grep to ensure basic tags exist
+          grep -Ei "<html[ >]" app/src/index.html
+          grep -Ei "<body[ >]" app/src/index.html
