@@ -130,6 +130,68 @@ This approach will maintain project discipline and ensure all work is properly s
 
 ---
 
+### E02-S007: Terraform hygiene: implement `tflint` config
+
+* Established a centralized `.tflint.hcl` configuration to enforce deep linting and AWS-specific best practices.
+
+* Configured the `aws` plugin with specific rules for resource naming, deprecated features, and security gaps.
+
+* Integrated `tflint` into the `pre-commit` workflow to ensure all code is linted before being committed.
+
+---
+
+### E02-S008: Terraform hygiene: implement `terraform-docs` generation
+
+* Automated infrastructure documentation using `terraform-docs`.
+
+* Configured a standardized template for `README.md` generation across all modules, including inputs, outputs, and resource dependencies.
+
+* Enforced documentation updates via `pre-commit` hooks, ensuring the "Library" is always up-to-date.
+
+---
+
+### E02-S009: Terraform hygiene: module version pinning policy
+
+* Implemented a strict version pinning policy for all external and internal module references.
+
+* Added `terraform_module_pinned_source` rules to `tflint` to prevent unpinned or "floating" module versions.
+
+* Ensured reproducible builds and prevented accidental breaking changes during infrastructure deployments.
+
+---
+
+### E02-S010: Terraform hygiene: implement `checkov` baseline
+
+* Standardized security scanning across the monorepo using a global `.checkov.yml` configuration.
+
+* Configured "Secure by Default" enforcement with automated scanning of 119+ security checks.
+
+* Integrated `checkov` into the CI/CD pipeline to block PRs that introduce high-severity security risks.
+
+---
+
+### E02-S011: Terraform hygiene: implement `gitleaks` baseline
+
+* Established a centralized `.gitleaks.toml` configuration to standardize secret detection.
+
+* Defined global allowlists for known safe patterns (e.g., `.terraform` directories and state files) while maintaining strict detection for API keys and private credentials.
+
+* Synchronized local and CI secret scanning to ensure consistent security enforcement.
+
+---
+
+### E02-S012: Terraform hygiene: implement `terraform-compliance` baseline
+
+* Migrated `terraform-compliance` from local pre-commit hooks to a dedicated GitHub Actions CI workflow.
+
+* Developed a Behavior-Driven Development (BDD) tagging policy in `infra/policy/tagging.feature` to enforce mandatory `Project` and `ManagedBy` tags.
+
+* Configured the CI pipeline to generate Terraform plan JSONs and validate them against compliance rules non-interactively.
+
+* Hardened the repository by updating `.gitignore` to exclude sensitive plan artifacts (`tfplan.binary`, `tfplan.json`).
+
+---
+
 ## Summary
 
 Epic E02 successfully matured the `infra-lab` infrastructure-as-code practices by:
@@ -140,7 +202,7 @@ Epic E02 successfully matured the `infra-lab` infrastructure-as-code practices b
 
 * **Standardizing Components**: Launching the first "Module Interfaces" for KMS and S3, ensuring that every new resource adheres to the project's security and tagging baseline.
 
-* **Maintaining Quality**: Resolving complex `pre-commit` and `tflint` interactions to keep the developer workflow frictionless but rigorous.
+* **Automating Governance**: Implementing a comprehensive "Hygiene" suite including `tflint`, `checkov`, `gitleaks`, and `terraform-compliance` to enforce security, documentation, and tagging standards automatically in CI/CD.
 
 ---
 
@@ -148,10 +210,10 @@ Epic E02 successfully matured the `infra-lab` infrastructure-as-code practices b
 
 * **State Integrity**: Verified `terraform.tfstate` is correctly stored and locked in AWS.
 
-* **Security Compliance**: All new modules pass `checkov` and `gitleaks` scans.
+* **Security Compliance**: All new modules pass `checkov`, `gitleaks`, and `terraform-compliance` scans.
 
-* **Provider Logic**: Confirmed `terraform plan` correctly interprets the `AssumeRole` configuration for target accounts.
+* **CI/CD Reliability**: Confirmed GitHub Actions correctly execute linting, security, and compliance checks on every Pull Request.
 
 ---
 
-_Prepared on 2026-03-06 by infra-lab AI Assistant._
+_Prepared on 2026-03-07 by infra-lab AI Assistant._
