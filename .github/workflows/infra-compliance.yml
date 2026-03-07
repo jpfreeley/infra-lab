@@ -1,0 +1,42 @@
+name: Terraform Compliance
+
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+
+jobs:
+  compliance:
+    name: Compliance Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install terraform-compliance
+        run: pip install terraform-compliance
+
+      - name: Terraform Init
+        working-directory: infra/live/shared
+        run: terraform init -backend=false
+
+      - name: Terraform Plan
+        working-directory: infra/live/shared
+        run: terraform plan -out=tfplan.binary -var="environment=dev" -var="target_role_arn=arn:aws:iam::551452024305:role/dummy-role"
+
+      - name: Convert Plan to JSON
+        working-directory: infra/live/shared
+        run: terraform show -json tfplan.binary > tfplan.json
+
+      - name: Run terraform-compliance
+        run: terraform-compliance --features infra/policy --planfile infra/live/shared/tfplan.json
