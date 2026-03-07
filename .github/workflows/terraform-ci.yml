@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - '**/*.tf'
+      - '.github/workflows/terraform-ci.yml'
   push:
     branches: [ main ]
     paths:
