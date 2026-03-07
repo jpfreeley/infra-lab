@@ -39,4 +39,4 @@ jobs:
         run: terraform show -json tfplan.binary > tfplan.json
 
       - name: Run terraform-compliance
-        run: terraform-compliance --features infra/policy --planfile infra/live/shared/tfplan.json
+        run: terraform-compliance --features infra/policy --planfile infra/live/shared/tfplan.json -out=tfplan.binary -var="environment=dev" -var="target_role_arn=arn:aws:iam::551452024305:role/dummy-role"
