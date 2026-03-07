@@ -18,6 +18,10 @@ repos:
         args:
           - --args=--quiet
           - --args=--framework terraform
+      - id: terraform_docs
+        args:
+          - --args=--config=infra/.terraform-docs.yml
+
   - repo: local
     hooks:
       - id: gitleaks
