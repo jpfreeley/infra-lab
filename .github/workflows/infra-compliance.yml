@@ -32,11 +32,11 @@ jobs:
 
       - name: Terraform Plan
         working-directory: infra/live/shared
-        run: terraform plan -out=tfplan.binary
+        run: terraform plan -out=tfplan.binary -var="environment=dev" -var="target_role_arn=arn:aws:iam::551452024305:role/dummy-role"
 
       - name: Convert Plan to JSON
         working-directory: infra/live/shared
         run: terraform show -json tfplan.binary > tfplan.json
 
       - name: Run terraform-compliance
-        run: terraform-compliance --features infra/policy --planfile infra/live/shared/tfplan.json -out=tfplan.binary -var="environment=dev" -var="target_role_arn=arn:aws:iam::551452024305:role/dummy-role"
+        run: terraform-compliance --features infra/policy --planfile infra/live/shared/tfplan.json
