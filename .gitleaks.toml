@@ -1,0 +1,8 @@
+[allowlist]
+description = "Global allowlist for infra-lab"
+paths = [
+    '''\.terraform/''',
+    '''\.terraform\.lock\.hcl''',
+    '''terraform\.tfstate''',
+    '''terraform\.tfstate\.backup'''
+]
