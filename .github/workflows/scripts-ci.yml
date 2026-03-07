@@ -5,11 +5,13 @@ on:
     branches: [ main ]
     paths:
       - 'scripts/**'
+      - '**/*.sh'
       - '.github/workflows/scripts-ci.yml'
   push:
     branches: [ main ]
     paths:
       - 'scripts/**'
+      - '**/*.sh'
 
 permissions:
   contents: read
