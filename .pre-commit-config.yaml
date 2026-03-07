@@ -25,5 +25,5 @@ repos:
     hooks:
       - id: gitleaks
         name: gitleaks
-        entry: gitleaks detect --verbose
+        entry: gitleaks detect --verbose --config .gitleaks.toml
         language: system
