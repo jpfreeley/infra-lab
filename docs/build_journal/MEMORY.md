@@ -1,3 +1,4 @@
+
 # [MEMORY.md](http://MEMORY.md)
 
 ## User Profile & Preferences
@@ -8,7 +9,7 @@
 
 * **Security Conscious**: Prefers official, corporate tooling from reputable sources only.
 
-* **Workflow Preference**: Uses GitHub CLI (`gh`) for all repo and PR operations.
+* **Workflow Preference**: Uses GitHub CLI (`gh`) for all repo/PR management.
 
 * **Security Stance**: Prefers strong encryption (KMS CMKs) and no random 3rd party tools.
 
@@ -27,6 +28,8 @@
 * **gitleaks**: Secret detection (Note: uses local hook due to macOS dyld compatibility).
 
 * **aws-cli**: AWS command line interface.
+
+* **terraform-compliance**: Moved from pre-commit to CI pipeline for plan-based compliance testing.
 
 ## Local Paths
 
@@ -62,9 +65,9 @@
 
 * **Source of Truth**: This file contains the full list of Epics and Stories used to drive the project.
 
-* **Current Epic**: E02
+* **Current Epic**: E03
 
-* **Current Story**: S003
+* **Current Story**: S001
 
 ## Repository & Workflow
 
