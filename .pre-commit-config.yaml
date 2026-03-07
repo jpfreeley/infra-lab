@@ -15,8 +15,6 @@ repos:
       - id: terraform_tflint
       - id: terraform_validate
       - id: terraform_checkov
-        args:
-          - --args=--config-file .checkov.yml
       - id: terraform_docs
         args:
           - --args=--config=infra/.terraform-docs.yml
