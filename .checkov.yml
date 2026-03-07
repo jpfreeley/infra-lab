@@ -1,0 +1,11 @@
+directory:
+  - .
+quiet: true
+soft-fail: false
+framework:
+  - terraform
+output:
+  - cli
+  - junitxml
+download-external-modules: true
+evaluate-variables: true
