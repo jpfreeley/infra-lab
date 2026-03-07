@@ -16,8 +16,7 @@ repos:
       - id: terraform_validate
       - id: terraform_checkov
         args:
-          - --args=--quiet
-          - --args=--framework terraform
+          - --args=--config-file .checkov.yml
       - id: terraform_docs
         args:
           - --args=--config=infra/.terraform-docs.yml
