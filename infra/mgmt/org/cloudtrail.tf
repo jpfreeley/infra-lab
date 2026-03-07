@@ -1,4 +1,6 @@
 # --- KMS Keys ---
+
+# 1. KMS Key for CloudTrail S3 Logs
 resource "aws_kms_key" "cloudtrail" {
   description             = "KMS key for Organization-wide CloudTrail"
   deletion_window_in_days = 30
@@ -15,10 +17,12 @@ resource "aws_kms_alias" "cloudtrail" {
   target_key_id = aws_kms_key.cloudtrail.key_id
 }
 
+# 2. KMS Key for CloudWatch Logs (CloudTrail Integration)
 resource "aws_kms_key" "cloudwatch" {
   description             = "KMS key for CloudTrail CloudWatch Logs"
   deletion_window_in_days = 30
   enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.kms_cloudwatch.json
 
   tags = {
     Name = "infra-lab-cloudwatch-cloudtrail-key"
@@ -30,7 +34,8 @@ resource "aws_kms_alias" "cloudwatch" {
   target_key_id = aws_kms_key.cloudwatch.key_id
 }
 
-# --- CloudWatch Logs ---
+# --- CloudWatch Logs Configuration ---
+
 resource "aws_cloudwatch_log_group" "cloudtrail" {
   name              = "/aws/cloudtrail/infra-lab-org-trail"
   retention_in_days = 365
@@ -71,7 +76,8 @@ resource "aws_iam_role_policy" "cloudtrail_cloudwatch_policy" {
   })
 }
 
-# --- CloudTrail ---
+# --- CloudTrail Resource ---
+
 resource "aws_cloudtrail" "org_trail" {
   # checkov:skip=CKV_AWS_252:SNS topic not required for this architectural stage
   name                          = "infra-lab-org-trail"
@@ -91,9 +97,10 @@ resource "aws_cloudtrail" "org_trail" {
   ]
 }
 
-# --- KMS Policy ---
-data "aws_iam_policy_document" "cloudtrail_kms" {
-  # 1. Allow Management Account Root (Full Access)
+# --- IAM Policy Documents (KMS) ---
+
+# Policy for CloudWatch Logs KMS Key
+data "aws_iam_policy_document" "kms_cloudwatch" {
   statement {
     # checkov:skip=CKV_AWS_111:Root principal requires full access to prevent lockout
     # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
@@ -108,7 +115,41 @@ data "aws_iam_policy_document" "cloudtrail_kms" {
     resources = ["*"]
   }
 
-  # 2. Allow CloudTrail Service to Encrypt
+  statement {
+    # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
+    sid    = "Allow CloudWatch Logs to use the key"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["logs.us-east-1.amazonaws.com"]
+    }
+    actions = [
+      "kms:Encrypt*",
+      "kms:Decrypt*",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:Describe*"
+    ]
+    resources = ["*"]
+  }
+}
+
+# Policy for CloudTrail S3 KMS Key
+data "aws_iam_policy_document" "cloudtrail_kms" {
+  statement {
+    # checkov:skip=CKV_AWS_111:Root principal requires full access to prevent lockout
+    # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
+    # checkov:skip=CKV_AWS_109:Root principal requires management permissions
+    sid    = "Enable IAM User Permissions"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::551452024305:root"]
+    }
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
   statement {
     # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
     sid    = "Allow CloudTrail to encrypt logs"
@@ -126,7 +167,6 @@ data "aws_iam_policy_document" "cloudtrail_kms" {
     }
   }
 
-  # 3. Allow Log-Archive Account to Describe/Decrypt (Required for cross-account S3 delivery)
   statement {
     # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
     sid    = "Allow Log Archive Account Access"
