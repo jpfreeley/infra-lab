@@ -1,4 +1,4 @@
-# KMS Key for Organization-wide CloudTrail
+# --- KMS Keys ---
 resource "aws_kms_key" "cloudtrail" {
   description             = "KMS key for Organization-wide CloudTrail"
   deletion_window_in_days = 30
@@ -15,7 +15,63 @@ resource "aws_kms_alias" "cloudtrail" {
   target_key_id = aws_kms_key.cloudtrail.key_id
 }
 
-# Organization CloudTrail
+resource "aws_kms_key" "cloudwatch" {
+  description             = "KMS key for CloudTrail CloudWatch Logs"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+
+  tags = {
+    Name = "infra-lab-cloudwatch-cloudtrail-key"
+  }
+}
+
+resource "aws_kms_alias" "cloudwatch" {
+  name          = "alias/cloudwatch-cloudtrail"
+  target_key_id = aws_kms_key.cloudwatch.key_id
+}
+
+# --- CloudWatch Logs ---
+resource "aws_cloudwatch_log_group" "cloudtrail" {
+  name              = "/aws/cloudtrail/infra-lab-org-trail"
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.cloudwatch.arn
+}
+
+resource "aws_iam_role" "cloudtrail_cloudwatch_role" {
+  name = "infra-lab-cloudtrail-cloudwatch-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "cloudtrail.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "cloudtrail_cloudwatch_policy" {
+  name = "infra-lab-cloudtrail-cloudwatch-policy"
+  role = aws_iam_role.cloudtrail_cloudwatch_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:PutLogEvents",
+          "logs:CreateLogStream"
+        ]
+        Resource = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
+      }
+    ]
+  })
+}
+
+# --- CloudTrail ---
 resource "aws_cloudtrail" "org_trail" {
   # checkov:skip=CKV_AWS_252:SNS topic not required for this architectural stage
   name                          = "infra-lab-org-trail"
@@ -27,12 +83,15 @@ resource "aws_cloudtrail" "org_trail" {
   enable_log_file_validation    = true
   kms_key_id                    = aws_kms_key.cloudtrail.arn
 
+  cloud_watch_logs_group_arn = aws_cloudwatch_log_group.cloudtrail.arn
+  cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch_role.arn
+
   depends_on = [
     aws_organizations_organization.org
   ]
 }
 
-# KMS Policy to allow CloudTrail service to use the key
+# --- KMS Policy ---
 data "aws_iam_policy_document" "cloudtrail_kms" {
   # 1. Allow Management Account Root (Full Access)
   statement {
