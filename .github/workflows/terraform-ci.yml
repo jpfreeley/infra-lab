@@ -3,8 +3,12 @@ name: "Terraform CI"
 on:
   pull_request:
     branches: [ main ]
+    paths:
+      - '**/*.tf'
   push:
     branches: [ main ]
+    paths:
+      - '**/*.tf'
 
 # Explicitly set minimal permissions for the GITHUB_TOKEN
 permissions:
