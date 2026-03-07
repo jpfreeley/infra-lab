@@ -24,3 +24,8 @@ rule "terraform_naming_convention" {
 rule "terraform_unused_declarations" {
   enabled = true
 }
+
+# Enforce that all modules from a registry have a version specified
+rule "terraform_module_pinned_source" {
+  enabled = true
+}
