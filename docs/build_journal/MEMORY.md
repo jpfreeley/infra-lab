@@ -1,4 +1,3 @@
-
 # [MEMORY.md](http://MEMORY.md)
 
 ## User Profile & Preferences
@@ -65,9 +64,9 @@
 
 * **Source of Truth**: This file contains the full list of Epics and Stories used to drive the project.
 
-* **Current Epic**: E02
+* **Current Epic**: E03
 
-* **Current Story**: S003
+* **Current Story**: S009 (Define and attach SCPs)
 
 ## Repository & Workflow
 
@@ -121,43 +120,55 @@
 
 ### Infrastructure & Governance Notes
 
-* **Control Tower Manifest Limitations**:
-  The `aws_controltower_landing_zone` Terraform resource manifest strictly manages Landing Zone configuration such as governed regions and logging. It **does not support** managing Organizational Units (OUs) or Service Control Policies (SCPs).
+* **Control Tower Manifest Limitations**:\
+  The `aws_controltower_landing_zone` Terraform resource manifest strictly manages Landing Zone configuration such as governed regions and logging. It **does not support** managing Organizational Units (OUs) or Service Control Policies (SCPs).\
   OUs must be managed separately using native `aws_organizations_organizational_unit` Terraform resources.
 
-* **Organizational Units (OUs)**:
+* **Organizational Units (OUs)**:\
   Created and managed via `aws_organizations_organizational_unit` resources to define account boundaries and governance domains.
 
-* **Service Principals for Control Tower**:
+* **Service Principals for Control Tower**:\
   The AWS Organization must enable the service principal `member.org.stacksets.cloudformation.amazonaws.com` to support Control Tower Account Factory operations. This is a required addition to the `aws_organizations_organization` resource to avoid drift.
 
 ### Tooling & CI/CD Notes
 
-* **Checkov Pre-commit Hook**:
-  The `terraform_checkov` hook from `antonbabenko/pre-commit-terraform` (v1.105.0) does **not** support passing a config file via `--config-file` argument in `args`.
+* **Checkov Pre-commit Hook**:\
+  The `terraform_checkov` hook from `antonbabenko/pre-commit-terraform` (v1.105.0) does **not** support passing a config file via `--config-file` argument in `args`.\
   The `.checkov.yml` configuration file must be placed in the repository root for automatic discovery by Checkov.
 
-* **TFLint Hygiene**:
+* **TFLint Hygiene**:\
   Maintain a zero-warning policy. Remove unused Terraform declarations such as `data "aws_caller_identity" "current"` immediately to keep CI signals clean and avoid noise.
 
 ### Lessons Learned
 
 * Attempting to manage OUs via the Control Tower manifest results in API validation errors. Always use native AWS Organizations resources for OU management.
+
 * The Control Tower Landing Zone resource requires precise manifest JSON matching the AWS API schema; deviations cause update failures.
+
 * Pre-commit hooks can have subtle argument parsing issues; always verify hook documentation and test locally.
+
 * Service principals required by AWS services like Control Tower must be explicitly declared in Terraform to prevent drift.
+
 * Remote Terraform state backend configuration with S3 and DynamoDB locking is critical for multi-account deployments and must be verified after bootstrap.
+
 * **Graph Checks**: Checkov `CKV2` checks require a full directory context (`-d`) to resolve relationships between resources (e.g., Org vs. Detector).
+
 * **Hook Limitations**: The `terraform_checkov` pre-commit hook does not support the `--config-file` argument; it relies on auto-discovery of `.checkov.yml` in the root.
+
 * **Delegated Admin Pattern**: In a multi-account setup, the Management account detector exists primarily to facilitate delegation; the actual Org configuration happens via the Delegated Admin provider.
 
 ### Current Project State Update
 
 * **Current Epic**: E03 (AWS Organization + Control Tower)
+
 * **Current Story**: S004 (Enable CloudTrail Organization Trail)
+
 * **Completed in E03**:
+
   * S001: Org Bootstrap + Remote State Import.
+
   * S002: Control Tower LZ v4.0 Import & Alignment.
+
   * S003: Core OU Structure (Security, Infrastructure, Workloads, Sandbox).
 
 ---
@@ -165,11 +176,17 @@
 ## Recent Learnings and Session Notes (2026-03-07)
 
 * GuardDuty delegation successfully transferred to Log Archive account (172134854767).
+
 * CloudTrail CloudWatch Logs integration blocked by persistent `InvalidCloudWatchLogsLogGroupArnException`.
+
 * Identified that the AWSServiceRoleForCloudTrail SLR requires explicit KMS permissions.
+
 * Workaround implemented: CloudTrail running in S3-only mode with CloudWatch Logs integration commented out.
+
 * No SCPs or permission boundaries blocking the current setup.
+
 * Terraform state updated to reflect current GuardDuty delegation.
+
 * Pending: Open AWS Support case to resolve CloudTrail validation issue.
 
 ### Documented Exceptions
@@ -179,9 +196,13 @@
 ## Recent Work Completed (2026-03-08)
 
 * Successfully enabled GuardDuty delegated administrator account configuration using a dedicated provider alias for the Log Archive account.
+
 * Corrected GuardDuty organization configuration resource to use the delegated admin's detector ID.
-* Fixed CloudTrail CloudWatch Logs integration by explicitly including the ':*' suffix in the log group ARN.
+
+* Fixed CloudTrail CloudWatch Logs integration by explicitly including the ':\*' suffix in the log group ARN.
+
 * Updated IAM role policy to match the explicit CloudWatch Logs ARN pattern.
+
 * Verified successful Terraform apply with no errors.
 
 This resolves the previous issues with GuardDuty delegation and CloudTrail logging integration.
@@ -193,18 +214,59 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 ### Infrastructure & Security Progress (Epic E03)
 
 * **GuardDuty (S007)**: Successfully configured GuardDuty detectors in Management account (`us-east-1` and `us-west-2`).
+
 * **Delegated Administration**: Established delegation to the Security/Log Archive account (`172134854767`).
+
 * **Org Configuration**: Enabled organization-wide GuardDuty with S3, Kubernetes, and Malware protection data sources auto-enabled for all members.
+
 * **Finding Frequency**: Updated `finding_publishing_frequency` to `FIFTEEN_MINUTES` to meet security best practices and resolve `CKV2_AWS_3`.
 
 ### Tooling & CI/CD Alignment
 
 * **Checkov Consistency**: Aligned local `pre-commit` with GitHub Actions by forcing `--directory=infra/` and `--framework=terraform` in `.pre-commit-config.yaml`.
+
 * **Checkov Configuration**: Confirmed `.checkov.yml` in the root is the "Single Source of Truth" for both local and CI scans.
+
 * **Policy Suppression**: Applied `checkov:skip=CKV2_AWS_3` to Management account detectors with clear documentation, acknowledging the delegated administration model.
+
 * **Credential Management**: Resolved `ExpiredToken` errors by refreshing AWS SSO/STS sessions for the `infra-lab` profile.
 
 ### Next Steps
 
-* **Epic E03 / Story S008**: Enable Security Hub and delegate administration to the Security/Log Archive account.
-* **Epic E03 / Story S004**: Finalize and verify the CloudTrail Organization Trail.
+* **Epic E03 / Story S009**: Define and attach SCPs (deny IAM users, deny disabling logs/config, deny leaving org).
+
+* **Epic E03 / Story S010**: Configure IAM Identity Center.
+
+---
+
+## Session Update: 2026-03-08 (Security Hub & CloudTrail Finalization)
+
+### Infrastructure & Security Progress (Epic E03)
+
+* **Security Hub (S008)**:
+
+  * Successfully enabled Security Hub and delegated administration to the Audit account (`881413600100`).
+
+  * Enabled "AWS Foundational Security Best Practices" and "CIS AWS Foundations Benchmark" standards.
+
+  * **Finding Aggregator**: Configured organization-wide finding aggregation in the Audit account with `linking_mode = "ALL_REGIONS"`.
+
+  * **Provider Architecture**: Implemented a provider-split model where the Management account manages its own standards while the Audit account manages organization-wide configuration.
+
+* **CloudTrail (S004)**:
+
+  * Verified Organization Trail is correctly logging to the centralized S3 bucket in the Log Archive account.
+
+  * Confirmed KMS encryption using the Management account CMK is functional and delivery is successful.
+
+### Lessons Learned
+
+* **Security Hub Delegation**: Once administration is delegated, the Management account can no longer manage organization-wide configuration. However, the Audit account (Delegated Admin) cannot manage standards _inside_ the Management account. A dual-provider approach is required in Terraform.
+
+* **CloudTrail KMS**: CloudTrail Organization Trails can use a KMS key in the Management account to encrypt logs delivered to a bucket in a different account, provided the bucket and key policies are correctly aligned.
+
+### Tooling & CI/CD Notes
+
+* **Checkov Compliance**: Added `checkov:skip=CKV_AWS_274` for the `AdministratorAccess` policy attachment in `audit_role.tf` to acknowledge the requirement for full administrative permissions for the delegated security role.
+
+* **TFLint**: Addressed unused variable warnings to maintain a clean CI signal.
