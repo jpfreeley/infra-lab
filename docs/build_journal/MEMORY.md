@@ -147,6 +147,10 @@
 * Pre-commit hooks can have subtle argument parsing issues; always verify hook documentation and test locally.
 * Service principals required by AWS services like Control Tower must be explicitly declared in Terraform to prevent drift.
 * Remote Terraform state backend configuration with S3 and DynamoDB locking is critical for multi-account deployments and must be verified after bootstrap.
+* **Graph Checks**: Checkov `CKV2` checks require a full directory context (`-d`) to resolve relationships between resources (e.g., Org vs. Detector).
+* **Hook Limitations**: The `terraform_checkov` pre-commit hook does not support the `--config-file` argument; it relies on auto-discovery of `.checkov.yml` in the root.
+* **Delegated Admin Pattern**: In a multi-account setup, the Management account detector exists primarily to facilitate delegation; the actual Org configuration happens via the Delegated Admin provider.
+
 
 ### Current Project State Update
 
@@ -200,12 +204,6 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 * **Checkov Configuration**: Confirmed `.checkov.yml` in the root is the "Single Source of Truth" for both local and CI scans.
 * **Policy Suppression**: Applied `checkov:skip=CKV2_AWS_3` to Management account detectors with clear documentation, acknowledging the delegated administration model.
 * **Credential Management**: Resolved `ExpiredToken` errors by refreshing AWS SSO/STS sessions for the `infra-lab` profile.
-
-### Lessons Learned
-
-* **Graph Checks**: Checkov `CKV2` checks require a full directory context (`-d`) to resolve relationships between resources (e.g., Org vs. Detector).
-* **Hook Limitations**: The `terraform_checkov` pre-commit hook does not support the `--config-file` argument; it relies on auto-discovery of `.checkov.yml` in the root.
-* **Delegated Admin Pattern**: In a multi-account setup, the Management account detector exists primarily to facilitate delegation; the actual Org configuration happens via the Delegated Admin provider.
 
 ### Next Steps
 
