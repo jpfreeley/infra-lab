@@ -89,8 +89,9 @@ resource "aws_cloudtrail" "org_trail" {
   enable_log_file_validation    = true
   kms_key_id                    = aws_kms_key.cloudtrail.arn
 
-  # Explicitly including the :* suffix
-  cloud_watch_logs_group_arn = "arn:aws:logs:us-east-1:551452024305:log-group:/aws/cloudtrail/infra-lab-org-trail:*"
+  # Reference the resource directly to satisfy Checkov CKV2_AWS_10
+  # The :* suffix is required by the CloudTrail API
+  cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
   cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch_role.arn
 
   depends_on = [
@@ -113,7 +114,7 @@ data "aws_iam_policy_document" "kms_cloudwatch" {
       "kms:GenerateDataKey*",
       "kms:Decrypt"
     ]
-    resources = ["*"]
+    resources = ["*"] # Fixed Cycle
   }
 
   statement {
@@ -160,7 +161,7 @@ data "aws_iam_policy_document" "kms_cloudwatch" {
       "kms:GenerateDataKey*",
       "kms:Decrypt"
     ]
-    resources = ["*"]
+    resources = ["*"] # Fixed Cycle
   }
 }
 
@@ -188,7 +189,7 @@ data "aws_iam_policy_document" "cloudtrail_kms" {
       identifiers = ["cloudtrail.amazonaws.com"]
     }
     actions   = ["kms:GenerateDataKey*", "kms:Decrypt"]
-    resources = ["*"]
+    resources = ["*"] # Fixed Cycle
     condition {
       test     = "StringLike"
       variable = "kms:EncryptionContext:aws:cloudtrail:arn"
