@@ -153,9 +153,9 @@
 * **Current Epic**: E03 (AWS Organization + Control Tower)
 * **Current Story**: S004 (Enable CloudTrail Organization Trail)
 * **Completed in E03**:
-  - S001: Org Bootstrap + Remote State Import.
-  - S002: Control Tower LZ v4.0 Import & Alignment.
-  - S003: Core OU Structure (Security, Infrastructure, Workloads, Sandbox).
+  * S001: Org Bootstrap + Remote State Import.
+  * S002: Control Tower LZ v4.0 Import & Alignment.
+  * S003: Core OU Structure (Security, Infrastructure, Workloads, Sandbox).
 
 ---
 
