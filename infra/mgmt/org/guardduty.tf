@@ -13,12 +13,14 @@ resource "aws_guardduty_detector" "log_archive_replica" {
 }
 
 resource "aws_guardduty_detector" "mgmt" {
-  enable = true
+  enable                       = true
+  finding_publishing_frequency = "FIFTEEN_MINUTES"
 }
 
 resource "aws_guardduty_detector" "mgmt_replica" {
-  provider = aws.replica
-  enable   = true
+  provider                     = aws.replica
+  enable                       = true
+  finding_publishing_frequency = "FIFTEEN_MINUTES"
 }
 
 # 2. Delegate GuardDuty Administration to the Log Archive Account
