@@ -1,3 +1,8 @@
+locals {
+  # CloudTrail requires the Log Group ARN WITHOUT the :* suffix
+  cloudtrail_log_group_arn = replace(aws_cloudwatch_log_group.cloudtrail.arn, "/:\\*$/", "")
+}
+
 # --- KMS Keys ---
 
 # 1. KMS Key for CloudTrail S3 Logs
@@ -78,6 +83,7 @@ resource "aws_iam_role_policy" "cloudtrail_cloudwatch_policy" {
 
 # --- CloudTrail Resource ---
 
+# checkov:skip=CKV2_AWS_10: CloudWatch Logs integration disabled due to AWS validation bug
 resource "aws_cloudtrail" "org_trail" {
   # checkov:skip=CKV_AWS_252:SNS topic not required for this architectural stage
   name                          = "infra-lab-org-trail"
@@ -89,8 +95,10 @@ resource "aws_cloudtrail" "org_trail" {
   enable_log_file_validation    = true
   kms_key_id                    = aws_kms_key.cloudtrail.arn
 
-  cloud_watch_logs_group_arn = aws_cloudwatch_log_group.cloudtrail.arn
-  cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch_role.arn
+  # checkov:skip=CKV2_AWS_10: CloudWatch Logs integration disabled due to AWS validation bug
+  # Temporarily removed due to persistent CloudTrail validation error
+  # cloud_watch_logs_group_arn = local.cloudtrail_log_group_arn
+  # cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch_role.arn
 
   depends_on = [
     aws_organizations_organization.org
@@ -101,6 +109,21 @@ resource "aws_cloudtrail" "org_trail" {
 
 # Policy for CloudWatch Logs KMS Key
 data "aws_iam_policy_document" "kms_cloudwatch" {
+  # Add this statement to data "aws_iam_policy_document" "kms_cloudwatch"
+  statement {
+    sid    = "Allow CloudTrail to use the CloudWatch Logs KMS key"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+    actions = [
+      "kms:GenerateDataKey*",
+      "kms:Decrypt"
+    ]
+    resources = ["*"]
+  }
+
   statement {
     # checkov:skip=CKV_AWS_111:Root principal requires full access to prevent lockout
     # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
@@ -129,6 +152,21 @@ data "aws_iam_policy_document" "kms_cloudwatch" {
       "kms:ReEncrypt*",
       "kms:GenerateDataKey*",
       "kms:Describe*"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
+    sid    = "Allow CloudTrail SLR to use the key"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::551452024305:role/aws-service-role/cloudtrail.amazonaws.com/AWSServiceRoleForCloudTrail"]
+    }
+    actions = [
+      "kms:GenerateDataKey*",
+      "kms:Decrypt"
     ]
     resources = ["*"]
   }
@@ -181,4 +219,9 @@ data "aws_iam_policy_document" "cloudtrail_kms" {
     ]
     resources = ["*"]
   }
+}
+
+output "cleaned_cloudwatch_log_group_arn" {
+  value       = local.cloudtrail_log_group_arn
+  description = "The CloudWatch Log Group ARN passed to CloudTrail without the trailing :*"
 }

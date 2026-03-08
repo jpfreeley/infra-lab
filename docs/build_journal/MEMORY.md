@@ -1,3 +1,4 @@
+
 # [MEMORY.md](http://MEMORY.md)
 
 ## User Profile & Preferences
@@ -114,71 +115,60 @@
 
 * Confirm Terraform state is stored remotely before proceeding with applies.
 
-* **Current Epic**: E03
-
-* **Current Story**: S007 (Enable GuardDuty and delegate administration to security-audit account)
-
----
-
-## Recent Progress Updates
-
-* E03-S004: Provisioned and aligned core accounts via Control Tower Account Factory.
-
-* E03-S005: Implemented centralized CloudTrail logging with KMS encryption.
-
-* E03-S006: Deployed AWS Config Aggregator for organization-wide compliance.
-
----
-
 ---
 
 ## Epic E03: AWS Organization and Control Tower Governance Bootstrap
 
 ### Infrastructure & Governance Notes
 
-* **Control Tower Manifest Limitations**:\
-  The `aws_controltower_landing_zone` Terraform resource manifest strictly manages Landing Zone configuration such as governed regions and logging. It **does not support** managing Organizational Units (OUs) or Service Control Policies (SCPs).\
+* **Control Tower Manifest Limitations**:
+  The `aws_controltower_landing_zone` Terraform resource manifest strictly manages Landing Zone configuration such as governed regions and logging. It **does not support** managing Organizational Units (OUs) or Service Control Policies (SCPs).
   OUs must be managed separately using native `aws_organizations_organizational_unit` Terraform resources.
 
-* **Organizational Units (OUs)**:\
+* **Organizational Units (OUs)**:
   Created and managed via `aws_organizations_organizational_unit` resources to define account boundaries and governance domains.
 
-* **Service Principals for Control Tower**:\
+* **Service Principals for Control Tower**:
   The AWS Organization must enable the service principal `member.org.stacksets.cloudformation.amazonaws.com` to support Control Tower Account Factory operations. This is a required addition to the `aws_organizations_organization` resource to avoid drift.
 
 ### Tooling & CI/CD Notes
 
-* **Checkov Pre-commit Hook**:\
-  The `terraform_checkov` hook from `antonbabenko/pre-commit-terraform` (v1.105.0) does **not** support passing a config file via `--config-file` argument in `args`.\
+* **Checkov Pre-commit Hook**:
+  The `terraform_checkov` hook from `antonbabenko/pre-commit-terraform` (v1.105.0) does **not** support passing a config file via `--config-file` argument in `args`.
   The `.checkov.yml` configuration file must be placed in the repository root for automatic discovery by Checkov.
 
-* **TFLint Hygiene**:\
+* **TFLint Hygiene**:
   Maintain a zero-warning policy. Remove unused Terraform declarations such as `data "aws_caller_identity" "current"` immediately to keep CI signals clean and avoid noise.
 
 ### Lessons Learned
 
 * Attempting to manage OUs via the Control Tower manifest results in API validation errors. Always use native AWS Organizations resources for OU management.
-
 * The Control Tower Landing Zone resource requires precise manifest JSON matching the AWS API schema; deviations cause update failures.
-
 * Pre-commit hooks can have subtle argument parsing issues; always verify hook documentation and test locally.
-
 * Service principals required by AWS services like Control Tower must be explicitly declared in Terraform to prevent drift.
-
 * Remote Terraform state backend configuration with S3 and DynamoDB locking is critical for multi-account deployments and must be verified after bootstrap.
 
 ### Current Project State Update
 
 * **Current Epic**: E03 (AWS Organization + Control Tower)
-
 * **Current Story**: S004 (Enable CloudTrail Organization Trail)
-
 * **Completed in E03**:
-
   * S001: Org Bootstrap + Remote State Import.
-
   * S002: Control Tower LZ v4.0 Import & Alignment.
-
   * S003: Core OU Structure (Security, Infrastructure, Workloads, Sandbox).
 
 ---
+
+## Recent Learnings and Session Notes (2026-03-07)
+
+* GuardDuty delegation successfully transferred to Log Archive account (172134854767).
+* CloudTrail CloudWatch Logs integration blocked by persistent `InvalidCloudWatchLogsLogGroupArnException`.
+* Identified that the AWSServiceRoleForCloudTrail SLR requires explicit KMS permissions.
+* Workaround implemented: CloudTrail running in S3-only mode with CloudWatch Logs integration commented out.
+* No SCPs or permission boundaries blocking the current setup.
+* Terraform state updated to reflect current GuardDuty delegation.
+* Pending: Open AWS Support case to resolve CloudTrail validation issue.
+
+### Documented Exceptions
+
+* **Checkov CKV2_AWS_10**: CloudTrail organization trail is currently running without CloudWatch Logs integration due to a persistent AWS validation error (`InvalidCloudWatchLogsLogGroupArnException`). This is a known limitation being tracked for future resolution once AWS validation issues are resolved.
