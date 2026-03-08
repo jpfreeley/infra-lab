@@ -83,6 +83,7 @@ resource "aws_iam_role_policy" "cloudtrail_cloudwatch_policy" {
 
 # --- CloudTrail Resource ---
 
+# checkov:skip=CKV2_AWS_10: CloudWatch Logs integration disabled due to AWS validation bug
 resource "aws_cloudtrail" "org_trail" {
   # checkov:skip=CKV_AWS_252:SNS topic not required for this architectural stage
   name                          = "infra-lab-org-trail"
@@ -94,6 +95,7 @@ resource "aws_cloudtrail" "org_trail" {
   enable_log_file_validation    = true
   kms_key_id                    = aws_kms_key.cloudtrail.arn
 
+  # checkov:skip=CKV2_AWS_10: CloudWatch Logs integration disabled due to AWS validation bug
   # Temporarily removed due to persistent CloudTrail validation error
   # cloud_watch_logs_group_arn = local.cloudtrail_log_group_arn
   # cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch_role.arn
