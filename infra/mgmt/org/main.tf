@@ -3,6 +3,7 @@ resource "aws_organizations_organization" "org" {
     "controltower.amazonaws.com",
     "iam.amazonaws.com",
     "sso.amazonaws.com",
+    "securityhub.amazonaws.com",
     "cloudtrail.amazonaws.com",
     "config.amazonaws.com",
     "member.org.stacksets.cloudformation.amazonaws.com",
