@@ -147,6 +147,9 @@
 * Pre-commit hooks can have subtle argument parsing issues; always verify hook documentation and test locally.
 * Service principals required by AWS services like Control Tower must be explicitly declared in Terraform to prevent drift.
 * Remote Terraform state backend configuration with S3 and DynamoDB locking is critical for multi-account deployments and must be verified after bootstrap.
+* **Graph Checks**: Checkov `CKV2` checks require a full directory context (`-d`) to resolve relationships between resources (e.g., Org vs. Detector).
+* **Hook Limitations**: The `terraform_checkov` pre-commit hook does not support the `--config-file` argument; it relies on auto-discovery of `.checkov.yml` in the root.
+* **Delegated Admin Pattern**: In a multi-account setup, the Management account detector exists primarily to facilitate delegation; the actual Org configuration happens via the Delegated Admin provider.
 
 ### Current Project State Update
 
@@ -159,6 +162,20 @@
 
 ---
 
+## Recent Learnings and Session Notes (2026-03-07)
+
+* GuardDuty delegation successfully transferred to Log Archive account (172134854767).
+* CloudTrail CloudWatch Logs integration blocked by persistent `InvalidCloudWatchLogsLogGroupArnException`.
+* Identified that the AWSServiceRoleForCloudTrail SLR requires explicit KMS permissions.
+* Workaround implemented: CloudTrail running in S3-only mode with CloudWatch Logs integration commented out.
+* No SCPs or permission boundaries blocking the current setup.
+* Terraform state updated to reflect current GuardDuty delegation.
+* Pending: Open AWS Support case to resolve CloudTrail validation issue.
+
+### Documented Exceptions
+
+* **Checkov CKV2_AWS_10**: CloudTrail organization trail is currently running without CloudWatch Logs integration due to a persistent AWS validation error (`InvalidCloudWatchLogsLogGroupArnException`). This is a known limitation being tracked for future resolution once AWS validation issues are resolved.
+
 ## Recent Work Completed (2026-03-08)
 
 * Successfully enabled GuardDuty delegated administrator account configuration using a dedicated provider alias for the Log Archive account.
@@ -168,3 +185,26 @@
 * Verified successful Terraform apply with no errors.
 
 This resolves the previous issues with GuardDuty delegation and CloudTrail logging integration.
+
+---
+
+## Session Update: 2026-03-08
+
+### Infrastructure & Security Progress (Epic E03)
+
+* **GuardDuty (S007)**: Successfully configured GuardDuty detectors in Management account (`us-east-1` and `us-west-2`).
+* **Delegated Administration**: Established delegation to the Security/Log Archive account (`172134854767`).
+* **Org Configuration**: Enabled organization-wide GuardDuty with S3, Kubernetes, and Malware protection data sources auto-enabled for all members.
+* **Finding Frequency**: Updated `finding_publishing_frequency` to `FIFTEEN_MINUTES` to meet security best practices and resolve `CKV2_AWS_3`.
+
+### Tooling & CI/CD Alignment
+
+* **Checkov Consistency**: Aligned local `pre-commit` with GitHub Actions by forcing `--directory=infra/` and `--framework=terraform` in `.pre-commit-config.yaml`.
+* **Checkov Configuration**: Confirmed `.checkov.yml` in the root is the "Single Source of Truth" for both local and CI scans.
+* **Policy Suppression**: Applied `checkov:skip=CKV2_AWS_3` to Management account detectors with clear documentation, acknowledging the delegated administration model.
+* **Credential Management**: Resolved `ExpiredToken` errors by refreshing AWS SSO/STS sessions for the `infra-lab` profile.
+
+### Next Steps
+
+* **Epic E03 / Story S008**: Enable Security Hub and delegate administration to the Security/Log Archive account.
+* **Epic E03 / Story S004**: Finalize and verify the CloudTrail Organization Trail.
