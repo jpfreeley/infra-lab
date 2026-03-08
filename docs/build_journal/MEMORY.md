@@ -151,7 +151,6 @@
 * **Hook Limitations**: The `terraform_checkov` pre-commit hook does not support the `--config-file` argument; it relies on auto-discovery of `.checkov.yml` in the root.
 * **Delegated Admin Pattern**: In a multi-account setup, the Management account detector exists primarily to facilitate delegation; the actual Org configuration happens via the Delegated Admin provider.
 
-
 ### Current Project State Update
 
 * **Current Epic**: E03 (AWS Organization + Control Tower)
