@@ -188,22 +188,26 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 ## Session Update: 2026-03-08
 
 ### Infrastructure & Security Progress (Epic E03)
+
 * **GuardDuty (S007)**: Successfully configured GuardDuty detectors in Management account (`us-east-1` and `us-west-2`).
 * **Delegated Administration**: Established delegation to the Security/Log Archive account (`172134854767`).
 * **Org Configuration**: Enabled organization-wide GuardDuty with S3, Kubernetes, and Malware protection data sources auto-enabled for all members.
 * **Finding Frequency**: Updated `finding_publishing_frequency` to `FIFTEEN_MINUTES` to meet security best practices and resolve `CKV2_AWS_3`.
 
 ### Tooling & CI/CD Alignment
+
 * **Checkov Consistency**: Aligned local `pre-commit` with GitHub Actions by forcing `--directory=infra/` and `--framework=terraform` in `.pre-commit-config.yaml`.
 * **Checkov Configuration**: Confirmed `.checkov.yml` in the root is the "Single Source of Truth" for both local and CI scans.
 * **Policy Suppression**: Applied `checkov:skip=CKV2_AWS_3` to Management account detectors with clear documentation, acknowledging the delegated administration model.
 * **Credential Management**: Resolved `ExpiredToken` errors by refreshing AWS SSO/STS sessions for the `infra-lab` profile.
 
 ### Lessons Learned
+
 * **Graph Checks**: Checkov `CKV2` checks require a full directory context (`-d`) to resolve relationships between resources (e.g., Org vs. Detector).
 * **Hook Limitations**: The `terraform_checkov` pre-commit hook does not support the `--config-file` argument; it relies on auto-discovery of `.checkov.yml` in the root.
 * **Delegated Admin Pattern**: In a multi-account setup, the Management account detector exists primarily to facilitate delegation; the actual Org configuration happens via the Delegated Admin provider.
 
 ### Next Steps
+
 * **Epic E03 / Story S008**: Enable Security Hub and delegate administration to the Security/Log Archive account.
 * **Epic E03 / Story S004**: Finalize and verify the CloudTrail Organization Trail.
