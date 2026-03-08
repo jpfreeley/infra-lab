@@ -159,16 +159,12 @@
 
 ---
 
-## Recent Learnings and Session Notes (2026-03-07)
+## Recent Work Completed (2026-03-08)
 
-* GuardDuty delegation successfully transferred to Log Archive account (172134854767).
-* CloudTrail CloudWatch Logs integration blocked by persistent `InvalidCloudWatchLogsLogGroupArnException`.
-* Identified that the AWSServiceRoleForCloudTrail SLR requires explicit KMS permissions.
-* Workaround implemented: CloudTrail running in S3-only mode with CloudWatch Logs integration commented out.
-* No SCPs or permission boundaries blocking the current setup.
-* Terraform state updated to reflect current GuardDuty delegation.
-* Pending: Open AWS Support case to resolve CloudTrail validation issue.
+* Successfully enabled GuardDuty delegated administrator account configuration using a dedicated provider alias for the Log Archive account.
+* Corrected GuardDuty organization configuration resource to use the delegated admin's detector ID.
+* Fixed CloudTrail CloudWatch Logs integration by explicitly including the ':*' suffix in the log group ARN.
+* Updated IAM role policy to match the explicit CloudWatch Logs ARN pattern.
+* Verified successful Terraform apply with no errors.
 
-### Documented Exceptions
-
-* **Checkov CKV2_AWS_10**: CloudTrail organization trail is currently running without CloudWatch Logs integration due to a persistent AWS validation error (`InvalidCloudWatchLogsLogGroupArnException`). This is a known limitation being tracked for future resolution once AWS validation issues are resolved.
+This resolves the previous issues with GuardDuty delegation and CloudTrail logging integration.

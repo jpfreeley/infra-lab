@@ -1,8 +1,3 @@
-locals {
-  # CloudTrail requires the Log Group ARN WITHOUT the :* suffix
-  cloudtrail_log_group_arn = replace(aws_cloudwatch_log_group.cloudtrail.arn, "/:\\*$/", "")
-}
-
 # --- KMS Keys ---
 
 # 1. KMS Key for CloudTrail S3 Logs
@@ -83,7 +78,6 @@ resource "aws_iam_role_policy" "cloudtrail_cloudwatch_policy" {
 
 # --- CloudTrail Resource ---
 
-# checkov:skip=CKV2_AWS_10: CloudWatch Logs integration disabled due to AWS validation bug
 resource "aws_cloudtrail" "org_trail" {
   # checkov:skip=CKV_AWS_252:SNS topic not required for this architectural stage
   name                          = "infra-lab-org-trail"
@@ -95,10 +89,9 @@ resource "aws_cloudtrail" "org_trail" {
   enable_log_file_validation    = true
   kms_key_id                    = aws_kms_key.cloudtrail.arn
 
-  # checkov:skip=CKV2_AWS_10: CloudWatch Logs integration disabled due to AWS validation bug
-  # Temporarily removed due to persistent CloudTrail validation error
-  # cloud_watch_logs_group_arn = local.cloudtrail_log_group_arn
-  # cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch_role.arn
+  # Explicitly including the :* suffix
+  cloud_watch_logs_group_arn = "arn:aws:logs:us-east-1:551452024305:log-group:/aws/cloudtrail/infra-lab-org-trail:*"
+  cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch_role.arn
 
   depends_on = [
     aws_organizations_organization.org
@@ -109,7 +102,6 @@ resource "aws_cloudtrail" "org_trail" {
 
 # Policy for CloudWatch Logs KMS Key
 data "aws_iam_policy_document" "kms_cloudwatch" {
-  # Add this statement to data "aws_iam_policy_document" "kms_cloudwatch"
   statement {
     sid    = "Allow CloudTrail to use the CloudWatch Logs KMS key"
     effect = "Allow"
@@ -189,7 +181,6 @@ data "aws_iam_policy_document" "cloudtrail_kms" {
   }
 
   statement {
-    # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
     sid    = "Allow CloudTrail to encrypt logs"
     effect = "Allow"
     principals {
@@ -206,7 +197,6 @@ data "aws_iam_policy_document" "cloudtrail_kms" {
   }
 
   statement {
-    # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
     sid    = "Allow Log Archive Account Access"
     effect = "Allow"
     principals {
@@ -219,9 +209,4 @@ data "aws_iam_policy_document" "cloudtrail_kms" {
     ]
     resources = ["*"]
   }
-}
-
-output "cleaned_cloudwatch_log_group_arn" {
-  value       = local.cloudtrail_log_group_arn
-  description = "The CloudWatch Log Group ARN passed to CloudTrail without the trailing :*"
 }
