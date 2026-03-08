@@ -139,6 +139,10 @@
 * **TFLint Hygiene**:\
   Maintain a zero-warning policy. Remove unused Terraform declarations such as `data "aws_caller_identity" "current"` immediately to keep CI signals clean and avoid noise.
 
+* **Checkov Compliance**: Added `checkov:skip=CKV_AWS_274` for the `AdministratorAccess` policy attachment in `audit_role.tf` to acknowledge the requirement for full administrative permissions for the delegated security role.
+
+* **TFLint**: Addressed unused variable warnings to maintain a clean CI signal.
+
 ### Lessons Learned
 
 * Attempting to manage OUs via the Control Tower manifest results in API validation errors. Always use native AWS Organizations resources for OU management.
@@ -156,6 +160,10 @@
 * **Hook Limitations**: The `terraform_checkov` pre-commit hook does not support the `--config-file` argument; it relies on auto-discovery of `.checkov.yml` in the root.
 
 * **Delegated Admin Pattern**: In a multi-account setup, the Management account detector exists primarily to facilitate delegation; the actual Org configuration happens via the Delegated Admin provider.
+
+* **Security Hub Delegation**: Once administration is delegated, the Management account can no longer manage organization-wide configuration. However, the Audit account (Delegated Admin) cannot manage standards _inside_ the Management account. A dual-provider approach is required in Terraform.
+
+* **CloudTrail KMS**: CloudTrail Organization Trails can use a KMS key in the Management account to encrypt logs delivered to a bucket in a different account, provided the bucket and key policies are correctly aligned.
 
 ### Current Project State Update
 
@@ -221,6 +229,22 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 * **Finding Frequency**: Updated `finding_publishing_frequency` to `FIFTEEN_MINUTES` to meet security best practices and resolve `CKV2_AWS_3`.
 
+* **Security Hub (S008)**:
+
+  * Successfully enabled Security Hub and delegated administration to the Audit account (`881413600100`).
+
+  * Enabled "AWS Foundational Security Best Practices" and "CIS AWS Foundations Benchmark" standards.
+
+  * **Finding Aggregator**: Configured organization-wide finding aggregation in the Audit account with `linking_mode = "ALL_REGIONS"`.
+
+  * **Provider Architecture**: Implemented a provider-split model where the Management account manages its own standards while the Audit account manages organization-wide configuration.
+
+* **CloudTrail (S004)**:
+
+  * Verified Organization Trail is correctly logging to the centralized S3 bucket in the Log Archive account.
+
+  * Confirmed KMS encryption using the Management account CMK is functional and delivery is successful.
+
 ### Tooling & CI/CD Alignment
 
 * **Checkov Consistency**: Aligned local `pre-commit` with GitHub Actions by forcing `--directory=infra/` and `--framework=terraform` in `.pre-commit-config.yaml`.
@@ -238,35 +262,3 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 * **Epic E03 / Story S010**: Configure IAM Identity Center.
 
 ---
-
-## Session Update: 2026-03-08 (Security Hub & CloudTrail Finalization)
-
-### Infrastructure & Security Progress (Epic E03)
-
-* **Security Hub (S008)**:
-
-  * Successfully enabled Security Hub and delegated administration to the Audit account (`881413600100`).
-
-  * Enabled "AWS Foundational Security Best Practices" and "CIS AWS Foundations Benchmark" standards.
-
-  * **Finding Aggregator**: Configured organization-wide finding aggregation in the Audit account with `linking_mode = "ALL_REGIONS"`.
-
-  * **Provider Architecture**: Implemented a provider-split model where the Management account manages its own standards while the Audit account manages organization-wide configuration.
-
-* **CloudTrail (S004)**:
-
-  * Verified Organization Trail is correctly logging to the centralized S3 bucket in the Log Archive account.
-
-  * Confirmed KMS encryption using the Management account CMK is functional and delivery is successful.
-
-### Lessons Learned
-
-* **Security Hub Delegation**: Once administration is delegated, the Management account can no longer manage organization-wide configuration. However, the Audit account (Delegated Admin) cannot manage standards _inside_ the Management account. A dual-provider approach is required in Terraform.
-
-* **CloudTrail KMS**: CloudTrail Organization Trails can use a KMS key in the Management account to encrypt logs delivered to a bucket in a different account, provided the bucket and key policies are correctly aligned.
-
-### Tooling & CI/CD Notes
-
-* **Checkov Compliance**: Added `checkov:skip=CKV_AWS_274` for the `AdministratorAccess` policy attachment in `audit_role.tf` to acknowledge the requirement for full administrative permissions for the delegated security role.
-
-* **TFLint**: Addressed unused variable warnings to maintain a clean CI signal.
