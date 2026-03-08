@@ -169,6 +169,7 @@
 * Terraform state updated to reflect current GuardDuty delegation.
 * Pending: Open AWS Support case to resolve CloudTrail validation issue.
 
-
 ### Documented Exceptions
+
+
 * **Checkov CKV2_AWS_10**: CloudTrail organization trail is currently running without CloudWatch Logs integration due to a persistent AWS validation error (`InvalidCloudWatchLogsLogGroupArnException`). This is a known limitation being tracked for future resolution once AWS validation issues are resolved.
