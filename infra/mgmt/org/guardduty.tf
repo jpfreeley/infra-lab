@@ -1,8 +1,24 @@
 # E03-S007: Enable GuardDuty and delegate administration to security-audit account
 
 # 1. Enable GuardDuty in the Management Account (Required to delegate)
+# Data source to get GuardDuty detector in Log Archive Account (us-east-1)
+data "aws_guardduty_detector" "log_archive" {
+  provider = aws.delegated_admin
+}
+
+# Enable GuardDuty in the Delegated Admin Account (Log Archive) for us-west-2
+resource "aws_guardduty_detector" "log_archive_replica" {
+  provider = aws.delegated_admin_replica
+  enable   = true
+}
+
 resource "aws_guardduty_detector" "mgmt" {
   enable = true
+}
+
+resource "aws_guardduty_detector" "mgmt_replica" {
+  provider = aws.replica
+  enable   = true
 }
 
 # 2. Delegate GuardDuty Administration to the Log Archive Account
@@ -11,6 +27,13 @@ resource "aws_guardduty_organization_admin_account" "security_audit" {
   admin_account_id = "172134854767"
 
   depends_on = [aws_guardduty_detector.mgmt]
+}
+
+resource "aws_guardduty_organization_admin_account" "security_audit_replica" {
+  provider         = aws.replica
+  admin_account_id = "172134854767"
+
+  depends_on = [aws_guardduty_detector.mgmt_replica]
 }
 
 # 3. Configure Organization-wide settings
@@ -22,7 +45,7 @@ resource "aws_guardduty_organization_configuration" "org" {
   provider = aws.delegated_admin
 
   # Use the Detector ID from the Log Archive Account (Delegated Admin)
-  detector_id                      = "80ce656eaede5e533ce9b198fe16f3cd"
+  detector_id                      = data.aws_guardduty_detector.log_archive.id
   auto_enable_organization_members = "ALL"
 
   # Data sources configuration
@@ -46,4 +69,35 @@ resource "aws_guardduty_organization_configuration" "org" {
 
   # Ensure delegation happens before trying to configure the org
   depends_on = [aws_guardduty_organization_admin_account.security_audit]
+}
+
+resource "aws_guardduty_organization_configuration" "org_replica" {
+  # Use provider alias for delegated admin account in replica region
+  provider = aws.delegated_admin_replica
+
+  # Use the Detector ID from the Log Archive Account (Delegated Admin) in replica region
+  detector_id                      = aws_guardduty_detector.log_archive_replica.id
+  auto_enable_organization_members = "ALL"
+
+  # Data sources configuration
+  datasources {
+    s3_logs {
+      auto_enable = true
+    }
+    kubernetes {
+      audit_logs {
+        enable = true
+      }
+    }
+    malware_protection {
+      scan_ec2_instance_with_findings {
+        ebs_volumes {
+          auto_enable = true
+        }
+      }
+    }
+  }
+
+  # Ensure delegation happens before trying to configure the org
+  depends_on = [aws_guardduty_organization_admin_account.security_audit_replica]
 }

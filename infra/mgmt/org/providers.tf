@@ -22,3 +22,17 @@ provider "aws" {
   region  = "us-east-1"
   profile = "infra-lab-log-archive"
 }
+
+# Replica provider (Management Account)
+provider "aws" {
+  alias   = "replica"
+  region  = "us-west-2"
+  profile = "infra-lab"
+}
+
+# Delegated Admin Replica provider (Log Archive Account)
+provider "aws" {
+  alias   = "delegated_admin_replica"
+  region  = "us-west-2"
+  profile = "infra-lab-log-archive"
+}
