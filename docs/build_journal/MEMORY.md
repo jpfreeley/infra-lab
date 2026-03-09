@@ -149,6 +149,19 @@
 
 * The Control Tower Landing Zone resource requires precise manifest JSON matching the AWS API schema; deviations cause update failures.
 
+## Recent Learnings and Cleanup (2026-03-09)
+
+* Successfully cleaned up Terraform state to remove stuck resources causing errors.
+* Reverted Terraform code to a stable baseline allowing clean `terraform apply`.
+* Budgets (`budgets.tf`) are working and included in the clean apply.
+* Documented the "Object Lock Trap" where S3 buckets with Compliance mode cannot be deleted or renamed by Terraform.
+* Noted Control Tower's management of Organization Trail and its KMS key prevents direct modification via Terraform.
+* GuardDuty delegation requires careful provider separation to avoid member account management errors.
+* Current state is stable and ready for next stories.
+
+---
+
+
 * Pre-commit hooks can have subtle argument parsing issues; always verify hook documentation and test locally.
 
 * Service principals required by AWS services like Control Tower must be explicitly declared in Terraform to prevent drift.
