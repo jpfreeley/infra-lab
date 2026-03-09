@@ -1,4 +1,5 @@
 resource "aws_iam_role" "organization_account_access_role" {
+  # checkov:skip=CKV_AWS_274:AdministratorAccess is required for the OrganizationAccountAccessRole to manage the Audit account
   # Force it to use the audit alias
   provider = aws.audit
   name     = "OrganizationAccountAccessRole"
