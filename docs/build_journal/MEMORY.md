@@ -161,7 +161,6 @@
 
 ---
 
-
 * Pre-commit hooks can have subtle argument parsing issues; always verify hook documentation and test locally.
 
 * Service principals required by AWS services like Control Tower must be explicitly declared in Terraform to prevent drift.
