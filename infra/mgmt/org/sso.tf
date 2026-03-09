@@ -6,8 +6,6 @@ locals {
 
 # Define Permission Sets
 resource "aws_ssoadmin_permission_set" "admin_access" {
-  # checkov:skip=CKV_AWS_274 "AdministratorAccess is required for OrganizationAccountAccessRole to manage Audit account"
-
   name             = "AdministratorAccess"
   description      = "Full administrative access to AWS accounts"
   instance_arn     = local.sso_instance_arn
