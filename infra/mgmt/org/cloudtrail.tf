@@ -1,3 +1,16 @@
+# --- CloudTrail Consolidation Notes ---
+# On 2026-03-10, it was identified that the account had two redundant Organization Trails:
+# 1. aws-controltower-BaselineCloudTrail (Managed by Control Tower)
+# 2. infra-lab-org-trail (Managed by this Terraform file)
+#
+# Both trails were capturing the same management events across all regions and accounts,
+# leading to additional costs ($2.00 per 100,000 events for the second trail).
+#
+# Consolidation Steps Taken:
+# - Verified that 'infra-lab-org-trail' is a Multi-Region Organization Trail.
+# - Editted Landing Zone Settings to DISABLE baseline trail (35m to update settings)
+#   -- Upon successful edit to the settings, the CT cloudtrail will be deleted
+
 # --- KMS Keys ---
 
 # 1. KMS Key for CloudTrail S3 Logs
