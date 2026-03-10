@@ -1,3 +1,21 @@
+# --- CloudTrail Consolidation Notes ---
+# On 2026-03-10, it was identified that the account had two redundant Organization Trails:
+# 1. aws-controltower-BaselineCloudTrail (Managed by Control Tower)
+# 2. infra-lab-org-trail (Managed by this Terraform file)
+#
+# Both trails were capturing the same management events across all regions and accounts,
+# leading to additional costs ($2.00 per 100,000 events for the second trail).
+#
+# Consolidation Steps Taken:
+# - Verified that 'infra-lab-org-trail' is a Multi-Region Organization Trail.
+# - Editted Control Tower Settings to DISABLE baseline trail (35m to update settings)
+# - Stopped logging and deleted the redundant Control Tower baseline trail via CLI:
+#   aws cloudtrail stop-logging --name aws-controltower-BaselineCloudTrail --profile infra-lab --region us-east-1
+#   aws cloudtrail delete-trail --name aws-controltower-BaselineCloudTrail --profile infra-lab --region us-east-1
+#
+# Note: Control Tower may report 'Drift' in the console. To resolve this permanently,
+# the CloudTrail baseline should be disabled in the Control Tower Landing Zone settings.
+
 # --- KMS Keys ---
 
 # 1. KMS Key for CloudTrail S3 Logs
