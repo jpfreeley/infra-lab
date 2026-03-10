@@ -8,13 +8,8 @@
 #
 # Consolidation Steps Taken:
 # - Verified that 'infra-lab-org-trail' is a Multi-Region Organization Trail.
-# - Editted Control Tower Settings to DISABLE baseline trail (35m to update settings)
-# - Stopped logging and deleted the redundant Control Tower baseline trail via CLI:
-#   aws cloudtrail stop-logging --name aws-controltower-BaselineCloudTrail --profile infra-lab --region us-east-1
-#   aws cloudtrail delete-trail --name aws-controltower-BaselineCloudTrail --profile infra-lab --region us-east-1
-#
-# Note: Control Tower may report 'Drift' in the console. To resolve this permanently,
-# the CloudTrail baseline should be disabled in the Control Tower Landing Zone settings.
+# - Editted Landing Zone Settings to DISABLE baseline trail (35m to update settings)
+#   -- Upon successful edit to the settings, the CT cloudtrail will be deleted
 
 # --- KMS Keys ---
 
