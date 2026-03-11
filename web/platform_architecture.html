@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Architecture — Reference Notes</title>
+
+<!-- Fonts -->
+<link href="platform_architecture_files/css2.css" rel="stylesheet">
+
+<!-- Mermaid -->
+<script src="platform_architecture_files/mermaid.min.js"></script>
+
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #6c63ff;
+    --accent2: #00d4aa;
+    --danger: #ff4f6d;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --code-bg: #12151f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ---- Layout ---- */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ---- Sidebar TOC ---- */
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 32px 20px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .sidebar-logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 6px;
+    letter-spacing: -0.5px;
+  }
+
+  .sidebar-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 28px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .toc-section {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--muted);
+    margin: 20px 0 8px 0;
+  }
+
+  .toc-link {
+    display: block;
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    transition: background 0.15s;
+    margin-bottom: 2px;
+  }
+
+  .toc-link:hover { background: var(--surface2); color: var(--accent); }
+  .toc-link.sub { padding-left: 22px; font-size: 12px; color: var(--muted); }
+  .toc-link.sub:hover { color: var(--accent2); }
+
+  /* ---- Main content ---- */
+  .main {
+    flex: 1;
+    padding: 48px 56px;
+    max-width: 960px;
+  }
+
+  .page-title {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .page-meta {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 48px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page-meta span { color: var(--accent2); font-weight: 500; }
+
+  /* ---- Sections ---- */
+  .section { margin-bottom: 64px; scroll-margin-top: 32px; }
+
+  h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  h2 .num {
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent2);
+    margin: 24px 0 10px 0;
+  }
+
+  h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 16px 0 8px 0;
+  }
+
+  p { margin-bottom: 14px; color: var(--text); }
+
+  /* ---- Cards ---- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+  }
+
+  /* ---- Tag pills ---- */
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+
+  .tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-size: 12px;
+    color: var(--accent2);
+    font-weight: 500;
+  }
+
+  /* ---- Code blocks ---- */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-family: "Fira Code", monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #a8d8a8;
+  }
+
+  code {
+    font-family: "Fira Code", monospace;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 13px;
+    color: var(--accent2);
+  }
+
+  /* ---- Tables ---- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+
+  th {
+    background: var(--surface2);
+    color: var(--accent);
+    font-weight: 600;
+    padding: 10px 14px;
+    text-align: left;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td { background: var(--surface); }
+
+  /* ---- Lists ---- */
+  ul, ol {
+    padding-left: 22px;
+    margin-bottom: 14px;
+  }
+
+  li { margin-bottom: 6px; }
+
+  /* ---- Callout boxes ---- */
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--surface);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+
+  .callout.green { border-color: var(--accent2); }
+  .callout.red { border-color: var(--danger); }
+
+  .callout strong { color: var(--accent); }
+  .callout.green strong { color: var(--accent2); }
+  .callout.red strong { color: var(--danger); }
+
+  /* ---- Mermaid ---- */
+  .mermaid-wrap {
+    background: #fff;
+    border-radius: 10px;
+    padding: 24px;
+    margin: 20px 0;
+    overflow-x: auto;
+  }
+
+  /* ---- Phase timeline ---- */
+  .phase-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+
+  .phase-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .phase-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+
+  .phase-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .phase-items {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ---- Scrollbar ---- */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ---- Responsive ---- */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { padding: 24px 20px; }
+  }
+</style>
+</head>
+<body data-new-gr-c-s-check-loaded="8.936.0" data-gr-ext-installed="">
+
+<div class="layout">
+
+<!-- ============================================================ -->
+<!-- SIDEBAR TOC -->
+<!-- ============================================================ -->
+<nav class="sidebar">
+  <div class="sidebar-logo">Infra-Lab Architecture</div>
+  <div class="sidebar-sub">Infra-Lab Architecture Notes</div>
+
+  <div class="toc-section">Foundation</div>
+  <a class="toc-link" href="#top">Back to Top</a>
+  <a class="toc-link" href="#background">Background</a>
+  <a class="toc-link" href="#backlog">Agile Plan</a>
+  <a class="toc-link" href="#assumptions">Locked Assumptions</a>
+  <a class="toc-link" href="#org">AWS Org + Control Tower</a>
+  <a class="toc-link sub" href="#org">OU Structure</a>
+  <a class="toc-link sub" href="#org">Account Layout</a>
+  <a class="toc-link sub" href="#org">SCPs + Guardrails</a>
+  <a class="toc-link sub" href="#org">Identity (SSO)</a>
+
+  <div class="toc-section">Networking</div>
+  <a class="toc-link" href="#networking">Dual VPC Architecture</a>
+  <a class="toc-link sub" href="#networking">Control Plane VPC</a>
+  <a class="toc-link sub" href="#networking">Execution Plane VPC</a>
+  <a class="toc-link sub" href="#networking">PrivateLink / mTLS</a>
+
+  <div class="toc-section">Platform</div>
+  <a class="toc-link" href="#database">Database (Aurora + RDS Proxy)</a>
+  <a class="toc-link" href="#rls">Row-Level Security (RLS)</a>
+  <a class="toc-link" href="#pki">Internal PKI + mTLS</a>
+  <a class="toc-link" href="#workers">Workers + Orchestration</a>
+  <a class="toc-link" href="#cicd">CI/CD + IaC</a>
+  <a class="toc-link" href="#observability">Observability</a>
+
+  <div class="toc-section">Execution</div>
+  <a class="toc-link" href="#timeline">90-Day Timeline</a>
+  <a class="toc-link" href="#narrative">Interview Narrative</a>
+  <a class="toc-link" href="#vendors">3rd-Party Vendors</a>
+  <a class="toc-link" href="#questions">CTO Questions</a>
+
+
+
+  <div class="toc-section">Agile Backlog</div>
+  <a class="toc-link" href="#agile_backlog">Agile Backlog Links</a>
+  <a class="toc-link sub" href="http://ypgmedia.com/infra_lab/agile_master_epics.html">Master Epics (generated)</a>
+
+  <div class="toc-section">Reference</div>
+  <a class="toc-link" href="#diagram">Architecture Diagram</a>
+  <a class="toc-link" href="#scorecard">Technical Maturity Model Scorecard</a>
+  <a class="toc-link" href="#checklist">Day 1–90 Execution Checklist</a>
+</nav>
+
+<!-- ============================================================ -->
+<!-- MAIN CONTENT -->
+<!-- ============================================================ -->
+<main class="main" id="top">
+
+  <div class="page-title">Infra Lab: Building a Zero-Trust, Multi-Tenant AWS Platform for Autonomous AI Execution</div>
+  <div class="page-meta">
+    <span>Generated March 2026</span> &nbsp;|&nbsp;
+    AWS · Control Tower · ECS Fargate · Aurora Serverless · mTLS · Private CA
+  </div>
+  <div class="page-meta">
+  Author: JP Freeley GH:@jpfreeley
+  </div>
+<!-- ==== -->
+  <!-- 0. BACKGROUND -->
+  <!-- ==== -->
+  <section class="section" id="background">
+    <h2><span class="num"></span>Background</h2>
+
+    <div class="card">
+      <div class="card-title">Architecture Design and Objective</div>
+      <p>Enterprise-grade, secure, and scalable AWS platform architecture for autonomous AI execution with strict multi-tenant isolation and robust CI/CD.
+</p>
+<P>
+The Infra Lab project is a comprehensive, enterprise-grade AWS platform architecture designed to build a secure, scalable, and multi-tenant infrastructure for an autonomous AI execution system. It features a multi-account AWS Organization with Control Tower, dual VPC architecture for strict environment isolation, Aurora Serverless with row-level security, internal PKI with mTLS for secure service communication, and a robust CI/CD pipeline with Terraform and CloudFormation. The project includes detailed agile backlogs with 236 stories across 12 epics covering everything from repo standards and Terraform foundations to observability, compliance, and cost management, aiming for a SOC2-ready, highly reliable, and scalable platform within a 90-day build timeline.
+</p>
+      <ul>
+        <li><a class="toc-link" style="display:inline;padding:0" href="http://github.com/jpfreeley/infra-lab">Open: Project Github</a></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ==== -->
+  <!-- 0. AGILE BACKLOG LINKS -->
+  <!-- ==== -->
+  <section class="section" id="backlog">
+    <h2><span class="num"></span> Agile Backlog Links</h2>
+
+    <div class="card">
+      <div class="card-title">Jira-ready backlog generated from this architecture</div>
+      <p>Jira-ready backlog with <strong>236</strong> stories across <strong>12</strong>
+ epics (target range 150200+; we landed at 236). Use the master index
+to browse and then open each epic for detailed stories, acceptance
+criteria, and subtasks.</p>
+      <ul>
+        <li><a class="toc-link" style="display:inline;padding:0" href="http://ypgmedia.com/infra_lab/agile_master_epics.html">Open: Agile Master Epics</a></li>
+      </ul>
+    </div>
+  </section>
+
+
+  <!-- ======================================================== -->
+  <!-- 1. LOCKED ASSUMPTIONS -->
+  <!-- ======================================================== -->
+  <section class="section" id="assumptions">
+    <h2><span class="num">1</span> Locked Assumptions</h2>
+    <div class="tags">
+      <span class="tag">AWS Control Tower</span>
+      <span class="tag">True Dev / Staging / Prod</span>
+      <span class="tag">Dual VPC per env</span>
+      <span class="tag">mTLS via AWS Private CA</span>
+      <span class="tag">ECS Fargate</span>
+      <span class="tag">Step Functions + SQS</span>
+      <span class="tag">Aurora Serverless v2</span>
+      <span class="tag">RDS Proxy</span>
+      <span class="tag">Terraform + CloudFormation hybrid</span>
+      <span class="tag">Versioned worker rollout</span>
+      <span class="tag">SOC2-aligned posture</span>
+    </div>
+    <div class="callout green">
+      <strong>Context:</strong> Platform is building the world's first
+fully autonomous Autonomous Executioner (AI system). $8M seed. Small
+elite team. Moving fast. The infrastructure engineer is a
+founding-level, hands-on builder role — not maintenance.
+    </div>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 2. AWS ORG + CONTROL TOWER -->
+  <!-- ======================================================== -->
+  <section class="section" id="org">
+    <h2><span class="num">2</span> AWS Organization + Control Tower</h2>
+
+    <p>One AWS Organization. AWS Control Tower provides the Landing
+Zone, Account Factory, and managed guardrails. No IAM users — all access
+ via IAM Identity Center (SSO).</p>
+
+    <h3>OU Structure</h3>
+    <table>
+      <tbody><tr><th>OU</th><th>Accounts</th><th>Purpose</th></tr>
+      <tr><td><strong>Security</strong></td><td>security-audit, log-archive</td><td>GuardDuty/SecurityHub aggregation, immutable centralized logs</td></tr>
+      <tr><td><strong>Infrastructure</strong></td><td>shared-services, (network)</td><td>CI/CD roles, artifact buckets, ECR, central DNS/PKI distribution</td></tr>
+      <tr><td><strong>Workloads</strong></td><td>Platform-dev, Platform-staging, Platform-prod</td><td>True environment isolation — hard blast radius boundary</td></tr>
+      <tr><td><strong>Sandbox</strong></td><td>sandbox</td><td>Experimentation, spikes, looser guardrails</td></tr>
+    </tbody></table>
+
+    <h3>SCPs + Guardrails (by OU)</h3>
+    <div class="card">
+      <div class="card-title">All Workload Accounts</div>
+      <ul>
+        <li>Deny disabling CloudTrail / Config</li>
+        <li>Deny creating IAM users (force SSO + roles)</li>
+        <li>Deny public S3 buckets (except dev if needed)</li>
+        <li>Deny leaving org / changing guardrails</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Prod-Only Hardening</div>
+      <ul>
+        <li>Deny changes outside approved regions</li>
+        <li>Deny deletion of log buckets / KMS keys</li>
+        <li>Deny turning off GuardDuty / SecurityHub</li>
+        <li>Deny wide SGs (0.0.0.0/0) on sensitive ports</li>
+      </ul>
+    </div>
+
+    <h3>Identity Model (IAM Identity Center)</h3>
+    <table>
+      <tbody><tr><th>Permission Set</th><th>Access Level</th><th>Notes</th></tr>
+      <tr><td>Admin</td><td>Full</td><td>CTO + break-glass only</td></tr>
+      <tr><td>Platform</td><td>Infra + deploy</td><td>Founding infra engineer</td></tr>
+      <tr><td>Developer</td><td>App-level</td><td>Backend engineers</td></tr>
+      <tr><td>Security</td><td>Audit + read</td><td>Security lead</td></tr>
+      <tr><td>ReadOnly</td><td>View only</td><td>Stakeholders</td></tr>
+    </tbody></table>
+    <div class="callout">
+      <strong>Break-glass:</strong> Prod Admin role requires MFA + approval. All access logged to log-archive account.
+    </div>
+
+    <h3>CI/CD Deployment Flow Across Accounts</h3>
+    <ul>
+      <li>GitHub Actions assumes a role in <code>shared-services</code></li>
+      <li>From there it assumes into <code>Platform-dev</code> (every merge), <code>Platform-staging</code> (release candidates), <code>Platform-prod</code> (tagged releases + approvals only)</li>
+    </ul>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 3. DUAL VPC NETWORKING -->
+  <!-- ======================================================== -->
+  <section class="section" id="networking">
+    <h2><span class="num">3</span> Dual VPC Architecture (per environment)</h2>
+
+    <p>Each environment account (dev/staging/prod) contains two VPCs with a hard isolation boundary between them.</p>
+
+    <div class="card">
+      <div class="card-title">Control Plane VPC — 10.10.0.0/16 (The "Brain")</div>
+      <ul>
+        <li>WAF → ALB (TLS termination)</li>
+        <li>ECS Fargate: API Service (Blue/Green via CodeDeploy)</li>
+        <li>Results Ingestion API (mTLS required)</li>
+        <li>RDS Proxy → Aurora Serverless v2 (Postgres, RLS enforced)</li>
+        <li>Secrets Manager, Step Functions, SQS Queues</li>
+        <li>VPC Endpoints (S3, SQS, ECR, CloudWatch, SecretsManager)</li>
+        <li>Private subnets only for DB and API</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Execution Plane VPC — 10.20.0.0/16 (The "Red Zone")</div>
+      <ul>
+        <li>ECS Fargate Worker Pools: nano / medium / xlarge (binpacked)</li>
+        <li>NAT Gateway (static egress IP — customer allowlist)</li>
+        <li>NACLs: block all RFC1918 egress (no internal scanning)</li>
+        <li>3-layer safety guardrails: pre-dispatch scope, worker re-check, network deny</li>
+        <li>PrivateLink bridge to Results API (NO direct DB access)</li>
+        <li>Workers reach only: public internet targets + Results API</li>
+      </ul>
+    </div>
+
+    <h3>The Hard Boundary</h3>
+    <div class="callout red">
+      <strong>Rule:</strong> Workers in the Execution VPC can NEVER connect directly to RDS. All findings flow via <code>POST /findings</code> to the Results Ingestion API over mTLS. Even a fully compromised worker cannot reach the database.
+    </div>
+
+    <h3>Connection Method: PrivateLink (recommended)</h3>
+    <p>One-way traffic only. Execution VPC can call the Results API
+endpoint. Control VPC is not reachable from Execution VPC in any other
+way. No VPC peering broad enough to allow lateral movement.</p>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 4. DATABASE -->
+  <!-- ======================================================== -->
+  <section class="section" id="database">
+    <h2><span class="num">4</span> Database: Aurora Serverless v2 + RDS Proxy</h2>
+
+    <h3>Why Aurora Serverless v2 (not standard RDS)</h3>
+    <table>
+      <tbody><tr><th>Feature</th><th>Standard RDS</th><th>Aurora Provisioned</th><th>Aurora Serverless v2</th></tr>
+      <tr><td>Scaling</td><td>Manual (instance change)</td><td>Manual</td><td><strong>Automatic &amp; instant (ACUs)</strong></td></tr>
+      <tr><td>Storage</td><td>Provisioned (e.g. 500GB)</td><td>Auto-growing</td><td><strong>Auto-growing</strong></td></tr>
+      <tr><td>Failover</td><td>~30-60 seconds</td><td>~15-30 seconds</td><td><strong>~15 seconds</strong></td></tr>
+      <tr><td>Cost</td><td>Fixed hourly</td><td>Fixed hourly</td><td><strong>Pay-per-use (ACUs)</strong></td></tr>
+    </tbody></table>
+
+    <h3>RDS Proxy (AWS Managed — you do NOT build this)</h3>
+    <div class="callout green">
+      <strong>RDS Proxy is a fully managed AWS service.</strong> You configure it (target DB, auth via Secrets Manager, subnets/SGs, pooling settings). AWS runs and scales the proxy fleet.
+    </div>
+    <ul>
+      <li><strong>Connection pooling:</strong> Absorbs bursty Fargate connections — Postgres hates thousands of open connections</li>
+      <li><strong>Failover handling:</strong> Holds app connections open during Aurora scaling/failover events</li>
+      <li><strong>Security:</strong> DB credentials stored in Secrets Manager, rotated without app disruption</li>
+      <li><strong>RLS compatibility:</strong> Use <code>SET LOCAL app.tenant_id = ...</code> per transaction (not session) to avoid tenant leakage across pooled connections</li>
+    </ul>
+
+    <h3>Key Meta Variables (stamped on every record)</h3>
+    <table>
+      <tbody><tr><th>Variable</th><th>Purpose</th><th>DB Index Strategy</th></tr>
+      <tr><td><code>tenant_id</code></td><td>Multi-tenancy, RLS, billing, RBAC</td><td>Composite index prefix on all tenant tables</td></tr>
+      <tr><td><code>job_id</code></td><td>Unit of work, frontend correlation</td><td>Index with tenant_id</td></tr>
+      <tr><td><code>run_id</code></td><td>Reliability, retries, deduplication</td><td>Index with job_id</td></tr>
+      <tr><td><code>module_version</code></td><td>Reproducibility, QA, rollback</td><td>Index for version-specific queries</td></tr>
+      <tr><td><code>trace_id</code></td><td>Distributed tracing (OTel)</td><td>Logs only (not DB indexed)</td></tr>
+    </tbody></table>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 5. ROW-LEVEL SECURITY -->
+  <!-- ======================================================== -->
+  <section class="section" id="rls">
+    <h2><span class="num">5</span> Row-Level Security (RLS)</h2>
+
+    <p>PostgreSQL RLS makes the database itself enforce tenant isolation — not just application code. Even if a developer forgets <code>WHERE tenant_id = ...</code>, the DB blocks cross-tenant access.</p>
+
+    <h3>Implementation Pattern</h3>
+
+    <h4>1) Table design</h4>
+    <pre>CREATE TABLE findings (
+  tenant_id  uuid NOT NULL,
+  job_id     uuid NOT NULL,
+  run_id     uuid NOT NULL,
+  finding_id uuid NOT NULL,
+  severity   text NOT NULL,
+  evidence_s3_path text,
+  PRIMARY KEY (tenant_id, finding_id)
+);
+
+-- Composite indexes start with tenant_id
+CREATE INDEX findings_tenant_job_idx ON findings (tenant_id, job_id);
+CREATE INDEX findings_tenant_run_idx ON findings (tenant_id, run_id);</pre>
+
+    <h4>2) Separate owner vs runtime role</h4>
+    <pre>CREATE ROLE Platform_owner NOLOGIN;   -- migrations only
+CREATE ROLE Platform_app LOGIN PASSWORD '...';  -- runtime API
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON findings TO Platform_app;</pre>
+
+    <h4>3) Enable + FORCE RLS</h4>
+    <pre>ALTER TABLE findings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE findings FORCE ROW LEVEL SECURITY;</pre>
+
+    <h4>4) Define policy</h4>
+    <pre>CREATE POLICY findings_tenant_isolation
+ON findings FOR ALL
+USING (
+  tenant_id = current_setting('app.tenant_id', true)::uuid
+)
+WITH CHECK (
+  tenant_id = current_setting('app.tenant_id', true)::uuid
+);</pre>
+
+    <h4>5) Set tenant context per request (transaction-scoped)</h4>
+    <pre>BEGIN;
+SET LOCAL app.tenant_id = '7c2c0f0f-4f6f-4b6f-9a22-6d0d7a9f0b2a';
+SELECT * FROM findings WHERE job_id = '...';
+COMMIT;</pre>
+
+    <div class="callout">
+      <strong>Why SET LOCAL?</strong> It resets automatically at end of
+transaction — critical for connection pooling (RDS Proxy / PgBouncer) to
+ prevent tenant context leaking to the next request.
+    </div>
+
+    <h3>Common Pitfalls</h3>
+    <table>
+      <tbody><tr><th>Pitfall</th><th>Fix</th></tr>
+      <tr><td>App connects as table owner</td><td>Separate owner vs runtime role</td></tr>
+      <tr><td>Role has BYPASSRLS</td><td>Never grant BYPASSRLS to app role</td></tr>
+      <tr><td>Forgot FORCE ROW LEVEL SECURITY</td><td>Always FORCE, not just ENABLE</td></tr>
+      <tr><td>SET (session) instead of SET LOCAL (transaction)</td><td>Always use SET LOCAL inside transaction</td></tr>
+      <tr><td>SECURITY DEFINER functions bypass RLS</td><td>Treat as privileged code, minimize usage</td></tr>
+    </tbody></table>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 6. INTERNAL PKI + mTLS -->
+  <!-- ======================================================== -->
+  <section class="section" id="pki">
+    <h2><span class="num">6</span> Internal PKI + mTLS</h2>
+
+    <p>Internal PKI is a system for creating, managing, and revoking
+digital certificates trusted only within your own network. mTLS (Mutual
+TLS) means both sides of a connection present a certificate — not just
+the server.</p>
+
+    <h3>Why Platform needs it</h3>
+    <div class="callout red">
+      <strong>The Problem:</strong> If a worker in the Execution VPC
+needs to POST findings to the Results API in the Control VPC, how does
+the API know it is really your worker and not an attacker who hopped
+onto your network?<br><br>
+      <strong>The Solution:</strong> The API requires a client certificate. The worker presents one. Both certificates are issued by your Internal Root CA.
+    </div>
+
+    <h3>AWS Private CA (the managed approach)</h3>
+    <ul>
+      <li><strong>Root CA:</strong> Created in the Security or Infrastructure account. KMS/HSM-backed (FIPS 140-2 Level 3). Keys never leave the hardware.</li>
+      <li><strong>Issuing CA:</strong> Middle-man CA that signs daily worker certificates. Can be revoked without destroying Root.</li>
+      <li><strong>RAM sharing:</strong> Private CA shared to dev/staging/prod accounts via AWS Resource Access Manager.</li>
+      <li><strong>ACM integration:</strong> Fargate tasks request private certs automatically at startup via ACM.</li>
+      <li><strong>Short-lived certs:</strong> Rotate automatically — a stolen container image alone is useless without a valid cert.</li>
+    </ul>
+
+    <h3>What an HSM is (and why it matters)</h3>
+    <p>An HSM (Hardware Security Module) is a physical vault for
+cryptographic keys. The private key never leaves the hardware — even AWS
+ admins cannot export it. AWS KMS uses HSMs behind the scenes. For
+Platform's Root CA, the key is hardware-bound and non-exportable.</p>
+
+    <h3>mTLS Flow: Worker → Results API</h3>
+    <ol>
+      <li>Worker starts in Execution VPC</li>
+      <li>Worker requests a short-lived cert from ACM (backed by Private CA)</li>
+      <li>Worker calls <code>POST /findings</code> presenting its client cert</li>
+      <li>Results API validates the cert against the Private CA trust chain</li>
+      <li>Only if valid: findings are written to DB</li>
+      <li>Cert expires in hours — rotation is automatic</li>
+    </ol>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 7. WORKERS + ORCHESTRATION -->
+  <!-- ======================================================== -->
+  <section class="section" id="workers">
+    <h2><span class="num">7</span> Workers + Orchestration</h2>
+
+    <h3>Worker Tiers (binpacked compute)</h3>
+    <table>
+      <tbody><tr><th>Tier</th><th>Compute</th><th>Use Case</th><th>Queue</th></tr>
+      <tr><td>nano</td><td>0.25 vCPU / 0.5GB</td><td>Port scan, DNS recon</td><td>worker-nano-queue</td></tr>
+      <tr><td>medium</td><td>1 vCPU / 2GB</td><td>Web Finding scanning</td><td>worker-medium-queue</td></tr>
+      <tr><td>xlarge</td><td>4 vCPU / 16GB</td><td>AI Task, headless browser</td><td>worker-xlarge-queue</td></tr>
+    </tbody></table>
+
+    <h3>Versioned Worker Rollout</h3>
+    <ul>
+      <li>SSM Parameter <code>/active_worker_version</code> gates which version workers pull</li>
+      <li>SQS messages carry <code>WorkerVersion</code> attribute for routing</li>
+      <li>SIGTERM extends visibility timeout — in-flight jobs checkpoint before drain</li>
+      <li>Canary tenants table: dogfood → 10 friendly customers → global rollout</li>
+      <li>Rollback: flip SSM parameter — no redeploy needed, &lt;5 minutes</li>
+    </ul>
+
+    <h3>Step Functions Job State Machine</h3>
+    <p>States: <code>queued → running → completed | failed | cancelled</code></p>
+    <ul>
+      <li>Retries with exponential backoff</li>
+      <li>Wait states for long-running jobs</li>
+      <li>Branching by job type / worker tier</li>
+      <li>Idempotency keys prevent duplicate execution</li>
+    </ul>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 8. CI/CD + IaC -->
+  <!-- ======================================================== -->
+  <section class="section" id="cicd">
+    <h2><span class="num">8</span> CI/CD + IaC (Hybrid Terraform + CloudFormation)</h2>
+
+    <div class="card">
+      <div class="card-title">Terraform (primary — stateful infra)</div>
+      <ul>
+        <li>VPCs, subnets, security groups, NACLs</li>
+        <li>ECS clusters, task definitions, services</li>
+        <li>RDS / Aurora, RDS Proxy</li>
+        <li>SQS queues, Step Functions</li>
+        <li>Multi-account deploy via AssumeRole</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-title">CloudFormation (selective — AWS-native wiring)</div>
+      <ul>
+        <li>ECS Blue/Green CodeDeploy wiring (native wait-for-success + auto-rollback)</li>
+        <li>Lambda functions (SAM)</li>
+        <li>AWS-native resources where CF handles lifecycle better than TF</li>
+      </ul>
+    </div>
+
+    <h3>Deployment Flow</h3>
+    <ol>
+      <li>GitHub Actions assumes role in <code>shared-services</code></li>
+      <li>Terraform plan/apply → target account</li>
+      <li>Build + push worker image to ECR (tagged with <code>module_version</code>)</li>
+      <li>Security scan (image + IaC)</li>
+      <li>Dev: auto-deploy on every merge</li>
+      <li>Staging: deploy on release candidate</li>
+      <li>Prod: tagged release + manual approval gate</li>
+    </ol>
+
+    <h3>Blue/Green API Deployment</h3>
+    <ul>
+      <li>ALB listener <code>:8443</code> for Green validation before traffic shift</li>
+      <li>CodeDeploy: 10% canary → 100% with auto-rollback on 5XX spike</li>
+      <li><code>/healthz</code> + <code>/readyz</code> enforced on all containers</li>
+    </ul>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 9. OBSERVABILITY -->
+  <!-- ======================================================== -->
+  <section class="section" id="observability">
+    <h2><span class="num">9</span> Observability</h2>
+
+    <table>
+      <tbody><tr><th>Layer</th><th>Tool</th><th>What it captures</th></tr>
+      <tr><td>Tracing</td><td>OpenTelemetry + X-Ray/Jaeger</td><td>trace_id propagation end-to-end; pivot trace → logs → S3 artifacts</td></tr>
+      <tr><td>Metrics</td><td>Prometheus + Grafana</td><td>queue_depth, job_duration_p95, worker_crash_rate, error_rate</td></tr>
+      <tr><td>Logs</td><td>CloudWatch Logs (JSON) + ELK</td><td>All logs tagged: tenant_id, job_id, run_id, module_version</td></tr>
+      <tr><td>Alerting</td><td>CloudWatch Alarms → CodeDeploy</td><td>Burn-rate alerts, auto-rollback triggers</td></tr>
+      <tr><td>Cost</td><td>Cost Allocation Tags</td><td>tenant_id · job_id · worker_tier → COGS + margin visibility</td></tr>
+    </tbody></table>
+
+    <div class="callout green">
+      <strong>The 3 questions observability must answer:</strong><br>
+      1) Why did job X fail?<br>
+      2) How much did tenant Y cost this month?<br>
+      3) Which worker version caused the spike?
+    </div>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 10. 90-DAY TIMELINE -->
+  <!-- ======================================================== -->
+  <section class="section" id="timeline">
+    <h2><span class="num">10</span> 90-Day Platform Build Timeline</h2>
+
+    <div class="phase-grid">
+      <div class="phase-card">
+        <div class="phase-label">Week 0–1</div>
+        <div class="phase-title">Org Foundation</div>
+        <div class="phase-items">Control Tower deploy<br>OUs + accounts<br>SCPs + guardrails<br>IAM Identity Center<br>Break-glass roles</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-label">Week 2–4</div>
+        <div class="phase-title">Networking + Logging</div>
+        <div class="phase-items">Dual VPC per env (dev first)<br>NACLs + SGs<br>VPC Endpoints<br>Centralized log flows<br>CloudTrail aggregation</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-label">Week 5–7</div>
+        <div class="phase-title">Core Platform Migration</div>
+        <div class="phase-items">ECS Fargate API<br>Blue/Green CodeDeploy<br>Aurora + RDS Proxy<br>SQS + Step Functions<br>Worker tiers</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-label">Week 8–10</div>
+        <div class="phase-title">mTLS + PKI</div>
+        <div class="phase-items">AWS Private CA<br>Root + Issuing CA<br>RAM sharing to accounts<br>Worker cert issuance<br>Results API mTLS enforcement</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-label">Week 11–12</div>
+        <div class="phase-title">Reliability + Maturity</div>
+        <div class="phase-items">OTel full stack<br>Dashboards + alerts<br>Cost allocation tags<br>Versioned worker rollout<br>Canary tenant model</div>
+      </div>
+    </div>
+
+    <h3>Ownership Matrix</h3>
+    <table>
+      <tbody><tr><th>Area</th><th>Primary</th><th>Secondary</th></tr>
+      <tr><td>Control Tower + Org</td><td>You</td><td>CTO</td></tr>
+      <tr><td>IaC modules (Terraform/CFN)</td><td>You</td><td>—</td></tr>
+      <tr><td>Networking (VPCs, NACLs, SGs)</td><td>You</td><td>—</td></tr>
+      <tr><td>ECS Fargate (API + Workers)</td><td>You</td><td>Backend</td></tr>
+      <tr><td>Aurora + RDS Proxy + RLS</td><td>You</td><td>Backend</td></tr>
+      <tr><td>Step Functions + SQS</td><td>You</td><td>Backend</td></tr>
+      <tr><td>AWS Private CA + mTLS</td><td>You</td><td>Security</td></tr>
+      <tr><td>CI/CD pipelines</td><td>You</td><td>Backend</td></tr>
+      <tr><td>Observability stack</td><td>You</td><td>—</td></tr>
+      <tr><td>Worker versioning + rollout</td><td>You</td><td>Backend</td></tr>
+      <tr><td>SCPs + guardrails</td><td>You</td><td>CTO</td></tr>
+    </tbody></table>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 11. INTERVIEW NARRATIVE -->
+  <!-- ======================================================== -->
+  <section class="section" id="narrative">
+    <h2><span class="num">11</span> Interview Narrative</h2>
+
+    <h3>The Vision</h3>
+    <div class="callout">
+      "When I look at Platform, I don't see a collection of security
+tools — I see a high-scale distributed system that happens to perform
+offensive security. To move from $8M seed to enterprise traction, we
+have to solve for <strong>Trust</strong> and <strong>Scale</strong>
+simultaneously. My 90-day mission is to transform the current
+Docker-Compose on EC2 setup into a zero-trust, multi-tenant architecture
+ that can handle 1,000 concurrent deep-Autonomous Executions without
+breaking a sweat or risking customer data."
+    </div>
+
+    <h3>The Foundation (Weeks 1–3)</h3>
+    <div class="callout">
+      "The first thing I'm doing is establishing a hard isolation
+boundary. I'm implementing AWS Control Tower to move us into a true
+multi-account structure: Dev, Staging, and Prod, plus dedicated Audit
+and Log-Archive accounts. Inside each environment, I'm deploying a
+Dual-VPC architecture — the Control Plane VPC (the Brain) and a
+completely separate Execution Plane VPC (the Red Zone). By using NACLs
+to block all internal RFC1918 traffic and forcing workers to communicate
+ back only via PrivateLink and a specific Results Ingestion API, we
+ensure that even if a worker is compromised by a malicious target, the
+Brain remains unreachable."
+    </div>
+
+    <h3>The Engine (Weeks 4–7)</h3>
+    <div class="callout">
+      "To handle the unpredictable load of autonomous Execution, I'm
+moving us to ECS Fargate. Synchronous dashboard/API traffic sits behind
+an ALB with Blue/Green deployments. The actual Execution work is
+orchestrated by Step Functions and SQS across three worker tiers — Nano,
+ Medium, and X-Large — to binpack compute costs. This keeps COGS low
+while giving us infinite headroom to scale."
+    </div>
+
+    <h3>The Security (Weeks 8–10)</h3>
+    <div class="callout">
+      "Because we are a security company, good enough encryption is not
+enough. I'm implementing Internal PKI using AWS Private CA. Every worker
+ will be issued a short-lived identity certificate at runtime. The
+Results API requires mTLS — only a cryptographically verified Platform
+worker can write findings to our database. Every finding is stamped with
+ tenant_id, job_id, and module_version — a perfect audit trail."
+    </div>
+
+    <h3>The Maturity (Weeks 11–12)</h3>
+    <div class="callout">
+      "I'm closing the loop with OpenTelemetry — full distributed
+tracing from the moment a user clicks Scan to the moment a worker sends a
+ packet. The real founding engineer feature is our Versioned Rollout
+mechanism: SSM Parameter Store gates worker versions globally. We can
+flip the entire fleet or roll back in seconds without a redeploy, using a
+ Canary Tenant model."
+    </div>
+
+    <h3>Pressure Test Answers</h3>
+    <div class="card">
+      <div class="card-title">Q: Why Terraform AND CloudFormation?</div>
+      <p>Terraform for stateful infra (VPCs, RDS, SQS) — superior state
+management and multi-account provider ecosystem. CloudFormation for
+app-native pieces like ECS Blue/Green CodeDeploy — AWS-native tools
+handle wait-for-success and auto-rollback more reliably than a
+third-party state engine.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Q: Why not Kubernetes (EKS)?</div>
+      <p>At our current stage, EKS is an operational tax we don't need
+to pay. ECS Fargate gives us the same container isolation and scaling
+benefits with 90% less configuration overhead. Our innovation tokens
+should be spent on The Engine's AI Execution capabilities, not managing a
+ K8s control plane. We've built the VPCs to be EKS-ready if we ever need
+ it.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Q: How do you handle the Noisy Neighbor problem?</div>
+      <p>Three levels: Compute (Fargate tasks are kernel-isolated),
+Queueing (per-tenant SQS backlogs if one customer floods us), Database
+(Postgres RLS ensures a code bug can't leak data from Tenant A to Tenant
+ B).</p>
+    </div>
+
+    <h3>Mic Drop Closing Statement</h3>
+    <div class="callout green">
+      "By Day 90, Platform won't just have infrastructure. We will have a
+ Security Fortress — SOC2-ready on day one, clear margin visibility per
+customer to the CEO, and the engineering team with the autonomy to ship
+new AI Execution modules with total confidence that the underlying
+plumbing is indestructible."
+    </div>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 12. 3RD-PARTY VENDORS -->
+  <!-- ======================================================== -->
+  <section class="section" id="vendors">
+    <h2><span class="num">12</span> Strategic 3rd-Party Vendors</h2>
+
+    <p>Buy the commodities. Build the differentiators.</p>
+
+    <table>
+      <tbody><tr><th>Category</th><th>Vendor(s)</th><th>Why</th></tr>
+      <tr><td>Observability</td><td>Honeycomb / Datadog</td><td>High-cardinality tracing across tenant_id, run_id, module_version — CloudWatch alone is not enough</td></tr>
+      <tr><td>Customer Identity</td><td>Auth0 (Okta) / Clerk</td><td>Enterprise SAML/SSO on day one without writing auth code. Do not build your own.</td></tr>
+      <tr><td>Compliance Automation</td><td>Vanta / Drata</td><td>SOC2 evidence collection automated from AWS accounts. Integrate early.</td></tr>
+      <tr><td>Edge Security</td><td>Cloudflare</td><td>Superior DDoS protection + OOB callback domain management. Workers KV for low-latency callbacks.</td></tr>
+      <tr><td>Error Tracking</td><td>Sentry</td><td>Exact Python stack trace + local variables from crashed Fargate workers. Slack alerts immediately.</td></tr>
+    </tbody></table>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 13. CTO QUESTIONS -->
+  <!-- ======================================================== -->
+  <section class="section" id="questions">
+    <h2><span class="num">13</span> Critical Questions to Ask the CTO</h2>
+
+    <div class="card">
+      <div class="card-title">A. Long-Running Execution State</div>
+      <p>"As The Engine moves to complex multi-step autonomous
+Taskation, some jobs might take 12+ hours. How are we currently
+persisting the state of an ongoing attack? If a Fargate worker is
+preempted, do we restart the entire job or do we have a checkpointing
+mechanism?"</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">B. Data Residency vs. Global Scale</div>
+      <p>"As we sign European or Financial Services customers, will we
+be required to keep findings and evidence within specific geographic
+regions? Does our current Control Plane support a multi-region
+Cell-based architecture, or are we hard-coded to us-east-1?"</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">C. The AI Feedback Loop</div>
+      <p>"Does the infrastructure need to support a Training Loop where
+successful Tasks are fed back into a model? Do we need a high-throughput
+ pipeline (Kinesis/Kafka) to move data from the Execution Plane into a
+Data Lake for ML engineers?"</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">D. Authenticated Scanning + Secrets Handling</div>
+      <p>"Are we planning to support Authenticated Scans where customers
+ give us SSH keys or web session tokens? If so, how are we injecting
+those into ephemeral Fargate workers without them ever touching a disk
+or being logged? (Nitro Enclaves?)"</p>
+    </div>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- 14. ARCHITECTURE DIAGRAM (Mermaid rendered in-page) -->
+  <!-- ======================================================== -->
+  <section class="section" id="diagram">
+    <h2><span class="num">14</span> Full Architecture Diagram</h2>
+    <p>Rendered live via Mermaid JS. Scroll horizontally if needed.</p>
+
+    <div class="mermaid-wrap">
+      <div class="mermaid" data-processed="true"><svg aria-roledescription="flowchart-v2" role="graphics-document document" viewBox="-8 -8 7586.712890625 1904.199951171875" style="max-width: 7586.712890625px;" xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="100%" id="mermaid-1772746921845"><style>#mermaid-1772746921845{font-
+family:"trebuchet
+ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}
+#mermaid-1772746921845 .error-icon{fill:#552222;}#mermaid-1772746921845
+.error-text{fill:#552222;stroke:#552222;}#mermaid-1772746921845
+.edge-thickness-normal{stroke-width:2px;}#mermaid-1772746921845
+.edge-thickness-thick{stroke-width:3.5px;}#mermaid-1772746921845
+.edge-pattern-solid{stroke-dasharray:0;}#mermaid-1772746921845
+.edge-pattern-dashed{stroke-dasharray:3;}#mermaid-1772746921845
+.edge-pattern-dotted{stroke-dasharray:2;}#mermaid-1772746921845
+.marker{fill:#333333;stroke:#333333;}#mermaid-1772746921845
+.marker.cross{stroke:#333333;}#mermaid-1772746921845
+svg{font-family:"trebuchet
+ms",verdana,arial,sans-serif;font-size:16px;}#mermaid-1772746921845
+.label{font-family:"trebuchet
+ms",verdana,arial,sans-serif;color:#333;}#mermaid-1772746921845
+.cluster-label text{fill:#333;}#mermaid-1772746921845 .cluster-label
+span,#mermaid-1772746921845 p{color:#333;}#mermaid-1772746921845 .label
+text,#mermaid-1772746921845 span,#mermaid-1772746921845
+p{fill:#333;color:#333;}#mermaid-1772746921845 .node
+rect,#mermaid-1772746921845 .node circle,#mermaid-1772746921845 .node
+ellipse,#mermaid-1772746921845 .node polygon,#mermaid-1772746921845
+.node
+path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}
+#mermaid-1772746921845 .flowchart-label
+text{text-anchor:middle;}#mermaid-1772746921845 .node .katex
+path{fill:#000;stroke:#000;stroke-width:1px;}#mermaid-1772746921845
+.node .label{text-align:center;}#mermaid-1772746921845
+.node.clickable{cursor:pointer;}#mermaid-1772746921845
+.arrowheadPath{fill:#333333;}#mermaid-1772746921845 .edgePath
+.path{stroke:#333333;stroke-width:2.0px;}#mermaid-1772746921845
+.flowchart-link{stroke:#333333;fill:none;}#mermaid-1772746921845
+.edgeLabel{background-color:#e8e8e8;text-align:center;}
+#mermaid-1772746921845 .edgeLabel
+rect{opacity:0.5;background-color:#e8e8e8;fill:#e8e8e8;}
+#mermaid-1772746921845 .labelBkg{background-color:rgba(232, 232, 232,
+0.5);}#mermaid-1772746921845 .cluster
+rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}
+#mermaid-1772746921845 .cluster text{fill:#333;}#mermaid-1772746921845
+.cluster span,#mermaid-1772746921845
+p{color:#333;}#mermaid-1772746921845
+div.mermaidTooltip{position:absolute;text-align:center;max-
+width:200px;padding:2px;font-family:"trebuchet
+ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%,
+96.2745098039%);border:1px solid
+#aaaa33;border-radius:2px;pointer-events:none;z-index:100;}
+#mermaid-1772746921845
+.flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}
+#mermaid-1772746921845 :root{--mermaid-font-family:"trebuchet
+ms",verdana,arial,sans-serif;}</style><g><marker orient="auto" markerHeight="12" markerWidth="12" markerUnits="userSpaceOnUse" refY="5" refX="6" viewBox="0 0 10 10" class="marker flowchart" id="mermaid-1772746921845_flowchart-pointEnd"><path style="stroke-width: 1px; stroke-dasharray: 1px, 0px;" class="arrowMarkerPath" d="M 0 0 L 10 5 L 0 10 z"></path></marker><marker orient="auto" markerHeight="12" markerWidth="12" markerUnits="userSpaceOnUse" refY="5" refX="4.5" viewBox="0 0 10 10" class="marker flowchart" id="mermaid-1772746921845_flowchart-pointStart"><path style="stroke-width: 1px; stroke-dasharray: 1px, 0px;" class="arrowMarkerPath" d="M 0 5 L 10 10 L 10 0 z"></path></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5" refX="11" viewBox="0 0 10 10" class="marker flowchart" id="mermaid-1772746921845_flowchart-circleEnd"><circle style="stroke-width: 1px; stroke-dasharray: 1px, 0px;" class="arrowMarkerPath" r="5" cy="5" cx="5"></circle></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5" refX="-1" viewBox="0 0 10 10" class="marker flowchart" id="mermaid-1772746921845_flowchart-circleStart"><circle style="stroke-width: 1px; stroke-dasharray: 1px, 0px;" class="arrowMarkerPath" r="5" cy="5" cx="5"></circle></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5.2" refX="12" viewBox="0 0 11 11" class="marker cross flowchart" id="mermaid-1772746921845_flowchart-crossEnd"><path style="stroke-width: 2px; stroke-dasharray: 1px, 0px;" class="arrowMarkerPath" d="M 1,1 l 9,9 M 10,1 l -9,9"></path></marker><marker orient="auto" markerHeight="11" markerWidth="11" markerUnits="userSpaceOnUse" refY="5.2" refX="-1" viewBox="0 0 11 11" class="marker cross flowchart" id="mermaid-1772746921845_flowchart-crossStart"><path style="stroke-width: 2px; stroke-dasharray: 1px, 0px;" class="arrowMarkerPath" d="M 1,1 l 9,9 M 10,1 l -9,9"></path></marker><g class="root"><g class="clusters"><g id="CICD" class="cluster default flowchart-label"><rect height="527" width="538.3000030517578" y="1042.4000091552734" x="7032.41255569458" ry="0" rx="0" style=""></rect><g transform="translate(7194.587558746338, 1042.4000091552734)" class="cluster-label"><foreignObject height="27.199996948242188" width="213.9499969482422"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">CI/CD + IaC — shared-services</span></div></foreignObject></g></g><g id="ENV_PRD" class="cluster default flowchart-label"><rect height="278.1999969482422" width="1014.3666839599609" y="1291.2000122070312" x="4113.716686248779" ry="0" rx="0" style=""></rect><g transform="translate(4453.991703033447, 1291.2000122070312)" class="cluster-label"><foreignObject height="27.199996948242188" width="333.816650390625"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">ENV: PROD — Platform-prod — strict guardrails</span></div></foreignObject></g></g><g id="ENV_STG" class="cluster default flowchart-label"><rect height="278.1999969482422" width="1062.2833404541016" y="1291.2000122070312" x="3031.4333457946777" ry="0" rx="0" style=""></rect><g transform="translate(3350.6833534240723, 1291.2000122070312)" class="cluster-label"><foreignObject height="27.199996948242188" width="423.7833251953125"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">ENV: STAGING — Platform-staging — prod-like smaller scale</span></div></foreignObject></g></g><g id="ENV_DEV" class="cluster default flowchart-label"><rect height="1427.2000122070312" width="3011.4333457946777" y="142.1999969482422" x="0" ry="0" rx="0" style=""></rect><g transform="translate(1384.5583400726318, 142.1999969482422)" class="cluster-label"><foreignObject height="27.199996948242188" width="242.31666564941406"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">ENV: DEV — Platform-dev account</span></div></foreignObject></g></g><g id="ORG" class="cluster default flowchart-label"><rect height="597" width="1864.3291854858398" y="1291.2000122070312" x="5148.08337020874" ry="0" rx="0" style=""></rect><g transform="translate(5899.072959899902, 1291.2000122070312)" class="cluster-label"><foreignObject height="27.199996948242188" width="362.3500061035156"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">AWS ORGANIZATION — Control Tower Landing Zone</span></div></foreignObject></g></g><g id="EXT" class="cluster default flowchart-label"><rect height="92.19999694824219" width="7400.725067138672" y="0" x="66.42499542236328" ry="0" rx="0" style=""></rect><g transform="translate(3666.629196166992, 0)" class="cluster-label"><foreignObject height="27.199996948242188" width="200.31666564941406"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">USERS / EXTERNAL SYSTEMS</span></div></foreignObject></g></g><g id="DEV_CP" class="cluster default flowchart-label"><rect height="1377.2000122070312" width="806.5749893188477" y="167.1999969482422" x="20" ry="0" rx="0" style=""></rect><g transform="translate(309.4291648864746, 167.1999969482422)" class="cluster-label"><foreignObject height="27.199996948242188" width="227.71665954589844"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Control Plane VPC 10.10.0.0/16</span></div></foreignObject></g></g><g id="DEV_EP" class="cluster default flowchart-label"><rect height="874.6000061035156" width="593.108341217041" y="669.8000030517578" x="1816.5583267211914" ry="0" rx="0" style=""></rect><g transform="translate(1952.6708316802979, 669.8000030517578)" class="cluster-label"><foreignObject height="27.199996948242188" width="320.8833312988281"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Execution Plane VPC 10.20.0.0/16 RED ZONE</span></div></foreignObject></g></g><g id="DEV_DP" class="cluster default flowchart-label"><rect height="173.8000030517578" width="949.9833374023438" y="1067.4000091552734" x="846.5749893188477" ry="0" rx="0" style=""></rect><g transform="translate(1282.9166564941406, 1067.4000091552734)" class="cluster-label"><foreignObject height="27.199996948242188" width="77.30000305175781"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Data Plane</span></div></foreignObject></g></g><g id="DEV_OBS" class="cluster default flowchart-label"><rect height="477" width="561.7666778564453" y="1067.4000091552734" x="2429.6666679382324" ry="0" rx="0" style=""></rect><g transform="translate(2663.366672515869, 1067.4000091552734)" class="cluster-label"><foreignObject height="27.199996948242188" width="94.36666870117188"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Observability</span></div></foreignObject></g></g><g id="OU_SEC" class="cluster default flowchart-label"><rect height="547" width="701.6208572387695" y="1316.2000122070312" x="5168.08337020874" ry="0" rx="0" style=""></rect><g transform="translate(5468.760467529297, 1316.2000122070312)" class="cluster-label"><foreignObject height="27.199996948242188" width="100.26666259765625"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">OU: SECURITY</span></div></foreignObject></g></g><g id="OU_WORK" class="cluster default flowchart-label"><rect height="243.8000030517578" width="774.2083282470703" y="1619.4000091552734" x="6218.20422744751" ry="0" rx="0" style=""></rect><g transform="translate(6544.983394622803, 1619.4000091552734)" class="cluster-label"><foreignObject height="27.199996948242188" width="120.64999389648438"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">OU: WORKLOADS</span></div></foreignObject></g></g></g><g class="edgePaths"><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-EU LE-DEV_WAF" id="L-EU-DEV_WAF-0" d="M201.608,67.2L201.608,71.367C201.608,75.533,201.608,83.867,201.608,92.2C201.608,100.533,201.608,108.867,201.608,117.2C201.608,125.533,201.608,133.867,201.608,142.2C201.608,150.533,201.608,158.867,216.135,168.876C230.662,178.886,259.716,190.572,274.243,196.416L288.77,202.259"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-CAPI LE-DEV_WAF" id="L-CAPI-DEV_WAF-0" d="M430.833,67.2L430.833,71.367C430.833,75.533,430.833,83.867,430.833,92.2C430.833,100.533,430.833,108.867,430.833,117.2C430.833,125.533,430.833,133.867,430.833,142.2C430.833,150.533,430.833,158.867,416.306,168.876C401.779,178.886,372.725,190.572,358.198,196.416L343.671,202.259"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_WAF LE-DEV_ALB" id="L-DEV_WAF-DEV_ALB-0" d="M316.221,234.4L316.221,238.567C316.221,242.733,316.221,251.067,316.221,258.517C316.221,265.967,316.221,272.533,316.221,275.817L316.221,279.1"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_ALB LE-DEV_API" id="L-DEV_ALB-DEV_API-0" d="M316.221,326.6L316.221,330.767C316.221,334.933,316.221,343.267,320.279,351.015C324.338,358.764,332.455,365.929,336.514,369.511L340.573,373.093"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_API LE-DEV_SFN" id="L-DEV_API-DEV_SFN-0" d="M505.654,453.904L532.733,461.287C559.811,468.669,613.968,483.435,641.047,494.101C668.125,504.767,668.125,511.333,668.125,514.617L668.125,517.9"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_SFN LE-DEV_SQS" id="L-DEV_SFN-DEV_SQS-0" d="M668.125,619.8L668.125,623.967C668.125,628.133,668.125,636.467,668.125,644.8C668.125,653.133,668.125,661.467,668.125,671.183C668.125,680.9,668.125,692,668.125,697.55L668.125,703.1"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_SQS LE-DEV_WORKERS" id="L-DEV_SQS-DEV_WORKERS-0" d="M668.125,805L668.125,811.433C668.125,817.867,668.125,830.733,869.365,848.416C1070.604,866.099,1473.083,888.597,1674.323,899.846L1875.562,911.096"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_WORKERS LE-DEV_NAT" id="L-DEV_WORKERS-DEV_NAT-0" d="M2071.223,965.2L2083.454,971.633C2095.685,978.067,2120.146,990.933,2132.377,1003.8C2144.608,1016.667,2144.608,1029.533,2144.608,1040.133C2144.608,1050.733,2144.608,1059.067,2151.829,1069.109C2159.049,1079.152,2173.489,1090.903,2180.709,1096.779L2187.929,1102.655"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_NAT LE-DEV_TARGETS" id="L-DEV_NAT-DEV_TARGETS-0" d="M2251.392,1202.6L2251.392,1209.033C2251.392,1215.467,2251.392,1228.333,2251.392,1238.933C2251.392,1249.533,2251.392,1257.867,2251.392,1266.2C2251.392,1274.533,2251.392,1282.867,2251.392,1291.2C2251.392,1299.533,2251.392,1307.867,2251.392,1324.383C2251.392,1340.9,2251.392,1365.6,2251.392,1377.95L2251.392,1390.3"></path><path style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_NACL LE-DEV_NAT" id="L-DEV_NACL-DEV_NAT-0" d="M2271.392,951.6L2271.392,960.3C2271.392,969,2271.392,986.4,2271.392,1001.533C2271.392,1016.667,2271.392,1029.533,2271.392,1040.133C2271.392,1050.733,2271.392,1059.067,2269.911,1069.667C2268.43,1080.267,2265.469,1093.133,2263.989,1099.567L2262.508,1106"></path><path style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_GUARD LE-DEV_WORKERS" id="L-DEV_GUARD-DEV_WORKERS-0" d="M1979.396,818.6L1979.396,822.767C1979.396,826.933,1979.396,835.267,1979.396,843.6C1979.396,851.933,1979.396,860.267,1979.396,864.433L1979.396,868.6"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_WORKERS LE-DEV_S3" id="L-DEV_WORKERS-DEV_S3-0" d="M1925.033,965.2L1917.792,971.633C1910.551,978.067,1896.069,990.933,1888.828,1003.8C1881.587,1016.667,1881.587,1029.533,1881.587,1040.133C1881.587,1050.733,1881.587,1059.067,1747.762,1076.096C1613.936,1093.125,1346.285,1118.851,1212.46,1131.714L1078.634,1144.576"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_WORKERS LE-DEV_BRIDGE" id="L-DEV_WORKERS-DEV_BRIDGE-0" d="M1981.695,965.2L1982.002,971.633C1982.308,978.067,1982.921,990.933,1983.227,1003.8C1983.533,1016.667,1983.533,1029.533,1983.533,1040.133C1983.533,1050.733,1983.533,1059.067,1983.533,1071.05C1983.533,1083.033,1983.533,1098.667,1983.533,1106.483L1983.533,1114.3"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_BRIDGE LE-DEV_RAPI" id="L-DEV_BRIDGE-DEV_RAPI-0" d="M1983.533,1189L1983.533,1197.7C1983.533,1206.4,1983.533,1223.8,1983.533,1236.667C1983.533,1249.533,1983.533,1257.867,1983.533,1266.2C1983.533,1274.533,1983.533,1282.867,1983.533,1291.2C1983.533,1299.533,1983.533,1307.867,1754.328,1328.758C1525.123,1349.65,1066.713,1383.1,837.508,1399.825L608.303,1416.55"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_API LE-DEV_RPROXY" id="L-DEV_API-DEV_RPROXY-0" d="M292.887,451.298L261.385,459.115C229.883,466.932,166.879,482.566,138.428,493.884C109.976,505.201,116.077,512.203,119.128,515.704L122.179,519.204"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_RPROXY LE-DEV_RDS" id="L-DEV_RPROXY-DEV_RDS-0" d="M167.75,619.8L167.75,623.967C167.75,628.133,167.75,636.467,167.75,644.8C167.75,653.133,167.75,661.467,167.75,671.183C167.75,680.9,167.75,692,167.75,697.55L167.75,703.1"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_SM LE-DEV_RPROXY" id="L-DEV_SM-DEV_RPROXY-0" d="M153.953,446L157.919,454.7C161.885,463.4,169.818,480.8,173.335,492.791C176.852,504.783,175.954,511.366,175.505,514.657L175.056,517.949"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-OOB LE-DEV_API" id="L-OOB-DEV_API-0" d="M658.125,67.2L658.125,71.367C658.125,75.533,658.125,83.867,658.125,92.2C658.125,100.533,658.125,108.867,658.125,117.2C658.125,125.533,658.125,133.867,658.125,142.2C658.125,150.533,658.125,158.867,658.125,170.717C658.125,182.567,658.125,197.933,658.125,213.3C658.125,228.667,658.125,244.033,658.125,259.4C658.125,274.767,658.125,290.133,658.125,305.5C658.125,320.867,658.125,336.233,633.563,350.872C609.001,365.51,559.877,379.421,535.316,386.376L510.754,393.331"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_API LE-DEV_OTEL" id="L-DEV_API-DEV_OTEL-0" d="M438.73,473.2L442.134,477.367C445.538,481.533,452.346,489.867,455.75,506.25C459.154,522.633,459.154,547.067,459.154,571.5C459.154,595.933,459.154,620.367,459.154,636.75C459.154,653.133,459.154,661.467,459.154,680.117C459.154,698.767,459.154,727.733,459.154,756.7C459.154,785.667,459.154,814.633,459.154,841.333C459.154,868.033,459.154,892.467,459.154,919.167C459.154,945.867,459.154,974.833,459.154,995.75C459.154,1016.667,459.154,1029.533,459.154,1040.133C459.154,1050.733,459.154,1059.067,792.524,1076.931C1125.893,1094.796,1792.632,1122.192,2126.002,1135.89L2459.371,1149.589"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_WORKERS LE-DEV_OTEL" id="L-DEV_WORKERS-DEV_OTEL-0" d="M2077.937,940.028L2123.224,950.657C2168.51,961.285,2259.082,982.543,2304.368,999.605C2349.654,1016.667,2349.654,1029.533,2349.654,1040.133C2349.654,1050.733,2349.654,1059.067,2367.999,1070.338C2386.344,1081.61,2423.034,1095.819,2441.379,1102.924L2459.724,1110.029"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_OTEL LE-DEV_LOGS" id="L-DEV_OTEL-DEV_LOGS-0" d="M2573.288,1202.6L2573.188,1209.033C2573.089,1215.467,2572.89,1228.333,2572.791,1238.933C2572.692,1249.533,2572.692,1257.867,2572.692,1266.2C2572.692,1274.533,2572.692,1282.867,2572.692,1291.2C2572.692,1299.533,2572.692,1307.867,2572.692,1324.383C2572.692,1340.9,2572.692,1365.6,2572.692,1377.95L2572.692,1390.3"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_OTEL LE-DEV_METRICS" id="L-DEV_OTEL-DEV_METRICS-0" d="M2648.827,1202.6L2658.789,1209.033C2668.751,1215.467,2688.676,1228.333,2698.638,1238.933C2708.6,1249.533,2708.6,1257.867,2708.6,1266.2C2708.6,1274.533,2708.6,1282.867,2708.6,1291.2C2708.6,1299.533,2708.6,1307.867,2721.46,1324.648C2734.32,1341.43,2760.039,1366.659,2772.899,1379.274L2785.759,1391.889"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_COST LE-DEV_METRICS" id="L-DEV_COST-DEV_METRICS-0" d="M2844.917,1189L2844.917,1197.7C2844.917,1206.4,2844.917,1223.8,2844.917,1236.667C2844.917,1249.533,2844.917,1257.867,2844.917,1266.2C2844.917,1274.533,2844.917,1282.867,2844.917,1291.2C2844.917,1299.533,2844.917,1307.867,2842.75,1324.397C2840.582,1340.927,2836.248,1365.653,2834.081,1378.016L2831.914,1390.38"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-DEV_LOGS LE-ACC_LOG" id="L-DEV_LOGS-ACC_LOG-0" d="M2572.692,1465L2572.692,1478.233C2572.692,1491.467,2572.692,1517.933,2572.692,1535.333C2572.692,1552.733,2572.692,1561.067,3020.443,1569.4C3468.194,1577.733,4363.697,1586.067,4811.449,1594.4C5259.2,1602.733,5259.2,1611.067,5263.683,1624.439C5268.165,1637.812,5277.131,1656.223,5281.614,1665.429L5286.096,1674.635"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-STG_OBS LE-ACC_LOG" id="L-STG_OBS-ACC_LOG-0" d="M3934.483,1451.4L3934.483,1466.9C3934.483,1482.4,3934.483,1513.4,3934.483,1533.067C3934.483,1552.733,3934.483,1561.067,4158.603,1569.4C4382.722,1577.733,4830.961,1586.067,5055.081,1594.4C5279.2,1602.733,5279.2,1611.067,5282.157,1624.393C5285.115,1637.719,5291.029,1656.038,5293.987,1665.197L5296.944,1674.356"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-PRD_OBS LE-ACC_LOG" id="L-PRD_OBS-ACC_LOG-0" d="M4938.992,1478.6L4938.992,1489.567C4938.992,1500.533,4938.992,1522.467,4938.992,1537.6C4938.992,1552.733,4938.992,1561.067,4999.026,1569.4C5059.061,1577.733,5179.131,1586.067,5239.165,1594.4C5299.2,1602.733,5299.2,1611.067,5300.65,1624.361C5302.099,1637.655,5304.998,1655.91,5306.448,1665.038L5307.897,1674.166"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-ACC_AUDIT LE-ACC_LOG" id="L-ACC_AUDIT-ACC_LOG-0" d="M5365.313,1478.6L5365.313,1489.567C5365.313,1500.533,5365.313,1522.467,5365.313,1537.6C5365.313,1552.733,5365.313,1561.067,5365.313,1569.4C5365.313,1577.733,5365.313,1586.067,5365.313,1594.4C5365.313,1602.733,5365.313,1611.067,5361.793,1624.409C5358.274,1637.751,5351.236,1656.101,5347.717,1665.276L5344.198,1674.452"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-PCA LE-ACC_DEV" id="L-PCA-ACC_DEV-0" d="M5606.327,1492.2L5594.058,1500.9C5581.789,1509.6,5557.251,1527,5544.982,1539.867C5532.713,1552.733,5532.713,1561.067,5532.713,1569.4C5532.713,1577.733,5532.713,1586.067,5532.713,1594.4C5532.713,1602.733,5532.713,1611.067,5651.922,1633.987C5771.131,1656.907,6009.55,1694.415,6128.759,1713.169L6247.969,1731.922"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-PCA LE-ACC_STG" id="L-PCA-ACC_STG-0" d="M5695.382,1492.2L5695.629,1500.9C5695.877,1509.6,5696.372,1527,5696.619,1539.867C5696.867,1552.733,5696.867,1561.067,5696.867,1569.4C5696.867,1577.733,5696.867,1586.067,5696.867,1594.4C5696.867,1602.733,5696.867,1611.067,5836.186,1633.935C5975.506,1656.803,6254.145,1694.206,6393.465,1712.908L6532.785,1731.609"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-PCA LE-ACC_PRD" id="L-PCA-ACC_PRD-0" d="M5741.384,1492.2L5748.097,1500.9C5754.81,1509.6,5768.236,1527,5774.949,1539.867C5781.663,1552.733,5781.663,1561.067,5781.663,1569.4C5781.663,1577.733,5781.663,1586.067,5781.663,1594.4C5781.663,1602.733,5781.663,1611.067,5957.426,1634.401C6133.19,1657.735,6484.717,1696.071,6660.48,1715.238L6836.244,1734.406"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-CT LE-ACC_DEV" id="L-CT-ACC_DEV-0" d="M6324.911,1478.6L6317.907,1489.567C6310.904,1500.533,6296.898,1522.467,6289.895,1537.6C6282.892,1552.733,6282.892,1561.067,6282.892,1569.4C6282.892,1577.733,6282.892,1586.067,6282.892,1594.4C6282.892,1602.733,6282.892,1611.067,6286.119,1631.168C6289.346,1651.268,6295.8,1683.137,6299.027,1699.071L6302.254,1715.005"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-CT LE-ACC_STG" id="L-CT-ACC_STG-0" d="M6377.229,1478.6L6382.104,1489.567C6386.98,1500.533,6396.732,1522.467,6401.608,1537.6C6406.483,1552.733,6406.483,1561.067,6406.483,1569.4C6406.483,1577.733,6406.483,1586.067,6406.483,1594.4C6406.483,1602.733,6406.483,1611.067,6433.087,1631.571C6459.691,1652.075,6512.898,1684.751,6539.501,1701.089L6566.105,1717.426"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-CT LE-ACC_PRD" id="L-CT-ACC_PRD-0" d="M6466.254,1457.341L6525.548,1471.851C6584.842,1486.36,6703.429,1515.38,6762.723,1534.057C6822.017,1552.733,6822.017,1561.067,6822.017,1569.4C6822.017,1577.733,6822.017,1586.067,6822.017,1594.4C6822.017,1602.733,6822.017,1611.067,6832.216,1631.288C6842.416,1651.509,6862.816,1683.618,6873.015,1699.672L6883.215,1715.726"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-IDCS LE-ACC_DEV" id="L-IDCS-ACC_DEV-0" d="M6575.718,1478.6L6540.064,1489.567C6504.411,1500.533,6433.103,1522.467,6397.45,1537.6C6361.796,1552.733,6361.796,1561.067,6361.796,1569.4C6361.796,1577.733,6361.796,1586.067,6361.796,1594.4C6361.796,1602.733,6361.796,1611.067,6354.683,1631.226C6347.57,1651.386,6333.344,1683.372,6326.231,1699.364L6319.118,1715.357"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-IDCS LE-ACC_STG" id="L-IDCS-ACC_STG-0" d="M6753.603,1478.6L6758.339,1489.567C6763.074,1500.533,6772.545,1522.467,6777.281,1537.6C6782.017,1552.733,6782.017,1561.067,6782.017,1569.4C6782.017,1577.733,6782.017,1586.067,6782.017,1594.4C6782.017,1602.733,6782.017,1611.067,6758.345,1631.532C6734.674,1651.998,6687.331,1684.596,6663.66,1700.895L6639.988,1717.194"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-IDCS LE-ACC_PRD" id="L-IDCS-ACC_PRD-0" d="M6785.976,1478.6L6798.062,1489.567C6810.148,1500.533,6834.32,1522.467,6846.406,1537.6C6858.492,1552.733,6858.492,1561.067,6858.492,1569.4C6858.492,1577.733,6858.492,1586.067,6858.492,1594.4C6858.492,1602.733,6858.492,1611.067,6863.857,1631.196C6869.222,1651.325,6879.952,1683.251,6885.317,1699.213L6890.682,1715.176"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-GHA LE-PIPE" id="L-GHA-PIPE-0" d="M7347.967,67.2L7347.967,71.367C7347.967,75.533,7347.967,83.867,7347.967,92.2C7347.967,100.533,7347.967,108.867,7347.967,117.2C7347.967,125.533,7347.967,133.867,7347.967,142.2C7347.967,150.533,7347.967,158.867,7347.967,170.717C7347.967,182.567,7347.967,197.933,7347.967,213.3C7347.967,228.667,7347.967,244.033,7347.967,259.4C7347.967,274.767,7347.967,290.133,7347.967,305.5C7347.967,320.867,7347.967,336.233,7347.967,356.133C7347.967,376.033,7347.967,400.467,7347.967,424.9C7347.967,449.333,7347.967,473.767,7347.967,498.2C7347.967,522.633,7347.967,547.067,7347.967,571.5C7347.967,595.933,7347.967,620.367,7347.967,636.75C7347.967,653.133,7347.967,661.467,7347.967,680.117C7347.967,698.767,7347.967,727.733,7347.967,756.7C7347.967,785.667,7347.967,814.633,7347.967,841.333C7347.967,868.033,7347.967,892.467,7347.967,919.167C7347.967,945.867,7347.967,974.833,7347.967,995.75C7347.967,1016.667,7347.967,1029.533,7347.967,1040.133C7347.967,1050.733,7347.967,1059.067,7347.967,1066.517C7347.967,1073.967,7347.967,1080.533,7347.967,1083.817L7347.967,1087.1"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-PIPE LE-TF" id="L-PIPE-TF-0" d="M7257.875,1197.721L7242.84,1204.967C7227.804,1212.214,7197.733,1226.707,7182.698,1238.12C7167.663,1249.533,7167.663,1257.867,7167.663,1266.2C7167.663,1274.533,7167.663,1282.867,7167.663,1291.2C7167.663,1299.533,7167.663,1307.867,7167.663,1322.117C7167.663,1336.367,7167.663,1356.533,7167.663,1366.617L7167.663,1376.7"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-PIPE LE-CFN" id="L-PIPE-CFN-0" d="M7404.13,1216.2L7407.91,1220.367C7411.691,1224.533,7419.252,1232.867,7423.032,1241.2C7426.813,1249.533,7426.813,1257.867,7426.813,1266.2C7426.813,1274.533,7426.813,1282.867,7426.813,1291.2C7426.813,1299.533,7426.813,1307.867,7426.813,1322.117C7426.813,1336.367,7426.813,1356.533,7426.813,1366.617L7426.813,1376.7"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-TF LE-ACC_DEV" id="L-TF-ACC_DEV-0" d="M7147.502,1478.6L7142.925,1489.567C7138.347,1500.533,7129.192,1522.467,7124.615,1537.6C7120.038,1552.733,7120.038,1561.067,6997.779,1569.4C6875.52,1577.733,6631.001,1586.067,6508.742,1594.4C6386.483,1602.733,6386.483,1611.067,6376.089,1631.292C6365.695,1651.517,6344.906,1683.634,6334.511,1699.692L6324.117,1715.751"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-TF LE-ACC_STG" id="L-TF-ACC_STG-0" d="M7189.137,1478.6L7194.013,1489.567C7198.888,1500.533,7208.64,1522.467,7213.516,1537.6C7218.392,1552.733,7218.392,1561.067,7148.996,1569.4C7079.6,1577.733,6940.808,1586.067,6871.413,1594.4C6802.017,1602.733,6802.017,1611.067,6775.613,1631.569C6749.209,1652.071,6696.4,1684.741,6669.996,1701.076L6643.592,1717.412"></path><path marker-end="url(#mermaid-1772746921845_flowchart-pointEnd)" style="fill:none;" class="edge-thickness-normal edge-pattern-solid flowchart-link LS-TF LE-ACC_PRD" id="L-TF-ACC_PRD-0" d="M7252.971,1478.6L7272.34,1489.567C7291.71,1500.533,7330.449,1522.467,7349.818,1537.6C7369.188,1552.733,7369.188,1561.067,7296.979,1569.4C7224.771,1577.733,7080.354,1586.067,7008.146,1594.4C6935.938,1602.733,6935.938,1611.067,6931.164,1631.187C6926.39,1651.307,6916.843,1683.215,6912.069,1699.169L6907.295,1715.122"></path></g><g class="edgeLabels"><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g transform="translate(1983.5333290100098, 1003.8000106811523)" class="edgeLabel"><g transform="translate(-70.33333587646484, -13.599998474121094)" class="label"><foreignObject height="27.199996948242188" width="140.6666717529297"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel">mTLS POST findings</span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g transform="translate(0, 0)" class="label"><foreignObject height="0" width="0"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel"></span></div></foreignObject></g></g></g><g class="nodes"><g transform="translate(7167.66255569458, 1430.3000106811523)" data-id="TF" data-node="true" id="flowchart-TF-42" class="node default default flowchart-label"><rect height="96.60000610351562" width="200.5" y="-48.30000305175781" x="-100.25" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-92.75, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="185.5"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Terraform<br>VPC ECS RDS SQS modules<br>multi-account deploy</span></div></foreignObject></g></g><g transform="translate(7426.812557220459, 1430.3000106811523)" data-id="CFN" data-node="true" id="flowchart-CFN-43" class="node default default flowchart-label"><rect height="96.60000610351562" width="217.8000030517578" y="-48.30000305175781" x="-108.9000015258789" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-101.4000015258789, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="202.8000030517578"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">CloudFormation<br>ECS Blue/Green CodeDeploy<br>AWS-native wiring</span></div></foreignObject></g></g><g transform="translate(7347.966728210449, 1154.3000106811523)" data-id="PIPE" data-node="true" id="flowchart-PIPE-44" class="node default default flowchart-label"><rect height="123.80000305175781" width="180.18333435058594" y="-61.900001525878906" x="-90.09166717529297" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-82.59166717529297, -54.400001525878906)" style="" class="label"><rect></rect><foreignObject height="108.80000305175781" width="165.18333435058594"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Deploy Flow<br>Dev auto on merge<br>Staging on RC<br>Prod tagged + approval</span></div></foreignObject></g></g><g transform="translate(4271.2000160217285, 1430.3000106811523)" data-id="PRD_CP" data-node="true" id="flowchart-PRD_CP-39" class="node default default flowchart-label"><rect height="178.1999969482422" width="244.96665954589844" y="-89.0999984741211" x="-122.48332977294922" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-114.98332977294922, -81.5999984741211)" style="" class="label"><rect></rect><foreignObject height="163.1999969482422" width="229.96665954589844"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Control Plane VPC<br>WAF + ALB + Blue/Green API<br>Results API mTLS<br>RDS Proxy + Aurora Postgres RLS<br>SQS + Step Functions<br>VPC Endpoints</span></div></foreignObject></g></g><g transform="translate(4589.2916831970215, 1430.3000106811523)" data-id="PRD_EP" data-node="true" id="flowchart-PRD_EP-40" class="node default default flowchart-label"><rect height="151" width="291.2166748046875" y="-75.5" x="-145.60833740234375" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-138.10833740234375, -68)" style="" class="label"><rect></rect><foreignObject height="136" width="276.2166748046875"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Execution Plane VPC RED ZONE<br>Fargate Worker Pools + NAT static IP<br>NACL deny RFC1918 + scope guardrails<br>PrivateLink bridge to Results API<br>NO DB access</span></div></foreignObject></g></g><g transform="translate(4938.991695404053, 1430.3000106811523)" data-id="PRD_OBS" data-node="true" id="flowchart-PRD_OBS-41" class="node default default flowchart-label"><rect height="96.60000610351562" width="308.183349609375" y="-48.30000305175781" x="-154.0916748046875" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-146.5916748046875, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="293.183349609375"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">OTel + CloudWatch + Dashboards + Alerts<br>Burn-rate + rollback alarms<br>Cost allocation per tenant</span></div></foreignObject></g></g><g transform="translate(3234.891689300537, 1430.3000106811523)" data-id="STG_CP" data-node="true" id="flowchart-STG_CP-36" class="node default default flowchart-label"><rect height="69.39999389648438" width="336.91668701171875" y="-34.69999694824219" x="-168.45834350585938" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-160.95834350585938, -27.199996948242188)" style="" class="label"><rect></rect><foreignObject height="54.399993896484375" width="321.91668701171875"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Control Plane VPC<br>API + RDS Proxy + Aurora + SQS + SFN + mTLS</span></div></foreignObject></g></g><g transform="translate(3606.8000297546387, 1430.3000106811523)" data-id="STG_EP" data-node="true" id="flowchart-STG_EP-37" class="node default default flowchart-label"><rect height="69.39999389648438" width="306.8999938964844" y="-34.69999694824219" x="-153.4499969482422" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-145.9499969482422, -27.199996948242188)" style="" class="label"><rect></rect><foreignObject height="54.399993896484375" width="291.8999938964844"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Execution Plane VPC<br>Workers + NAT + Guardrails + PrivateLink</span></div></foreignObject></g></g><g transform="translate(3934.48335647583, 1430.3000106811523)" data-id="STG_OBS" data-node="true" id="flowchart-STG_OBS-38" class="node default default flowchart-label"><rect height="42.19999694824219" width="248.46665954589844" y="-21.099998474121094" x="-124.23332977294922" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-116.73332977294922, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="233.46665954589844"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">OTel + Logs + Metrics + Cost tags</span></div></foreignObject></g></g><g transform="translate(2574.0333366394043, 1154.3000106811523)" data-id="DEV_OTEL" data-node="true" id="flowchart-DEV_OTEL-32" class="node default default flowchart-label"><rect height="96.60000610351562" width="218.73333740234375" y="-48.30000305175781" x="-109.36666870117188" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-101.86666870117188, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="203.73333740234375"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">OpenTelemetry Collector<br>trace_id propagation<br>tenant_id job_id run_id tags</span></div></foreignObject></g></g><g transform="translate(2572.691665649414, 1430.3000106811523)" data-id="DEV_LOGS" data-node="true" id="flowchart-DEV_LOGS-33" class="node default default flowchart-label"><rect height="69.39999389648438" width="176.86666870117188" y="-34.69999694824219" x="-88.43333435058594" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-80.93333435058594, -27.199996948242188)" style="" class="label"><rect></rect><foreignObject height="54.399993896484375" width="161.86666870117188"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">CloudWatch Logs JSON<br>ELK forward</span></div></foreignObject></g></g><g transform="translate(2824.916675567627, 1430.3000106811523)" data-id="DEV_METRICS" data-node="true" id="flowchart-DEV_METRICS-34" class="node default default flowchart-label"><rect height="69.39999389648438" width="211.1666717529297" y="-34.69999694824219" x="-105.58333587646484" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-98.08333587646484, -27.199996948242188)" style="" class="label"><rect></rect><foreignObject height="54.399993896484375" width="196.1666717529297"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Prometheus + Grafana<br>queue depth p95 error rate</span></div></foreignObject></g></g><g transform="translate(2844.916675567627, 1154.3000106811523)" data-id="DEV_COST" data-node="true" id="flowchart-DEV_COST-35" class="node default default flowchart-label"><rect height="69.39999389648438" width="223.03334045410156" y="-34.69999694824219" x="-111.51667022705078" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-104.01667022705078, -27.199996948242188)" style="" class="label"><rect></rect><foreignObject height="54.399993896484375" width="208.03334045410156"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Cost Allocation Tags<br>tenant_id job_id worker_tier</span></div></foreignObject></g></g><g transform="translate(977.4666595458984, 1154.3000106811523)" data-id="DEV_S3" data-node="true" id="flowchart-DEV_S3-28" class="node default default flowchart-label"><rect height="96.60000610351562" width="191.78334045410156" y="-48.30000305175781" x="-95.89167022705078" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-88.39167022705078, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="176.78334045410156"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">S3 Evidence<br>tenant_id/job_id/run_id<br>SSE-KMS + lifecycle</span></div></foreignObject></g></g><g transform="translate(1223.4249954223633, 1154.3000106811523)" data-id="DEV_CACHE" data-node="true" id="flowchart-DEV_CACHE-29" class="node default default flowchart-label"><rect height="69.39999389648438" width="200.13333129882812" y="-34.69999694824219" x="-100.06666564941406" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-92.56666564941406, -27.199996948242188)" style="" class="label"><rect></rect><foreignObject height="54.399993896484375" width="185.13333129882812"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">ElastiCache Redis<br>rate limits + idempotency</span></div></foreignObject></g></g><g transform="translate(1454.2999954223633, 1154.3000106811523)" data-id="DEV_ECR" data-node="true" id="flowchart-DEV_ECR-30" class="node default default flowchart-label"><rect height="96.60000610351562" width="161.61666870117188" y="-48.30000305175781" x="-80.80833435058594" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-73.30833435058594, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="146.61666870117188"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">ECR<br>worker images<br>module_version tags</span></div></foreignObject></g></g><g transform="translate(1673.3333282470703, 1154.3000106811523)" data-id="DEV_SSM" data-node="true" id="flowchart-DEV_SSM-31" class="node default default flowchart-label"><rect height="96.60000610351562" width="176.4499969482422" y="-48.30000305175781" x="-88.2249984741211" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-80.7249984741211, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="161.4499969482422"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">SSM Parameter Store<br>active_worker_version<br>canary_version</span></div></foreignObject></g></g><g transform="translate(1979.3958320617676, 916.9000091552734)" data-id="DEV_WORKERS" data-node="true" id="flowchart-DEV_WORKERS-22" class="node default default flowchart-label"><rect height="96.60000610351562" width="197.0833282470703" y="-48.30000305175781" x="-98.54166412353516" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-91.04166412353516, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="182.0833282470703"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">ECS Fargate Worker Pools<br>nano / medium / xlarge<br>binpack + autoscale</span></div></foreignObject></g></g><g transform="translate(2251.3916664123535, 1154.3000106811523)" data-id="DEV_NAT" data-node="true" id="flowchart-DEV_NAT-23" class="node default default flowchart-label"><rect height="96.60000610351562" width="146.56666564941406" y="-48.30000305175781" x="-73.28333282470703" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-65.78333282470703, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="131.56666564941406"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">NAT Gateway<br>static egress IP<br>customer allowlist</span></div></foreignObject></g></g><g transform="translate(2271.3916664123535, 916.9000091552734)" data-id="DEV_NACL" data-node="true" id="flowchart-DEV_NACL-24" class="node default default flowchart-label"><rect height="69.39999389648438" width="206.5500030517578" y="-34.69999694824219" x="-103.2750015258789" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-95.7750015258789, -27.199996948242188)" style="" class="label"><rect></rect><foreignObject height="54.399993896484375" width="191.5500030517578"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">NACL deny RFC1918 egress<br>no internal scanning</span></div></foreignObject></g></g><g transform="translate(1979.3958320617676, 756.7000045776367)" data-id="DEV_GUARD" data-node="true" id="flowchart-DEV_GUARD-25" class="node default default flowchart-label"><rect height="123.80000305175781" width="163.6999969482422" y="-61.900001525878906" x="-81.8499984741211" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-74.3499984741211, -54.400001525878906)" style="" class="label"><rect></rect><foreignObject height="108.80000305175781" width="148.6999969482422"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Safety Guardrails<br>1 pre-dispatch scope<br>2 worker re-check<br>3 network deny</span></div></foreignObject></g></g><g transform="translate(1983.5333290100098, 1154.3000106811523)" data-id="DEV_BRIDGE" data-node="true" id="flowchart-DEV_BRIDGE-26" class="node default default flowchart-label"><rect height="69.39999389648438" width="197.11666870117188" y="-34.69999694824219" x="-98.55833435058594" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-91.05833435058594, -27.199996948242188)" style="" class="label"><rect></rect><foreignObject height="54.399993896484375" width="182.11666870117188"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">PrivateLink to Results API<br>NO direct DB access</span></div></foreignObject></g></g><g transform="translate(2251.3916664123535, 1430.3000106811523)" data-id="DEV_TARGETS" data-node="true" id="flowchart-DEV_TARGETS-27" class="node default default flowchart-label"><rect height="69.39999389648438" width="139.31666564941406" y="-34.69999694824219" x="-69.65833282470703" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-62.15833282470703, -27.199996948242188)" style="" class="label"><rect></rect><foreignObject height="54.399993896484375" width="124.31666564941406"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Customer Targets<br>Public Internet</span></div></foreignObject></g></g><g transform="translate(316.22082901000977, 213.29999542236328)" data-id="DEV_WAF" data-node="true" id="flowchart-DEV_WAF-13" class="node default default flowchart-label"><rect height="42.19999694824219" width="45.06666564941406" y="-21.099998474121094" x="-22.53333282470703" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-15.033332824707031, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="30.066665649414062"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">WAF</span></div></foreignObject></g></g><g transform="translate(316.22082901000977, 305.49999237060547)" data-id="DEV_ALB" data-node="true" id="flowchart-DEV_ALB-14" class="node default default flowchart-label"><rect height="42.19999694824219" width="160.85000610351562" y="-21.099998474121094" x="-80.42500305175781" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-72.92500305175781, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="145.85000610351562"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">ALB TLS termination</span></div></foreignObject></g></g><g transform="translate(399.27082443237305, 424.8999938964844)" data-id="DEV_API" data-node="true" id="flowchart-DEV_API-15" class="node default default flowchart-label"><rect height="96.60000610351562" width="212.76666259765625" y="-48.30000305175781" x="-106.38333129882812" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-98.88333129882812, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="197.76666259765625"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">ECS Fargate API Service<br>Blue/Green via CodeDeploy<br>healthz + readyz</span></div></foreignObject></g></g><g transform="translate(419.86666107177734, 1430.3000106811523)" data-id="DEV_RAPI" data-node="true" id="flowchart-DEV_RAPI-16" class="node default default flowchart-label"><rect height="123.80000305175781" width="366.29998779296875" y="-61.900001525878906" x="-183.14999389648438" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-175.64999389648438, -54.400001525878906)" style="" class="label"><rect></rect><foreignObject height="108.80000305175781" width="351.29998779296875"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Results Ingestion API<br>mTLS required<br>POST /findings<br>tenant_id job_id run_id trace_id module_version</span></div></foreignObject></g></g><g transform="translate(167.75, 571.5)" data-id="DEV_RPROXY" data-node="true" id="flowchart-DEV_RPROXY-17" class="node default default flowchart-label"><rect height="96.60000610351562" width="225.5" y="-48.30000305175781" x="-112.75" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-105.25, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="210.5"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">RDS Proxy<br>AWS Managed<br>Connection pooling + failover</span></div></foreignObject></g></g><g transform="translate(167.75, 756.7000045776367)" data-id="DEV_RDS" data-node="true" id="flowchart-DEV_RDS-18" class="node default default flowchart-label"><rect height="96.60000610351562" width="224.18333435058594" y="-48.30000305175781" x="-112.09166717529297" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-104.59166717529297, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="209.18333435058594"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Aurora Serverless v2 Postgres<br>RLS enforced<br>tenant_id isolation</span></div></foreignObject></g></g><g transform="translate(144.33333206176758, 424.8999938964844)" data-id="DEV_SM" data-node="true" id="flowchart-DEV_SM-19" class="node default default flowchart-label"><rect height="42.19999694824219" width="131.8333282470703" y="-21.099998474121094" x="-65.91666412353516" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-58.416664123535156, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="116.83332824707031"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Secrets Manager</span></div></foreignObject></g></g><g transform="translate(668.1249923706055, 571.5)" data-id="DEV_SFN" data-node="true" id="flowchart-DEV_SFN-20" class="node default default flowchart-label"><rect height="96.60000610351562" width="246.89999389648438" y="-48.30000305175781" x="-123.44999694824219" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-115.94999694824219, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="231.89999389648438"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Step Functions<br>Job orchestration<br>queued to running to completed</span></div></foreignObject></g></g><g transform="translate(668.1249923706055, 756.7000045776367)" data-id="DEV_SQS" data-node="true" id="flowchart-DEV_SQS-21" class="node default default flowchart-label"><rect height="96.60000610351562" width="187.1666717529297" y="-48.30000305175781" x="-93.58333587646484" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-86.08333587646484, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="172.1666717529297"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">SQS Queues<br>nano / medium / xlarge<br>WorkerVersion attribute</span></div></foreignObject></g></g><g transform="translate(6355.754222869873, 1430.3000106811523)" data-id="CT" data-node="true" id="flowchart-CT-4" class="node default default flowchart-label"><rect height="96.60000610351562" width="221" y="-48.30000305175781" x="-110.5" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-103, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="206"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">AWS Control Tower<br>Account Factory + SCPs<br>Config + CloudTrail baselines</span></div></foreignObject></g></g><g transform="translate(6732.745891571045, 1430.3000106811523)" data-id="IDCS" data-node="true" id="flowchart-IDCS-5" class="node default default flowchart-label"><rect height="96.60000610351562" width="432.98333740234375" y="-48.30000305175781" x="-216.49166870117188" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-208.99166870117188, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="417.98333740234375"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">IAM Identity Center SSO<br>Permission Sets: Admin, Platform, Dev, Security, ReadOnly<br>No IAM users — Break-glass with MFA</span></div></foreignObject></g></g><g transform="translate(5897.20422744751, 1636.4000091552734)" class="root"><g class="clusters"><g id="OU_INFRA" class="cluster default flowchart-label"><rect height="193.8000030517578" width="278.5" y="8" x="8" ry="0" rx="0" style=""></rect><g transform="translate(68.50833129882812, 8)" class="cluster-label"><foreignObject height="27.199996948242188" width="157.48333740234375"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">OU: INFRASTRUCTURE</span></div></foreignObject></g></g></g><g class="edgePaths"></g><g class="edgeLabels"></g><g class="nodes"><g transform="translate(147.25, 104.9000015258789)" data-id="ACC_SHARED" data-node="true" id="flowchart-ACC_SHARED-9" class="node default default flowchart-label"><rect height="123.80000305175781" width="228.5" y="-61.900001525878906" x="-114.25" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-106.75, -54.400001525878906)" style="" class="label"><rect></rect><foreignObject height="108.80000305175781" width="213.5"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">shared-services account<br>CI/CD roles + artifact buckets<br>Central ECR + observability<br>DNS/PKI distribution</span></div></foreignObject></g></g></g></g><g transform="translate(6307.57922744751, 1741.3000106811523)" data-id="ACC_DEV" data-node="true" id="flowchart-ACC_DEV-10" class="node default default flowchart-label"><rect height="42.19999694824219" width="108.75" y="-21.099998474121094" x="-54.375" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-46.875, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="93.75"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Platform-dev</span></div></foreignObject></g></g><g transform="translate(6604.979228973389, 1741.3000106811523)" data-id="ACC_STG" data-node="true" id="flowchart-ACC_STG-11" class="node default default flowchart-label"><rect height="42.19999694824219" width="133.88333129882812" y="-21.099998474121094" x="-66.94166564941406" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-59.44166564941406, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="118.88333129882812"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Platform-staging</span></div></foreignObject></g></g><g transform="translate(6899.462558746338, 1741.3000106811523)" data-id="ACC_PRD" data-node="true" id="flowchart-ACC_PRD-12" class="node default default flowchart-label"><rect height="42.19999694824219" width="115.89999389648438" y="-21.099998474121094" x="-57.94999694824219" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-50.44999694824219, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="100.89999389648438"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Platform-prod</span></div></foreignObject></g></g><g transform="translate(5365.312534332275, 1430.3000106811523)" data-id="ACC_AUDIT" data-node="true" id="flowchart-ACC_AUDIT-6" class="node default default flowchart-label"><rect height="96.60000610351562" width="274.45001220703125" y="-48.30000305175781" x="-137.22500610351562" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-129.72500610351562, -40.80000305175781)" style="" class="label"><rect></rect><foreignObject height="81.60000610351562" width="259.45001220703125"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">security-audit account<br>GuardDuty/SecurityHub aggregation<br>Read-only org visibility</span></div></foreignObject></g></g><g transform="translate(5318.558368682861, 1741.3000106811523)" data-id="ACC_LOG" data-node="true" id="flowchart-ACC_LOG-7" class="node default default flowchart-label"><rect height="123.80000305175781" width="230.9499969482422" y="-61.900001525878906" x="-115.4749984741211" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-107.9749984741211, -54.400001525878906)" style="" class="label"><rect></rect><foreignObject height="108.80000305175781" width="215.9499969482422"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">log-archive account<br>Central CloudTrail/Config logs<br>ALB + VPC Flow Logs<br>Immutable retention</span></div></foreignObject></g></g><g transform="translate(5693.62088394165, 1430.3000106811523)" data-id="PCA" data-node="true" id="flowchart-PCA-8" class="node default default flowchart-label"><rect height="123.80000305175781" width="282.16668701171875" y="-61.900001525878906" x="-141.08334350585938" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-133.58334350585938, -54.400001525878906)" style="" class="label"><rect></rect><foreignObject height="108.80000305175781" width="267.16668701171875"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">AWS Private CA<br>Root CA + Issuing CA<br>KMS/HSM-backed keys<br>Shared via RAM to workload accounts</span></div></foreignObject></g></g><g transform="translate(201.60832977294922, 46.099998474121094)" data-id="EU" data-node="true" id="flowchart-EU-0" class="node default default flowchart-label"><rect height="42.19999694824219" width="200.36666870117188" y="-21.099998474121094" x="-100.18333435058594" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-92.68333435058594, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="185.36666870117188"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Enterprise User / Browser</span></div></foreignObject></g></g><g transform="translate(430.8333282470703, 46.099998474121094)" data-id="CAPI" data-node="true" id="flowchart-CAPI-1" class="node default default flowchart-label"><rect height="42.19999694824219" width="158.0833282470703" y="-21.099998474121094" x="-79.04166412353516" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-71.54166412353516, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="143.0833282470703"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Customer API Client</span></div></foreignObject></g></g><g transform="translate(7347.966728210449, 46.099998474121094)" data-id="GHA" data-node="true" id="flowchart-GHA-2" class="node default default flowchart-label"><rect height="42.19999694824219" width="168.36666870117188" y="-21.099998474121094" x="-84.18333435058594" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-76.68333435058594, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="153.36666870117188"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">GitHub Actions CI/CD</span></div></foreignObject></g></g><g transform="translate(658.1249923706055, 46.099998474121094)" data-id="OOB" data-node="true" id="flowchart-OOB-3" class="node default default flowchart-label"><rect height="42.19999694824219" width="196.5" y="-21.099998474121094" x="-98.25" ry="0" rx="0" style="" class="basic label-container"></rect><g transform="translate(-90.75, -13.599998474121094)" style="" class="label"><rect></rect><foreignObject height="27.199996948242188" width="181.5"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">OOB Callbacks DNS/HTTP</span></div></foreignObject></g></g></g></g></g></svg></div>
+    </div>
+  </section>
+
+
+  <!-- ==== -->
+  <!-- 15. TECHNICAL MATURITY MODEL SCORECARD -->
+  <!-- ==== -->
+  <section class="section" id="scorecard">
+    <h2><span class="num">15</span> Technical Maturity Model Scorecard</h2>
+
+    <div class="callout green">
+      <strong>Purpose:</strong> A repeatable way to measure “enterprise-ready” for the Infra Lab Project. Each domain is scored from <strong>Level 0 → Level 5</strong> (ad hoc → global scale).
+    </div>
+
+    <h3>Scoring Legend</h3>
+    <table>
+      <tbody><tr><th>Level</th><th>Meaning</th></tr>
+      <tr><td><strong>0</strong></td><td>Ad hoc / local only</td></tr>
+      <tr><td><strong>1</strong></td><td>Functional but fragile</td></tr>
+      <tr><td><strong>2</strong></td><td>Structured &amp; repeatable</td></tr>
+      <tr><td><strong>3</strong></td><td>Scalable &amp; isolated</td></tr>
+      <tr><td><strong>4</strong></td><td>Enterprise-grade</td></tr>
+      <tr><td><strong>5</strong></td><td>Resilient at global scale</td></tr>
+    </tbody></table>
+
+    <h3>1) Organizational Foundation</h3>
+    <table>
+      <tbody><tr><th>Level</th><th>Description</th></tr>
+      <tr><td>0</td><td>Single AWS account, no guardrails</td></tr>
+      <tr><td>1</td><td>Dev/Prod split manually</td></tr>
+      <tr><td>2</td><td>Multi-account with basic IAM</td></tr>
+      <tr><td>3</td><td>Control Tower + SCP guardrails</td></tr>
+      <tr><td>4</td><td>Centralized logging + break-glass + security audit account</td></tr>
+      <tr><td>5</td><td>Org-wide governance automation + region cell architecture</td></tr>
+    </tbody></table>
+
+    <h3>2) Environment Isolation &amp; Blast Radius</h3>
+    <table>
+      <tbody><tr><th>Level</th><th>Description</th></tr>
+      <tr><td>0</td><td>Everything in one VPC</td></tr>
+      <tr><td>1</td><td>Dev vs Prod VPC</td></tr>
+      <tr><td>2</td><td>Separate VPCs per env</td></tr>
+      <tr><td>3</td><td>Dual-VPC (Control Plane + Execution Plane)</td></tr>
+      <tr><td>4</td><td>PrivateLink-only cross-boundary communication</td></tr>
+      <tr><td>5</td><td>Cell-based multi-region isolation</td></tr>
+    </tbody></table>
+
+    <h3>3) Multi-Tenancy Safety</h3>
+    <table>
+      <tbody><tr><th>Level</th><th>Description</th></tr>
+      <tr><td>0</td><td>App-level tenant filtering only</td></tr>
+      <tr><td>1</td><td>Manual <code>WHERE tenant_id</code> everywhere</td></tr>
+      <tr><td>2</td><td>Composite DB indexing</td></tr>
+      <tr><td>3</td><td>PostgreSQL RLS enabled</td></tr>
+      <tr><td>4</td><td>RLS forced + transaction-scoped context + runtime role separation</td></tr>
+      <tr><td>5</td><td>Formal tenant isolation testing + audit tooling</td></tr>
+    </tbody></table>
+
+    <h3>4) Deployment &amp; Release Safety</h3>
+    <table>
+      <tbody><tr><th>Level</th><th>Description</th></tr>
+      <tr><td>0</td><td>SSH into servers</td></tr>
+      <tr><td>1</td><td>CI builds artifacts/images</td></tr>
+      <tr><td>2</td><td>Automated deployments</td></tr>
+      <tr><td>3</td><td>Blue/Green with rollback</td></tr>
+      <tr><td>4</td><td>Canary tenants + version gating</td></tr>
+      <tr><td>5</td><td>Error-budget-driven deploy policy</td></tr>
+    </tbody></table>
+
+    <h3>5) Execution Scalability</h3>
+    <table>
+      <tbody><tr><th>Level</th><th>Description</th></tr>
+      <tr><td>0</td><td>Fixed workers on a single host</td></tr>
+      <tr><td>1</td><td>Manual scaling</td></tr>
+      <tr><td>2</td><td>Containerized workers</td></tr>
+      <tr><td>3</td><td>Auto-scaling driven by queue depth</td></tr>
+      <tr><td>4</td><td>Tiered workers (nano/medium/xlarge) + routing</td></tr>
+      <tr><td>5</td><td>Predictive scaling + cost-aware scheduling</td></tr>
+    </tbody></table>
+
+    <h3>6) Cryptographic Trust &amp; Identity</h3>
+    <table>
+      <tbody><tr><th>Level</th><th>Description</th></tr>
+      <tr><td>0</td><td>HTTPS only</td></tr>
+      <tr><td>1</td><td>IAM role-based auth only</td></tr>
+      <tr><td>2</td><td>TLS everywhere</td></tr>
+      <tr><td>3</td><td>mTLS between services</td></tr>
+      <tr><td>4</td><td>Internal PKI with short-lived certs + rotation</td></tr>
+      <tr><td>5</td><td>Automated rotation + revocation enforcement + compromised workload response</td></tr>
+    </tbody></table>
+
+    <h3>7) Observability &amp; Traceability</h3>
+    <table>
+      <tbody><tr><th>Level</th><th>Description</th></tr>
+      <tr><td>0</td><td>Logs only</td></tr>
+      <tr><td>1</td><td>Basic metrics</td></tr>
+      <tr><td>2</td><td>Structured logs</td></tr>
+      <tr><td>3</td><td>Distributed tracing</td></tr>
+      <tr><td>4</td><td>High-cardinality tags (tenant_id, job_id, run_id, module_version)</td></tr>
+      <tr><td>5</td><td>SLOs + burn-rate alerts + auto-remediation</td></tr>
+    </tbody></table>
+
+    <h3>8) Cost &amp; Unit Economics Visibility</h3>
+    <table>
+      <tbody><tr><th>Level</th><th>Description</th></tr>
+      <tr><td>0</td><td>Single AWS bill</td></tr>
+      <tr><td>1</td><td>Service-level cost breakdown</td></tr>
+      <tr><td>2</td><td>Tag-based allocation</td></tr>
+      <tr><td>3</td><td>Tenant-level cost tracking</td></tr>
+      <tr><td>4</td><td>Job-level margin visibility</td></tr>
+      <tr><td>5</td><td>Real-time cost guardrails &amp; throttling</td></tr>
+    </tbody></table>
+
+    <h3>9) Compliance Readiness</h3>
+    <table>
+      <tbody><tr><th>Level</th><th>Description</th></tr>
+      <tr><td>0</td><td>None</td></tr>
+      <tr><td>1</td><td>Manual logging</td></tr>
+      <tr><td>2</td><td>CloudTrail + basic detections</td></tr>
+      <tr><td>3</td><td>Centralized immutable log archive</td></tr>
+      <tr><td>4</td><td>Controls mapped to infrastructure (SOC2-aligned posture)</td></tr>
+      <tr><td>5</td><td>Continuous compliance automation</td></tr>
+    </tbody></table>
+
+    <div class="callout">
+      <strong>How to use:</strong> Pick a current level per domain, pick
+ a target level (e.g., Level 4), and turn the gap into a 30/60/90 plan
+with owners + success metrics.
+    </div>
+
+  <!-- ==== -->
+  <!-- 16. DAY 1–90 EXECUTION CHECKLIST -->
+  <!-- ==== -->
+  <section class="section" id="checklist">
+    <h2><span class="num">16</span> Day 1–90 Execution Checklist</h2>
+
+    <div class="callout green">
+      <strong>How to read this:</strong> Each checklist item maps back
+to a domain in the Scorecard and is written as a verifiable deliverable.
+ If you can prove it (logs, dashboards, policies, runbooks), you can
+claim the level.
+    </div>
+
+    <h3>Day 1–7 (Baseline &amp; Direction)</h3>
+
+    <div class="card">
+      <div class="card-title">Org Foundation (Target: Level 1→2 in week 1)</div>
+      <ul>
+        <li>Inventory current AWS accounts, regions, and IAM usage (identify any IAM users).</li>
+        <li>Define environment boundaries (dev/staging/prod) and name standards for accounts, VPCs, and roles.</li>
+        <li>Draft the initial OU/account layout and permission sets (Admin, Platform, Developer, Security, ReadOnly).</li>
+        <li>Decide the -week MVP landing zone scope (what must be in place before migrations start).</li>
+      </ul>
+      <p><strong>Success evidence:</strong> written architecture decision record (ADR) + diagram + account plan.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Observability (Target: Level 1 in week 1)</div>
+      <ul>
+        <li>Standardize structured JSON logging schema for API + workers (must include <code>tenant_id</code>, <code>job_id</code>, <code>run_id</code>, <code>module_version</code>, <code>trace_id</code>).</li>
+        <li>Identify the top 10 golden signals for the system (availability, latency, saturation, queue depth, job success rate).</li>
+        <li>Create a minimal dashboard (even if manual) showing: queue depth, jobs/hr, failure rate, p95 job duration.</li>
+      </ul>
+      <p><strong>Success evidence:</strong> sample logs and one dashboard screenshot (or exported JSON/dashboard config).</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Cost Visibility (Target: Level 1 in week 1)</div>
+      <ul>
+        <li>Enable Cost Explorer + confirm CUR (Cost &amp; Usage Report) settings (or document why not yet).</li>
+        <li>Define cost allocation tag keys: <code>tenant_id</code>, <code>job_id</code>, <code>worker_tier</code>, <code>env</code>, <code>service</code>.</li>
+        <li>Audit current high-cost services and estimate baseline unit economics (rough: $/job, $/tenant/month).</li>
+      </ul>
+      <p><strong>Success evidence:</strong> baseline cost breakdown + agreed tagging standard.</p>
+    </div>
+
+    <h3>Day 8–30 (Level Up to Repeatable Systems)</h3>
+
+    <div class="card">
+      <div class="card-title">Org Foundation (Target: Level 3 by Day 30)</div>
+      <ul>
+        <li>Deploy AWS Control Tower landing zone (or equivalent) and create workload accounts for dev/staging/prod.</li>
+        <li>Stand up <code>log-archive</code> and <code>security-audit</code> accounts; centralize CloudTrail + Config.</li>
+        <li>Implement baseline SCPs: deny disabling CloudTrail/Config; deny IAM users; deny public S3 buckets by default.</li>
+        <li>Implement break-glass access with MFA + logging.</li>
+      </ul>
+      <p><strong>Success evidence:</strong> Control Tower enabled, accounts created, guardrails enforced, logs flowing to archive.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Environment Isolation (Target: Level 2→3 by Day 30)</div>
+      <ul>
+        <li>Create dev environment VPC(s) using IaC (subnets, routes, endpoints).</li>
+        <li>Implement Dual-VPC scaffolding in dev: Control Plane VPC + Execution Plane VPC with distinct CIDRs.</li>
+        <li>Establish hard boundary rule in code and infra: workers cannot reach the database network path.</li>
+        <li>Enable VPC Flow Logs in dev; ship to centralized logging.</li>
+      </ul>
+      <p><strong>Success evidence:</strong> IaC repo/module + dev VPCs deployed + flow logs searchable.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Deployment &amp; Release Safety (Target: Level 2 by Day 30)</div>
+      <ul>
+        <li>CI builds and signs container images; push to ECR with immutable tags.</li>
+        <li>Establish environment promotion rules (merge  dev, RC  staging, tags  prod).</li>
+        <li>Make deployments fully automated for dev (no SSH, no manual steps).</li>
+      </ul>
+      <p><strong>Success evidence:</strong> a single-command or single-workflow dev deploy from main branch.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Execution Scalability (Target: Level 2→3 by Day 30)</div>
+      <ul>
+        <li>Containerize workers with a consistent entrypoint + safe shutdown behavior (SIGTERM drain).</li>
+        <li>Introduce a queue-based dispatch (SQS) and basic orchestration (Step Functions or equivalent).</li>
+        <li>Define initial worker tiers (nano/medium/xlarge) and routing rules.</li>
+      </ul>
+      <p><strong>Success evidence:</strong> jobs dispatched via queue, workers autoscale in dev based on queue depth.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Observability &amp; Traceability (Target: Level 2→3 by Day 30)</div>
+      <ul>
+        <li>Roll out OpenTelemetry instrumentation to API and workers (trace propagation across job lifecycle).</li>
+        <li>Create runbook-style dashboards: job latency p50/p95, worker crash rate, queue depth by tier.</li>
+        <li>Set initial alert thresholds (page only on customer-impacting symptoms).</li>
+      </ul>
+      <p><strong>Success evidence:</strong> trace from request  queue  worker  results ingestion visible end-to-end.</p>
+    </div>
+
+    <h3>Day 31–60 (Isolation, Trust, and Enterprise Readiness)</h3>
+
+    <div class="card">
+      <div class="card-title">Multi-Tenancy Safety (Target: Level 4 by Day 60)</div>
+      <ul>
+        <li>Implement Postgres RLS on tenant-scoped tables; enable + FORCE RLS.</li>
+        <li>Enforce transaction-scoped tenant context (<code>SET LOCAL app.tenant_id</code>) compatible with connection pooling.</li>
+        <li>Separate DB owner role (migrations) from runtime app role; confirm app role cannot BYPASSRLS.</li>
+        <li>Introduce tenant isolation tests (attempt cross-tenant query in CI; must fail).</li>
+      </ul>
+      <p><strong>Success evidence:</strong> automated test proving cross-tenant reads/writes are blocked at DB layer.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Cryptographic Trust &amp; Identity (Target: Level 3→4 by Day 60)</div>
+      <ul>
+        <li>Stand up internal PKI (AWS Private CA or equivalent) with root + issuing CA patterns.</li>
+        <li>Require mTLS from workers to Results Ingestion API; rotate short-lived certs.</li>
+        <li>Ensure Execution Plane  Control Plane communication is one-way and minimal (PrivateLink preferred).</li>
+      </ul>
+      <p><strong>Success evidence:</strong> worker without valid client cert cannot submit findings (provable via logs/tests).</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Deployment &amp; Release Safety (Target: Level 3 by Day 60)</div>
+      <ul>
+        <li>Implement Blue/Green deployment for API with automatic rollback on error rate spikes.</li>
+        <li>Add readyz gates and dependency health checks (DB, queues, downstream services).</li>
+        <li>Version workers and implement a rollout gate (e.g., parameter store  active_worker_version).</li>
+      </ul>
+      <p><strong>Success evidence:</strong> prove rollback triggers work (game day / controlled failure injection).</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Compliance Readiness (Target: Level 3→4 by Day 60)</div>
+      <ul>
+        <li>Confirm immutable log retention and access controls in log-archive account.</li>
+        <li>Map infra controls to a lightweight compliance checklist (SOC2-aligned): access, change mgmt, logging, key mgmt.</li>
+        <li>Turn on baseline detections (GuardDuty/SecurityHub) and centralize findings.</li>
+      </ul>
+      <p><strong>Success evidence:</strong> auditor-friendly evidence pack: screenshots/config exports + policies + runbooks.</p>
+    </div>
+
+    <h3>Day 61–90 (Scale, Economics, and Operability)</h3>
+
+    <div class="card">
+      <div class="card-title">Execution Scalability (Target: Level 4→5 by Day 90)</div>
+      <ul>
+        <li>Auto-scale worker pools per tier based on queue depth + job age (SLO-aware scaling).</li>
+        <li>Introduce backpressure and per-tenant fairness: rate limiting, queue partitioning, or token buckets.</li>
+        <li>Run load tests to a defined concurrency target; capture p95 job duration and cost per job at scale.</li>
+      </ul>
+      <p><strong>Success evidence:</strong> load test report + autoscaling behavior graphs + failure mode notes.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Observability &amp; Reliability (Target: Level 4→5 by Day 90)</div>
+      <ul>
+        <li>Define SLOs (API availability, job completion success rate, results ingestion latency).</li>
+        <li>Implement burn-rate alerts tied to SLOs; validate paging policy (reduce noise).</li>
+        <li>Create incident runbooks and game days for top risks (DB failover, queue backlog, worker crash loop).</li>
+      </ul>
+      <p><strong>Success evidence:</strong> SLO dashboards + on-call playbook + at least one completed game day.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Cost &amp; Unit Economics (Target: Level 4→5 by Day 90)</div>
+      <ul>
+        <li>Ensure cost allocation tags are enforced in CI/IaC; block untagged resources in prod where possible.</li>
+        <li>Build tenant-level and job-level cost reporting (even if approximate) and publish a monthly margin report.</li>
+        <li>Set cost guardrails: max concurrency per tenant, max spend per day, and alerts on anomalous cost spikes.</li>
+      </ul>
+      <p><strong>Success evidence:</strong> a dashboard/report that answers How much did tenant X cost? and What did job Y cost?.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Compliance Readiness (Target: Level 4→5 by Day 90)</div>
+      <ul>
+        <li>Automate evidence collection (where practical) for access, logging, and change management.</li>
+        <li>Document data lifecycle: evidence storage (S3), retention, encryption, deletion, and audit trail.</li>
+        <li>Conduct a lightweight internal audit walkthrough (simulate external audit questions).</li>
+      </ul>
+      <p><strong>Success evidence:</strong> repeatable evidence workflow + documented policies + audit dry-run notes.</p>
+    </div>
+
+    <div class="callout">
+      <strong>Tip:</strong> If you only track one meta metric across Day
+ 1–90, track time-to-debug: the time from incident detection to root
+cause. This is the clearest signal that maturity is compounding.
+    </div>
+  </section>
+
+</section>
+
+</main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "default",
+    flowchart: { useMaxWidth: true, htmlLabels: true }
+  });
+</script>
+
+
+
+<div class="mermaidTooltip" style="opacity: 0;"></div><div></div><div class="calendly-frame-tag" manager_id="43c8d7ca-06b9-43b4-a104-e320611b37b6" style="height: 0px; width: 0px; visibility: hidden;" id="43c8d7ca-06b9-43b4-a104-e320611b37b6"></div></body><grammarly-desktop-integration data-grammarly-shadow-root="true"></grammarly-desktop-integration></html>
