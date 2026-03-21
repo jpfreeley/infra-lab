@@ -66,7 +66,7 @@
 
 * **Current Epic**: E03
 
-* **Current Story**: S009 (Define and attach SCPs)
+* **Current Story**: S010 (Configure IAM Identity Center)
 
 ## Repository & Workflow
 
@@ -120,24 +120,17 @@
 
 ### Infrastructure & Governance Notes
 
-* **Control Tower Manifest Limitations**:\
-  The `aws_controltower_landing_zone` Terraform resource manifest strictly manages Landing Zone configuration such as governed regions and logging. It **does not support** managing Organizational Units (OUs) or Service Control Policies (SCPs).\
-  OUs must be managed separately using native `aws_organizations_organizational_unit` Terraform resources.
+* **Control Tower Manifest Limitations**:  The `aws_controltower_landing_zone` Terraform resource manifest strictly manages Landing Zone configuration such as governed regions and logging. It **does not support** managing Organizational Units (OUs) or Service Control Policies (SCPs).  OUs must be managed separately using native `aws_organizations_organizational_unit` Terraform resources.
 
-* **Organizational Units (OUs)**:\
-  Created and managed via `aws_organizations_organizational_unit` resources to define account boundaries and governance domains.
+* **Organizational Units (OUs)**:  Created and managed via `aws_organizations_organizational_unit` resources to define account boundaries and governance domains.
 
-* **Service Principals for Control Tower**:\
-  The AWS Organization must enable the service principal `member.org.stacksets.cloudformation.amazonaws.com` to support Control Tower Account Factory operations. This is a required addition to the `aws_organizations_organization` resource to avoid drift.
+* **Service Principals for Control Tower**:  The AWS Organization must enable the service principal `member.org.stacksets.cloudformation.amazonaws.com` to support Control Tower Account Factory operations. This is a required addition to the `aws_organizations_organization` resource to avoid drift.
 
 ### Tooling & CI/CD Notes
 
-* **Checkov Pre-commit Hook**:\
-  The `terraform_checkov` hook from `antonbabenko/pre-commit-terraform` (v1.105.0) does **not** support passing a config file via `--config-file` argument in `args`.\
-  The `.checkov.yml` configuration file must be placed in the repository root for automatic discovery by Checkov.
+* **Checkov Pre-commit Hook**:  The `terraform_checkov` hook from `antonbabenko/pre-commit-terraform` (v1.105.0) does **not** support passing a config file via `--config-file` argument in `args`.  The `.checkov.yml` configuration file must be placed in the repository root for automatic discovery by Checkov.
 
-* **TFLint Hygiene**:\
-  Maintain a zero-warning policy. Remove unused Terraform declarations such as `data "aws_caller_identity" "current"` immediately to keep CI signals clean and avoid noise.
+* **TFLint Hygiene**:  Maintain a zero-warning policy. Remove unused Terraform declarations such as `data "aws_caller_identity" "current"` immediately to keep CI signals clean and avoid noise.
 
 * **Checkov Compliance**: Added `checkov:skip=CKV_AWS_274` for the `AdministratorAccess` policy attachment in `audit_role.tf` to acknowledge the requirement for full administrative permissions for the delegated security role.
 
@@ -181,7 +174,7 @@
 
 * **Current Epic**: E03 (AWS Organization + Control Tower)
 
-* **Current Story**: S004 (Enable CloudTrail Organization Trail)
+* **Current Story**: S010 (Configure IAM Identity Center)
 
 * **Completed in E03**:
 
@@ -190,6 +183,20 @@
   * S002: Control Tower LZ v4.0 Import & Alignment.
 
   * S003: Core OU Structure (Security, Infrastructure, Workloads, Sandbox).
+
+  * S004: Enable CloudTrail Organization Trail.
+
+  * S005: Centralized CloudTrail Logging.
+
+  * S006: AWS Config Aggregator.
+
+  * S007: Enable GuardDuty and Delegate Administration.
+
+  * S008: Enable Security Hub and Finding Aggregator.
+
+  * S009: Define and attach Service Control Policies (SCPs).
+
+  * S013: Implement Cost Budgets and Anomaly Detection.
 
 ---
 
@@ -269,8 +276,36 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 ### Next Steps
 
-* **Epic E03 / Story S009**: Define and attach SCPs (deny IAM users, deny disabling logs/config, deny leaving org).
-
 * **Epic E03 / Story S010**: Configure IAM Identity Center.
 
 ---
+
+## Session Update: 2026-03-21
+
+### Infrastructure & Governance Progress (Epic E03)
+
+* **SCPs (S009)**: Successfully implemented and applied hardened Service Control Policies across the organization.
+
+* **IAM User Prevention**: Expanded the IAM-user-deny SCP to block creation and management of IAM users, login profiles, access keys, signing certificates, and service-specific credentials to reinforce IAM Identity Center adoption.
+
+* **Security Service Protection**: Replaced the earlier security-protection SCP with a more granular policy that denies mutation or disabling of CloudTrail, AWS Config, and GuardDuty.
+
+* **Organization Retention**: Replaced the prior leave-organization SCP with a standardized, tagged policy preventing member accounts from leaving the AWS Organization.
+
+* **Administrative Exemptions / Break-Glass**: Added `ArnNotLike` exemptions for `AWSControlTowerExecution`, `AWSCloudFormationStackSetExecutionRole`, and `OrganizationAccountAccessRole` so automation and break-glass administration remain functional.
+
+* **Attachment Strategy**: Applied the leave-organization SCP at the Organization Root and applied the security-protection SCP to the Security, Infrastructure, and Workloads OUs. Updated the existing IAM-user SCP in place.
+
+* **Control Tower Centralized Logging**: Successfully updated the Control Tower Landing Zone manifest to enable `centralizedLogging` targeting the Log Archive account (`172134854767`) after correcting manifest schema/type issues.
+
+### Lessons Learned (2026-03-21)
+
+* **Control Tower Manifest Types**: `retentionDays` values in the Landing Zone manifest must be integers, not strings, or the Control Tower API returns a schema `ValidationException`.
+
+* **GuardDuty Delegation Constraint**: After delegation is enabled, the Management account cannot update delegated GuardDuty detector properties such as `finding_publishing_frequency`; Terraform must stop managing those mutable fields from the Management account context.
+
+* **Provider Auth Pattern**: The `audit` provider must use the Management account profile (`infra-lab`) as the source for `assume_role` into `OrganizationAccountAccessRole`; attempting to assume that role from an Audit-account SSO session results in `AccessDenied`.
+
+* **SCP Safety Model**: Verified that SCPs do not apply to the Management account and that break-glass access remains available through `OrganizationAccountAccessRole`, reducing lockout risk.
+
+* **Long-Running Apply Behavior**: Control Tower Landing Zone updates can legitimately take ~24 minutes through Terraform; extended `Still modifying...` output is normal.
