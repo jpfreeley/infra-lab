@@ -38,10 +38,7 @@ provider "aws" {
 }
 
 provider "aws" {
-  alias  = "audit"
-  region = var.region
-  # profile = "infra-lab-security-audit" # Remove or comment this
-  assume_role {
-    role_arn = "arn:aws:iam::${var.security_audit_account_id}:role/OrganizationAccountAccessRole"
-  }
+  alias   = "audit"
+  region  = "us-east-1"
+  profile = "infra-lab-security-audit"
 }
