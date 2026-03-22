@@ -1,17 +1,6 @@
 #!/usr/bin/env python3
-"""
-validate_foundation.py
+"""Validate infra-lab foundations from E01 through E03-S010."""
 
-Validates infra-lab foundations from E01 through E03-S010.
-Covers: repo structure, SDLC hygiene, Terraform layout/modules,
-local validation commands, and live AWS controls.
-
-Usage:
-    python3 scripts/validate_foundation.py [options]
-
-Lint:
-    python3 -m flake8 scripts/validate_foundation.py
-"""
 from __future__ import annotations
 
 import argparse
@@ -149,7 +138,6 @@ SECURITY_SCAN_TOKEN_GROUPS = [
 ]
 
 # SCP name-pattern signals per attachment target
-# Sourced from actual SCP names observed in the first run output
 SCP_PATTERNS: Dict[str, List[str]] = {
     "root": ["leave"],
     "workloads": ["region"],
@@ -158,12 +146,10 @@ SCP_PATTERNS: Dict[str, List[str]] = {
     "sandbox": ["security"],
 }
 
-# GuardDuty expected finding frequency — set to SIX_HOURS to match
-# current guardduty.tf implementation. Change to FIFTEEN_MINUTES
-# if you update the Terraform resource.
+# GuardDuty expected finding frequency
 GD_EXPECTED_FREQUENCY = "SIX_HOURS"
 
-# Security Hub standards ARN fragments — sourced from securityhub_standards.tf
+# Security Hub standards ARN fragments
 SH_EXPECTED_STANDARDS = [
     "aws-foundational-security-best-practices",
     "cis-aws-foundations-benchmark",
@@ -176,6 +162,8 @@ SH_EXPECTED_STANDARDS = [
 
 @dataclass
 class Result:
+    """Represents the outcome of a single validation check."""
+
     name: str
     ok: bool
     detail: str
@@ -184,6 +172,8 @@ class Result:
 
 @dataclass
 class Suite:
+    """A collection of validation results."""
+
     results: List[Result] = field(default_factory=list)
 
     def add(
@@ -193,6 +183,7 @@ class Suite:
         detail: str,
         severity: str = "fail",
     ) -> None:
+        """Add a new result to the suite."""
         self.results.append(
             Result(name=name, ok=ok, detail=detail, severity=severity)
         )
@@ -207,6 +198,7 @@ def run(
     cmd: Sequence[str],
     cwd: Optional[Path] = None,
 ) -> Tuple[int, str, str]:
+    """Execute a shell command and return rc, stdout, stderr."""
     proc = subprocess.run(
         list(cmd),
         cwd=str(cwd) if cwd else None,
@@ -222,6 +214,7 @@ def aws_json(
     args: Sequence[str],
     region: Optional[str] = None,
 ) -> Tuple[bool, Dict]:
+    """Execute an AWS CLI command and parse JSON output."""
     cmd = ["aws", "--profile", profile]
     if region:
         cmd.extend(["--region", region])
@@ -242,6 +235,7 @@ def aws_json(
 
 
 def path_exists(repo_root: Path, candidates: Sequence[str]) -> bool:
+    """Check if any of the candidate paths exist relative to repo_root."""
     return any((repo_root / c).exists() for c in candidates)
 
 
@@ -249,6 +243,7 @@ def first_existing(
     repo_root: Path,
     candidates: Sequence[str],
 ) -> Optional[Path]:
+    """Return the first candidate path that exists."""
     for c in candidates:
         p = repo_root / c
         if p.exists():
@@ -257,10 +252,12 @@ def first_existing(
 
 
 def read_text(path: Path) -> str:
+    """Read text from a file, ignoring encoding errors."""
     return path.read_text(encoding="utf-8", errors="ignore")
 
 
 def workflow_files(repo_root: Path) -> List[Path]:
+    """List all YAML files in .github/workflows."""
     wf_dir = repo_root / ".github" / "workflows"
     if not wf_dir.exists():
         return []
@@ -271,6 +268,7 @@ def any_workflow_contains(
     repo_root: Path,
     tokens: Sequence[str],
 ) -> bool:
+    """Check if any workflow file contains all specified tokens."""
     for wf in workflow_files(repo_root):
         text = read_text(wf).lower()
         if all(t.lower() in text for t in tokens):
@@ -284,6 +282,7 @@ def any_workflow_contains(
 
 
 def check_tools(s: Suite) -> None:
+    """Verify required CLI tools are installed on the PATH."""
     missing = [t for t in REQUIRED_TOOLS if shutil.which(t) is None]
     s.add(
         "local.tools.installed",
@@ -294,6 +293,7 @@ def check_tools(s: Suite) -> None:
 
 
 def check_repo_structure(repo_root: Path, s: Suite) -> None:
+    """Verify core directory and file structure."""
     missing_dirs = [
         d for d in REQUIRED_REPO_DIRS if not (repo_root / d).is_dir()
     ]
@@ -329,6 +329,7 @@ def check_repo_structure(repo_root: Path, s: Suite) -> None:
 
 
 def check_github_standards(repo_root: Path, s: Suite) -> None:
+    """Verify GitHub-specific templates and automation configs."""
     s.add(
         "e01.github.issue_templates",
         path_exists(repo_root, ISSUE_TEMPLATE_DIRS),
@@ -414,6 +415,7 @@ def check_github_standards(repo_root: Path, s: Suite) -> None:
 
 
 def check_pre_commit(repo_root: Path, s: Suite) -> None:
+    """Verify .pre-commit-config.yaml exists and contains required hooks."""
     path = repo_root / ".pre-commit-config.yaml"
     if not path.exists():
         s.add("e01.precommit.config", False, ".pre-commit-config.yaml not found")
@@ -436,6 +438,7 @@ def check_pre_commit(repo_root: Path, s: Suite) -> None:
 
 
 def check_terraform_layout(repo_root: Path, s: Suite) -> None:
+    """Verify Terraform directory structure and module interfaces."""
     for live_dir in LIVE_ROOTS_PRESENT:
         live_path = repo_root / "infra" / "live" / live_dir
         s.add(
@@ -463,7 +466,7 @@ def check_terraform_layout(repo_root: Path, s: Suite) -> None:
         s.add(
             "e02.module." + module_name,
             not missing_files,
-            "module interface complete (main/variables/outputs/README/versions)"
+            "module interface complete"
             if not missing_files
             else "missing: " + ", ".join(missing_files),
         )
@@ -504,6 +507,7 @@ def check_terraform_layout(repo_root: Path, s: Suite) -> None:
 
 
 def check_local_validation_commands(repo_root: Path, s: Suite) -> None:
+    """Run terraform fmt, validate, and pre-commit locally."""
     infra_root = repo_root / "infra"
 
     rc, _, err = run(
@@ -529,7 +533,7 @@ def check_local_validation_commands(repo_root: Path, s: Suite) -> None:
             cwd=full,
         )
         if rc != 0:
-            first_err = (err or "").splitlines()[0] if err else "terraform init failed"
+            first_err = (err or "").splitlines()[0] if err else "init failed"
             s.add(label, False, "terraform init failed: " + first_err)
             continue
 
@@ -541,7 +545,7 @@ def check_local_validation_commands(repo_root: Path, s: Suite) -> None:
             label,
             rc == 0,
             "terraform validate passed"
-            if rc == 0 else (err or "terraform validate failed").splitlines()[0],
+            if rc == 0 else (err or "validate failed").splitlines()[0],
         )
 
     rc, _, err = run(["pre-commit", "run", "--all-files"], cwd=repo_root)
@@ -564,6 +568,7 @@ def check_aws_identity(
     expected_account: str,
     s: Suite,
 ) -> None:
+    """Verify AWS caller identity matches the expected management account."""
     ok, data = aws_json(profile, ["sts", "get-caller-identity"])
     if not ok:
         s.add("e03.aws.identity", False, data["error"])
@@ -582,6 +587,7 @@ def check_organization(
     profile: str,
     s: Suite,
 ) -> Optional[str]:
+    """Verify AWS Organization settings and service access."""
     ok, data = aws_json(profile, ["organizations", "describe-organization"])
     if not ok:
         s.add("e03.org.describe", False, data["error"])
@@ -636,6 +642,7 @@ def check_ous(
     root_id: str,
     s: Suite,
 ) -> Dict[str, str]:
+    """Verify required Organizational Units exist."""
     ok, data = aws_json(
         profile,
         [
@@ -671,6 +678,7 @@ def check_state_backend(
     replica_region: str,
     s: Suite,
 ) -> None:
+    """Verify S3 and DynamoDB Terraform state backend hardening."""
     # Encryption
     ok, data = aws_json(
         profile,
@@ -729,11 +737,10 @@ def check_state_backend(
             block_ok,
             "all public access block settings enabled"
             if block_ok
-            else "public access block not fully enabled: " + str(block),
+            else "public access block not fully enabled",
         )
 
-    # Cross-region replication — tightened to exact replica bucket ARN
-    # from main.tf: infra-lab-tf-state-replica-551452024305
+    # Cross-region replication
     ok, data = aws_json(
         profile,
         ["s3api", "get-bucket-replication", "--bucket", state_bucket],
@@ -744,15 +751,16 @@ def check_state_backend(
             data.get("ReplicationConfiguration", {}).get("Rules", [])
         )
         replica_ok = any(
-            rule.get("Destination", {}).get("Bucket") == DEFAULT_REPLICA_BUCKET_ARN
+            rule.get("Destination", {}).get("Bucket") ==
+            DEFAULT_REPLICA_BUCKET_ARN
             for rule in rules
         )
         s.add(
             "e02.aws.state_bucket.replication",
             replica_ok,
-            "replication to infra-lab-tf-state-replica-551452024305 confirmed"
+            "replication to replica bucket confirmed"
             if replica_ok else
-            "expected destination " + DEFAULT_REPLICA_BUCKET_ARN + " not found in rules",
+            "expected destination replica not found in rules",
         )
     else:
         s.add(
@@ -787,7 +795,7 @@ def check_state_backend(
         sse in {"ENABLED", "UPDATING"},
         "DynamoDB lock table SSE enabled"
         if sse in {"ENABLED", "UPDATING"}
-        else "DynamoDB lock table SSE not enabled (status: " + str(sse) + ")",
+        else "DynamoDB lock table SSE not enabled",
     )
 
 
@@ -796,6 +804,7 @@ def check_control_tower(
     primary_region: str,
     s: Suite,
 ) -> None:
+    """Verify Control Tower landing zone is active."""
     ok, data = aws_json(
         profile,
         ["controltower", "list-landing-zones"],
@@ -824,6 +833,7 @@ def check_cloudtrail(
     primary_region: str,
     s: Suite,
 ) -> None:
+    """Verify Organization CloudTrail configuration and status."""
     ok, data = aws_json(
         profile,
         ["cloudtrail", "describe-trails", "--include-shadow-trails"],
@@ -857,15 +867,12 @@ def check_cloudtrail(
         else "org trail is NOT multi-region",
     )
 
-    # Control Tower manages the KMS key for its baseline trail.
-    # KmsKeyId is not always surfaced on describe-trails for CT-managed trails.
-    # Downgraded to WARN per known exception in MEMORY.md.
     s.add(
         "e03.cloudtrail.kms",
         bool(trail.get("KmsKeyId")),
-        "CloudTrail KMS CMK configured: " + str(trail.get("KmsKeyId"))
+        "CloudTrail KMS CMK configured"
         if trail.get("KmsKeyId")
-        else "Control Tower-managed trail KmsKeyId not surfaced (known exception)",
+        else "CT-managed trail KmsKeyId not surfaced (known exception)",
         severity="warn",
     )
 
@@ -900,7 +907,7 @@ def check_cloudtrail(
         bool(cw_arn),
         "CloudTrail CloudWatch Logs integration present"
         if cw_arn else
-        "CloudTrail running in S3-only mode (known exception per MEMORY.md)",
+        "CloudTrail running in S3-only mode (known exception)",
         severity="warn",
     )
 
@@ -910,6 +917,7 @@ def check_config_aggregator(
     primary_region: str,
     s: Suite,
 ) -> None:
+    """Verify AWS Config Organization Aggregator."""
     ok, data = aws_json(
         profile,
         ["configservice", "describe-configuration-aggregators"],
@@ -923,9 +931,7 @@ def check_config_aggregator(
     s.add(
         "e03.config.aggregator",
         bool(aggs),
-        "Config aggregator present: " + ", ".join(
-            a.get("ConfigurationAggregatorName", "") for a in aggs
-        )
+        "Config aggregator present"
         if aggs else "no Config aggregator found",
     )
 
@@ -945,6 +951,7 @@ def check_guardduty(
     regions: Sequence[str],
     s: Suite,
 ) -> None:
+    """Verify GuardDuty delegation and detector status across regions."""
     ok, data = aws_json(
         profile,
         ["guardduty", "list-organization-admin-accounts"],
@@ -962,7 +969,7 @@ def check_guardduty(
             admin_account in admins,
             "GuardDuty delegated admin confirmed: " + admin_account
             if admin_account in admins
-            else "expected " + admin_account + " not in: " + str(admins),
+            else "expected admin not in: " + str(admins),
         )
 
     for region in regions:
@@ -1001,8 +1008,6 @@ def check_guardduty(
             if enabled else "detector not ENABLED in " + region,
         )
 
-        # GD_EXPECTED_FREQUENCY is set to SIX_HOURS to match current
-        # guardduty.tf. Update to FIFTEEN_MINUTES after Terraform change.
         actual_freq = detector.get("FindingPublishingFrequency", "")
         freq_ok = actual_freq == GD_EXPECTED_FREQUENCY
         s.add(
@@ -1010,19 +1015,20 @@ def check_guardduty(
             freq_ok,
             "finding frequency " + GD_EXPECTED_FREQUENCY + " in " + region
             if freq_ok else
-            "finding frequency is " + actual_freq + " in " + region
-            + " (expected " + GD_EXPECTED_FREQUENCY + ")",
+            "finding frequency is " + actual_freq + " in " + region,
         )
 
 
 def check_security_hub(
-    profile: str,
+    mgmt_profile: str,
+    audit_profile: str,
     admin_account: str,
     primary_region: str,
     s: Suite,
 ) -> None:
+    """Verify Security Hub delegation, standards, and aggregator."""
     ok, data = aws_json(
-        profile,
+        mgmt_profile,
         ["securityhub", "list-organization-admin-accounts"],
         region=primary_region,
     )
@@ -1038,11 +1044,11 @@ def check_security_hub(
             admin_account in admins,
             "Security Hub delegated admin confirmed: " + admin_account
             if admin_account in admins
-            else "expected " + admin_account + " not found in admin accounts",
+            else "expected admin not found in admin accounts",
         )
 
     ok, data = aws_json(
-        profile,
+        audit_profile,
         ["securityhub", "get-enabled-standards"],
         region=primary_region,
     )
@@ -1050,14 +1056,13 @@ def check_security_hub(
         s.add("e03.securityhub.standards", False, data["error"])
     else:
         subs = data.get("StandardsSubscriptions", [])
-        # Fixed ARN parser: split on "/" and take last segment for readable name
-        # e.g. arn:aws:securityhub:...:standards/aws-foundational-security-best-practices/v/1.0.0
         names = [
             sub.get("StandardsArn", "").split("/")[-1]
             for sub in subs
         ]
-        # Check that both expected standards are present
-        arn_blob = " ".join(sub.get("StandardsArn", "") for sub in subs)
+        arn_blob = " ".join(
+            sub.get("StandardsArn", "") for sub in subs
+        )
         all_present = all(
             std in arn_blob for std in SH_EXPECTED_STANDARDS
         )
@@ -1065,15 +1070,12 @@ def check_security_hub(
             "e03.securityhub.standards",
             all_present,
             "expected standards enabled: " + ", ".join(names)
-            if all_present else
-            "missing expected standards. Found: " + (", ".join(names) or "none"),
+            if all_present
+            else "missing expected standards. Found: " + ", ".join(names),
         )
 
-    # Finding aggregator — defined in securityhub_standards.tf using aws.audit
-    # provider. If this fails, check that terraform apply has been run and
-    # that the aws.audit provider targets the correct account/region.
     ok, data = aws_json(
-        profile,
+        audit_profile,
         ["securityhub", "list-finding-aggregators"],
         region=primary_region,
     )
@@ -1085,9 +1087,8 @@ def check_security_hub(
             "e03.securityhub.finding_aggregator",
             bool(aggs),
             "finding aggregator present"
-            if aggs else
-            "no finding aggregator found — check securityhub_standards.tf "
-            "apply status and aws.audit provider region",
+            if aggs
+            else "no finding aggregator found — check securityhub_standards.tf",
         )
 
 
@@ -1097,6 +1098,7 @@ def check_budgets_and_anomalies(
     primary_region: str,
     s: Suite,
 ) -> None:
+    """Verify AWS Budgets and Cost Anomaly Detection."""
     ok, data = aws_json(
         profile,
         ["budgets", "describe-budgets", "--account-id", mgmt_account],
@@ -1153,6 +1155,7 @@ def check_scps(
     ou_map: Dict[str, str],
     s: Suite,
 ) -> None:
+    """Verify Service Control Policy existence and attachments."""
     ok, data = aws_json(
         profile,
         ["organizations", "list-policies", "--filter", "SERVICE_CONTROL_POLICY"],
@@ -1217,10 +1220,8 @@ def check_scps(
             "e03.scp.attachments." + label,
             matched,
             "SCP attachment signals matched for " + label
-            + " (" + ", ".join(attached_names) + ")"
             if matched else
-            "SCP pattern mismatch for " + label
-            + "; attached: " + (", ".join(attached_names) or "none"),
+            "SCP pattern mismatch for " + label,
             severity="warn",
         )
 
@@ -1231,6 +1232,7 @@ def check_scps(
 
 
 def print_summary(results: Sequence[Result]) -> int:
+    """Print a formatted summary of all validation results."""
     col_width = max(len(r.name) for r in results) + 2
     failures = 0
     warnings = 0
@@ -1263,6 +1265,7 @@ def print_summary(results: Sequence[Result]) -> int:
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description=(
             "Validate infra-lab foundations: E01 (repo/SDLC), "
@@ -1299,6 +1302,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip all live AWS API checks",
     )
+
+    parser.add_argument(
+        "--securityhub-profile",
+        default="infra-lab-security-audit",
+        help="AWS profile for Security Hub delegated admin checks",
+    )
     return parser.parse_args()
 
 
@@ -1308,6 +1317,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Run the validation script."""
     args = parse_args()
     repo_root = Path(args.repo_root).expanduser().resolve()
 
@@ -1330,12 +1340,11 @@ def main() -> int:
         print("--> Validating Terraform Layout & Modules...")
         check_terraform_layout(repo_root, s)
 
-        print("--> Running Terraform Init/Validate (this may take a minute)...")
+        print("--> Running Terraform Init/Validate...")
         check_local_validation_commands(repo_root, s)
 
     if not args.skip_aws:
         print(f"--> Connecting to AWS (Profile: {args.profile})...")
-        # Fixed: use args.profile (not args.mgmt_account) as the profile arg
         check_aws_identity(args.profile, args.mgmt_account, s)
 
         print("--> Checking AWS Organization & OUs...")
@@ -1358,7 +1367,7 @@ def main() -> int:
         check_control_tower(args.profile, args.primary_region, s)
         check_cloudtrail(args.profile, args.primary_region, s)
 
-        print("--> Checking Security Services (Config, GuardDuty, Security Hub)...")
+        print("--> Checking Security Services...")
         check_config_aggregator(args.profile, args.primary_region, s)
         check_guardduty(
             args.profile,
@@ -1367,7 +1376,8 @@ def main() -> int:
             s,
         )
         check_security_hub(
-            args.profile,
+            args.profile,             # Management Profile
+            args.securityhub_profile,  # Audit Profile
             args.securityhub_admin_account,
             args.primary_region,
             s,
