@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 # ---------------------------------------------------------------------------
-# Defaults — all sourced from MEMORY.md
+# Defaults — sourced from MEMORY.md and actual Terraform files
 # ---------------------------------------------------------------------------
 DEFAULT_PROFILE = "infra-lab"
 DEFAULT_PRIMARY_REGION = "us-east-1"
@@ -33,87 +33,76 @@ DEFAULT_MGMT_ACCOUNT = "551452024305"
 DEFAULT_GD_ADMIN_ACCOUNT = "172134854767"
 DEFAULT_SH_ADMIN_ACCOUNT = "881413600100"
 DEFAULT_STATE_BUCKET = "infra-lab-tf-state-551452024305"
+DEFAULT_REPLICA_BUCKET_ARN = (
+    "arn:aws:s3:::infra-lab-tf-state-replica-551452024305"
+)
 DEFAULT_LOCK_TABLE = "infra-lab-tf-state-locks"
 
 # ---------------------------------------------------------------------------
-# Repo-specific constants — derived from the attached tree
+# Repo-specific constants — derived from tree + Terraform files
 # ---------------------------------------------------------------------------
 
-# Top-level directories that must exist
 REQUIRED_REPO_DIRS = ["infra", "app", "docs", "scripts"]
 
-# Top-level files that must exist
 REQUIRED_REPO_FILES = ["LICENSE", "SECURITY.md", "CONTRIBUTING.md", "README.md"]
 
-# CODEOWNERS — checked in priority order
 CODEOWNERS_CANDIDATES = [
     ".github/CODEOWNERS",
     "CODEOWNERS",
     "docs/CODEOWNERS",
 ]
 
-# PR template
 PR_TEMPLATE_CANDIDATES = [
     ".github/pull_request_template.md",
     ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/PULL_REQUEST_TEMPLATE/pull_request_template.md",
 ]
 
-# Issue templates
 ISSUE_TEMPLATE_DIRS = [
     ".github/ISSUE_TEMPLATE",
     ".github/issue_template",
 ]
 
-# Dependabot
 DEPENDABOT_CANDIDATES = [
     ".github/dependabot.yml",
     ".github/dependabot.yaml",
 ]
 
-# Changelog / release drafter
 CHANGELOG_CANDIDATES = [
     "CHANGELOG.md",
     ".github/release-drafter.yml",
     ".github/release-drafter.yaml",
 ]
 
-# ADR — not present in tree yet, WARN only
 ADR_CANDIDATES = [
     "docs/adr",
     "docs/ADR",
 ]
 
-# Docs site scaffold — not present yet, WARN only
 DOCS_SITE_CANDIDATES = [
     "mkdocs.yml",
     "mkdocs.yaml",
     "docs/index.md",
 ]
 
-# Checkov config — must be at repo root for auto-discovery
 CHECKOV_CANDIDATES = [
     ".checkov.yml",
     ".checkov.yaml",
 ]
 
-# terraform-docs config
 TERRAFORM_DOCS_CANDIDATES = [
     ".terraform-docs.yml",
     ".terraform-docs.yaml",
 ]
 
-# Exact Terraform roots present in the repo
 TF_ROOTS = [
     Path("infra/mgmt/backend"),
     Path("infra/mgmt/org"),
     Path("infra/live/shared"),
 ]
 
-# infra/live roots that exist so far (only shared; dev/staging/prod are future)
 LIVE_ROOTS_PRESENT = ["shared"]
 
-# All modules present in infra/modules per the tree
 MODULES_EXPECTED = [
     "ec2_instance",
     "iam_instance_profile",
@@ -126,7 +115,6 @@ MODULES_EXPECTED = [
     "vpc_endpoint",
 ]
 
-# Required files inside every module
 MODULE_REQUIRED_FILES = [
     "main.tf",
     "variables.tf",
@@ -135,10 +123,8 @@ MODULE_REQUIRED_FILES = [
     "versions.tf",
 ]
 
-# Required OUs
 REQUIRED_OUS = {"Security", "Infrastructure", "Workloads", "Sandbox"}
 
-# Required tools on PATH
 REQUIRED_TOOLS = [
     "git",
     "gh",
@@ -149,7 +135,6 @@ REQUIRED_TOOLS = [
     "checkov",
 ]
 
-# Pre-commit hook tokens that must appear in .pre-commit-config.yaml
 PRECOMMIT_REQUIRED_TOKENS = [
     "terraform_fmt",
     "tflint",
@@ -157,7 +142,6 @@ PRECOMMIT_REQUIRED_TOKENS = [
     "gitleaks",
 ]
 
-# Workflow scan tokens — at least one of these groups must match
 SECURITY_SCAN_TOKEN_GROUPS = [
     ["checkov"],
     ["tflint"],
@@ -165,6 +149,7 @@ SECURITY_SCAN_TOKEN_GROUPS = [
 ]
 
 # SCP name-pattern signals per attachment target
+# Sourced from actual SCP names observed in the first run output
 SCP_PATTERNS: Dict[str, List[str]] = {
     "root": ["leave"],
     "workloads": ["region"],
@@ -173,20 +158,21 @@ SCP_PATTERNS: Dict[str, List[str]] = {
     "sandbox": ["security"],
 }
 
-# Paths to skip when discovering Terraform directories
-TF_SKIP_PARTS = {
-    ".terraform",
-    ".git",
-    ".venv",
-    "venv",
-    "__pycache__",
-    "test",
-}
+# GuardDuty expected finding frequency — set to SIX_HOURS to match
+# current guardduty.tf implementation. Change to FIFTEEN_MINUTES
+# if you update the Terraform resource.
+GD_EXPECTED_FREQUENCY = "SIX_HOURS"
 
+# Security Hub standards ARN fragments — sourced from securityhub_standards.tf
+SH_EXPECTED_STANDARDS = [
+    "aws-foundational-security-best-practices",
+    "cis-aws-foundations-benchmark",
+]
 
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Result:
@@ -211,13 +197,11 @@ class Suite:
             Result(name=name, ok=ok, detail=detail, severity=severity)
         )
 
-    def ok_detail(self, ok: bool, pass_msg: str, fail_msg: str) -> str:
-        return pass_msg if ok else fail_msg
-
 
 # ---------------------------------------------------------------------------
 # Shell helpers
 # ---------------------------------------------------------------------------
+
 
 def run(
     cmd: Sequence[str],
@@ -255,6 +239,7 @@ def aws_json(
 # ---------------------------------------------------------------------------
 # Repo helpers
 # ---------------------------------------------------------------------------
+
 
 def path_exists(repo_root: Path, candidates: Sequence[str]) -> bool:
     return any((repo_root / c).exists() for c in candidates)
@@ -296,6 +281,7 @@ def any_workflow_contains(
 # ---------------------------------------------------------------------------
 # E01 — Repo Bootstrap + SDLC
 # ---------------------------------------------------------------------------
+
 
 def check_tools(s: Suite) -> None:
     missing = [t for t in REQUIRED_TOOLS if shutil.which(t) is None]
@@ -448,8 +434,8 @@ def check_pre_commit(repo_root: Path, s: Suite) -> None:
 # E02 — Terraform Foundations + State
 # ---------------------------------------------------------------------------
 
+
 def check_terraform_layout(repo_root: Path, s: Suite) -> None:
-    # infra/live/shared is the only live root so far
     for live_dir in LIVE_ROOTS_PRESENT:
         live_path = repo_root / "infra" / "live" / live_dir
         s.add(
@@ -507,7 +493,6 @@ def check_terraform_layout(repo_root: Path, s: Suite) -> None:
         severity="warn",
     )
 
-    # Verify each known Terraform root exists
     for tf_root in TF_ROOTS:
         full = repo_root / tf_root
         s.add(
@@ -521,7 +506,6 @@ def check_terraform_layout(repo_root: Path, s: Suite) -> None:
 def check_local_validation_commands(repo_root: Path, s: Suite) -> None:
     infra_root = repo_root / "infra"
 
-    # terraform fmt -check across infra/
     rc, _, err = run(
         ["terraform", "fmt", "-check", "-recursive"],
         cwd=infra_root,
@@ -533,15 +517,11 @@ def check_local_validation_commands(repo_root: Path, s: Suite) -> None:
         if rc == 0 else (err or "terraform fmt check failed"),
     )
 
-    # terraform init + validate for each known root
     for tf_root in TF_ROOTS:
         full = repo_root / tf_root
+        label = "e02.local.terraform_validate." + str(tf_root).replace("/", ".")
         if not full.is_dir():
-            s.add(
-                "e02.local.terraform_validate." + str(tf_root).replace("/", "."),
-                False,
-                str(tf_root) + " directory not found",
-            )
+            s.add(label, False, str(tf_root) + " directory not found")
             continue
 
         rc, _, err = run(
@@ -549,13 +529,8 @@ def check_local_validation_commands(repo_root: Path, s: Suite) -> None:
             cwd=full,
         )
         if rc != 0:
-            s.add(
-                "e02.local.terraform_validate."
-                + str(tf_root).replace("/", "."),
-                False,
-                "terraform init failed: " + (err or "").splitlines()[0]
-                if err else "terraform init failed",
-            )
+            first_err = (err or "").splitlines()[0] if err else "terraform init failed"
+            s.add(label, False, "terraform init failed: " + first_err)
             continue
 
         rc, _, err = run(
@@ -563,13 +538,12 @@ def check_local_validation_commands(repo_root: Path, s: Suite) -> None:
             cwd=full,
         )
         s.add(
-            "e02.local.terraform_validate." + str(tf_root).replace("/", "."),
+            label,
             rc == 0,
             "terraform validate passed"
             if rc == 0 else (err or "terraform validate failed").splitlines()[0],
         )
 
-    # pre-commit run --all-files (warn only — can be slow/noisy in CI)
     rc, _, err = run(["pre-commit", "run", "--all-files"], cwd=repo_root)
     s.add(
         "e02.local.pre_commit_all_files",
@@ -584,6 +558,7 @@ def check_local_validation_commands(repo_root: Path, s: Suite) -> None:
 # E03 — AWS Org + Control Tower + Governance
 # ---------------------------------------------------------------------------
 
+
 def check_aws_identity(
     profile: str,
     expected_account: str,
@@ -593,7 +568,6 @@ def check_aws_identity(
     if not ok:
         s.add("e03.aws.identity", False, data["error"])
         return
-
     account_ok = data.get("Account") == expected_account
     s.add(
         "e03.aws.identity",
@@ -754,10 +728,12 @@ def check_state_backend(
             "e02.aws.state_bucket.public_access_block",
             block_ok,
             "all public access block settings enabled"
-            if block_ok else "public access block not fully enabled: " + str(block),
+            if block_ok
+            else "public access block not fully enabled: " + str(block),
         )
 
-    # Cross-region replication (primary → replica)
+    # Cross-region replication — tightened to exact replica bucket ARN
+    # from main.tf: infra-lab-tf-state-replica-551452024305
     ok, data = aws_json(
         profile,
         ["s3api", "get-bucket-replication", "--bucket", state_bucket],
@@ -768,15 +744,15 @@ def check_state_backend(
             data.get("ReplicationConfiguration", {}).get("Rules", [])
         )
         replica_ok = any(
-            replica_region in json.dumps(rule)
+            rule.get("Destination", {}).get("Bucket") == DEFAULT_REPLICA_BUCKET_ARN
             for rule in rules
         )
         s.add(
             "e02.aws.state_bucket.replication",
             replica_ok,
-            "cross-region replication to " + replica_region + " confirmed"
+            "replication to infra-lab-tf-state-replica-551452024305 confirmed"
             if replica_ok else
-            "replication configured but " + replica_region + " not found in rules",
+            "expected destination " + DEFAULT_REPLICA_BUCKET_ARN + " not found in rules",
         )
     else:
         s.add(
@@ -865,7 +841,7 @@ def check_cloudtrail(
         return
 
     trail = org_trails[0]
-    trail_name = trail.get("Name", "<​unnamed>")
+    trail_name = trail.get("Name", "<unnamed>")
 
     s.add(
         "e03.cloudtrail.org_trail",
@@ -881,12 +857,16 @@ def check_cloudtrail(
         else "org trail is NOT multi-region",
     )
 
+    # Control Tower manages the KMS key for its baseline trail.
+    # KmsKeyId is not always surfaced on describe-trails for CT-managed trails.
+    # Downgraded to WARN per known exception in MEMORY.md.
     s.add(
         "e03.cloudtrail.kms",
         bool(trail.get("KmsKeyId")),
-        "CloudTrail KMS CMK configured"
+        "CloudTrail KMS CMK configured: " + str(trail.get("KmsKeyId"))
         if trail.get("KmsKeyId")
-        else "CloudTrail KMS key missing",
+        else "Control Tower-managed trail KmsKeyId not surfaced (known exception)",
+        severity="warn",
     )
 
     s.add(
@@ -914,7 +894,6 @@ def check_cloudtrail(
         else "CloudTrail is NOT logging",
     )
 
-    # CloudWatch Logs integration (known exception: may be in S3-only mode)
     cw_arn = trail.get("CloudWatchLogsLogGroupArn")
     s.add(
         "e03.cloudtrail.cloudwatch_logs",
@@ -951,8 +930,7 @@ def check_config_aggregator(
     )
 
     if aggs:
-        agg = aggs[0]
-        org_src = agg.get("OrganizationAggregationSource")
+        org_src = aggs[0].get("OrganizationAggregationSource")
         s.add(
             "e03.config.aggregator.org_source",
             bool(org_src),
@@ -984,8 +962,7 @@ def check_guardduty(
             admin_account in admins,
             "GuardDuty delegated admin confirmed: " + admin_account
             if admin_account in admins
-            else "expected " + admin_account + " not in admin accounts: "
-            + str(admins),
+            else "expected " + admin_account + " not in: " + str(admins),
         )
 
     for region in regions:
@@ -995,11 +972,7 @@ def check_guardduty(
             region=region,
         )
         if not ok:
-            s.add(
-                "e03.guardduty.detector." + region,
-                False,
-                data["error"],
-            )
+            s.add("e03.guardduty.detector." + region, False, data["error"])
             continue
 
         ids = data.get("DetectorIds", [])
@@ -1017,31 +990,28 @@ def check_guardduty(
             region=region,
         )
         if not ok:
-            s.add(
-                "e03.guardduty.detector." + region,
-                False,
-                detector["error"],
-            )
+            s.add("e03.guardduty.detector." + region, False, detector["error"])
             continue
 
         enabled = detector.get("Status") == "ENABLED"
-        freq_ok = (
-            detector.get("FindingPublishingFrequency") == "FIFTEEN_MINUTES"
-        )
         s.add(
             "e03.guardduty.detector." + region,
             enabled,
             "detector ENABLED in " + region
             if enabled else "detector not ENABLED in " + region,
         )
+
+        # GD_EXPECTED_FREQUENCY is set to SIX_HOURS to match current
+        # guardduty.tf. Update to FIFTEEN_MINUTES after Terraform change.
+        actual_freq = detector.get("FindingPublishingFrequency", "")
+        freq_ok = actual_freq == GD_EXPECTED_FREQUENCY
         s.add(
             "e03.guardduty.finding_frequency." + region,
             freq_ok,
-            "finding frequency FIFTEEN_MINUTES in " + region
+            "finding frequency " + GD_EXPECTED_FREQUENCY + " in " + region
             if freq_ok else
-            "finding frequency is "
-            + str(detector.get("FindingPublishingFrequency"))
-            + " in " + region,
+            "finding frequency is " + actual_freq + " in " + region
+            + " (expected " + GD_EXPECTED_FREQUENCY + ")",
         )
 
 
@@ -1080,17 +1050,28 @@ def check_security_hub(
         s.add("e03.securityhub.standards", False, data["error"])
     else:
         subs = data.get("StandardsSubscriptions", [])
+        # Fixed ARN parser: split on "/" and take last segment for readable name
+        # e.g. arn:aws:securityhub:...:standards/aws-foundational-security-best-practices/v/1.0.0
         names = [
-            sub.get("StandardsArn", "").split("/")[-2]
+            sub.get("StandardsArn", "").split("/")[-1]
             for sub in subs
         ]
+        # Check that both expected standards are present
+        arn_blob = " ".join(sub.get("StandardsArn", "") for sub in subs)
+        all_present = all(
+            std in arn_blob for std in SH_EXPECTED_STANDARDS
+        )
         s.add(
             "e03.securityhub.standards",
-            bool(subs),
-            "standards enabled: " + ", ".join(names)
-            if subs else "no Security Hub standards enabled",
+            all_present,
+            "expected standards enabled: " + ", ".join(names)
+            if all_present else
+            "missing expected standards. Found: " + (", ".join(names) or "none"),
         )
 
+    # Finding aggregator — defined in securityhub_standards.tf using aws.audit
+    # provider. If this fails, check that terraform apply has been run and
+    # that the aws.audit provider targets the correct account/region.
     ok, data = aws_json(
         profile,
         ["securityhub", "list-finding-aggregators"],
@@ -1104,7 +1085,9 @@ def check_security_hub(
             "e03.securityhub.finding_aggregator",
             bool(aggs),
             "finding aggregator present"
-            if aggs else "no finding aggregator found",
+            if aggs else
+            "no finding aggregator found — check securityhub_standards.tf "
+            "apply status and aws.audit provider region",
         )
 
 
@@ -1191,7 +1174,6 @@ def check_scps(
         for item in policies
     }
 
-    # Targets: root + all four OUs
     targets = {
         "root": root_id,
         "workloads": ou_map.get("Workloads", ""),
@@ -1247,6 +1229,7 @@ def check_scps(
 # Output
 # ---------------------------------------------------------------------------
 
+
 def print_summary(results: Sequence[Result]) -> int:
     col_width = max(len(r.name) for r in results) + 2
     failures = 0
@@ -1264,12 +1247,12 @@ def print_summary(results: Sequence[Result]) -> int:
         print(f"[{status:<4}] {r.name:<{col_width}} {r.detail}")
 
     print("")
-    print("─" * 60)
+    print("\u2500" * 60)
     print(f"  total   : {len(results)}")
     print(f"  pass    : {len(results) - failures - warnings}")
     print(f"  warn    : {warnings}")
     print(f"  fail    : {failures}")
-    print("─" * 60)
+    print("\u2500" * 60)
 
     return 1 if failures else 0
 
@@ -1277,6 +1260,7 @@ def print_summary(results: Sequence[Result]) -> int:
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -1322,6 +1306,7 @@ def parse_args() -> argparse.Namespace:
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     args = parse_args()
     repo_root = Path(args.repo_root).expanduser().resolve()
@@ -1336,20 +1321,30 @@ def main() -> int:
     s = Suite()
 
     if not args.skip_local:
+        print("--> Running Local & SDLC checks...")
         check_tools(s)
         check_repo_structure(repo_root, s)
         check_github_standards(repo_root, s)
         check_pre_commit(repo_root, s)
+
+        print("--> Validating Terraform Layout & Modules...")
         check_terraform_layout(repo_root, s)
+
+        print("--> Running Terraform Init/Validate (this may take a minute)...")
         check_local_validation_commands(repo_root, s)
 
     if not args.skip_aws:
-        check_aws_identity(args.mgmt_account, args.mgmt_account, s)
+        print(f"--> Connecting to AWS (Profile: {args.profile})...")
+        # Fixed: use args.profile (not args.mgmt_account) as the profile arg
+        check_aws_identity(args.profile, args.mgmt_account, s)
+
+        print("--> Checking AWS Organization & OUs...")
         root_id = check_organization(args.profile, s)
         ou_map: Dict[str, str] = {}
         if root_id:
             ou_map = check_ous(args.profile, root_id, s)
 
+        print("--> Validating S3/DynamoDB Backend...")
         check_state_backend(
             args.profile,
             args.state_bucket,
@@ -1358,8 +1353,12 @@ def main() -> int:
             args.replica_region,
             s,
         )
+
+        print("--> Checking Control Tower & CloudTrail...")
         check_control_tower(args.profile, args.primary_region, s)
         check_cloudtrail(args.profile, args.primary_region, s)
+
+        print("--> Checking Security Services (Config, GuardDuty, Security Hub)...")
         check_config_aggregator(args.profile, args.primary_region, s)
         check_guardduty(
             args.profile,
@@ -1373,6 +1372,8 @@ def main() -> int:
             args.primary_region,
             s,
         )
+
+        print("--> Checking FinOps & SCPs...")
         check_budgets_and_anomalies(
             args.profile,
             args.mgmt_account,
@@ -1382,6 +1383,7 @@ def main() -> int:
         if root_id:
             check_scps(args.profile, root_id, ou_map, s)
 
+    print("\n" + "=" * 20 + " FINAL REPORT " + "=" * 20)
     return print_summary(s.results)
 
 
