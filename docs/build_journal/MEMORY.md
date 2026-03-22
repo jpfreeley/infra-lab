@@ -50,11 +50,17 @@
 
 ```json
 {
-    "UserId": "USERID",
+    "UserId": "AROAYAZI2DXYQE6O3PTRO:jpf321@gmail.com",
     "Account": "551452024305",
-    "Arn": "arn:aws:iam::551452024305:user/terraform-admin"
+    "Arn": "arn:aws:sts::551452024305:assumed-role/AWSReservedSSO_AWSAdministratorAccess_eea6c19cac23d161/jpf321@gmail.com"
 }
 ```
+
+### AWS Administrative Access Notes
+
+* The active administrative path for the `infra-lab` profile is IAM Identity Center / AWS SSO via the reserved role pattern `AWSReservedSSO_AWSAdministratorAccess_*`.
+
+* Break-glass and SCP-safe exemption handling must include the IAM Identity Center administrator role pattern in addition to Control Tower execution roles, StackSets execution roles, and `OrganizationAccountAccessRole`.
 
 ## Project Backlog
 
@@ -66,7 +72,7 @@
 
 * **Current Epic**: E03
 
-* **Current Story**: S009 (Define and attach SCPs)
+* **Current Story**: S011 (Log bucket immutability / Object Lock / retention guardrails)
 
 ## Repository & Workflow
 
@@ -120,24 +126,17 @@
 
 ### Infrastructure & Governance Notes
 
-* **Control Tower Manifest Limitations**:\
-  The `aws_controltower_landing_zone` Terraform resource manifest strictly manages Landing Zone configuration such as governed regions and logging. It **does not support** managing Organizational Units (OUs) or Service Control Policies (SCPs).\
-  OUs must be managed separately using native `aws_organizations_organizational_unit` Terraform resources.
+* **Control Tower Manifest Limitations**:  The `aws_controltower_landing_zone` Terraform resource manifest strictly manages Landing Zone configuration such as governed regions and logging. It **does not support** managing Organizational Units (OUs) or Service Control Policies (SCPs).  OUs must be managed separately using native `aws_organizations_organizational_unit` Terraform resources.
 
-* **Organizational Units (OUs)**:\
-  Created and managed via `aws_organizations_organizational_unit` resources to define account boundaries and governance domains.
+* **Organizational Units (OUs)**:  Created and managed via `aws_organizations_organizational_unit` resources to define account boundaries and governance domains.
 
-* **Service Principals for Control Tower**:\
-  The AWS Organization must enable the service principal `member.org.stacksets.cloudformation.amazonaws.com` to support Control Tower Account Factory operations. This is a required addition to the `aws_organizations_organization` resource to avoid drift.
+* **Service Principals for Control Tower**:  The AWS Organization must enable the service principal `member.org.stacksets.cloudformation.amazonaws.com` to support Control Tower Account Factory operations. This is a required addition to the `aws_organizations_organization` resource to avoid drift.
 
 ### Tooling & CI/CD Notes
 
-* **Checkov Pre-commit Hook**:\
-  The `terraform_checkov` hook from `antonbabenko/pre-commit-terraform` (v1.105.0) does **not** support passing a config file via `--config-file` argument in `args`.\
-  The `.checkov.yml` configuration file must be placed in the repository root for automatic discovery by Checkov.
+* **Checkov Pre-commit Hook**:  The `terraform_checkov` hook from `antonbabenko/pre-commit-terraform` (v1.105.0) does **not** support passing a config file via `--config-file` argument in `args`.  The `.checkov.yml` configuration file must be placed in the repository root for automatic discovery by Checkov.
 
-* **TFLint Hygiene**:\
-  Maintain a zero-warning policy. Remove unused Terraform declarations such as `data "aws_caller_identity" "current"` immediately to keep CI signals clean and avoid noise.
+* **TFLint Hygiene**:  Maintain a zero-warning policy. Remove unused Terraform declarations such as `data "aws_caller_identity" "current"` immediately to keep CI signals clean and avoid noise.
 
 * **Checkov Compliance**: Added `checkov:skip=CKV_AWS_274` for the `AdministratorAccess` policy attachment in `audit_role.tf` to acknowledge the requirement for full administrative permissions for the delegated security role.
 
@@ -181,7 +180,7 @@
 
 * **Current Epic**: E03 (AWS Organization + Control Tower)
 
-* **Current Story**: S004 (Enable CloudTrail Organization Trail)
+* **Current Story**: S011 (Log bucket immutability / Object Lock / retention guardrails)
 
 * **Completed in E03**:
 
@@ -190,6 +189,22 @@
   * S002: Control Tower LZ v4.0 Import & Alignment.
 
   * S003: Core OU Structure (Security, Infrastructure, Workloads, Sandbox).
+
+  * S004: Enable CloudTrail Organization Trail.
+
+  * S005: Centralized CloudTrail Logging.
+
+  * S006: AWS Config Aggregator.
+
+  * S007: GuardDuty delegated administration.
+
+  * S008: Security Hub and Finding Aggregator.
+
+  * S009: Baseline SCPs (IAM user restrictions, security service protection, deny leave organization).
+
+  * S010: Region restriction SCP for approved workload regions.
+
+  * S013: Cost budgets and anomaly detection.
 
 ---
 
@@ -267,10 +282,20 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 * **Credential Management**: Resolved `ExpiredToken` errors by refreshing AWS SSO/STS sessions for the `infra-lab` profile.
 
+### Session Update: 2026-03-22
+
+* Completed **E03-S009** by finalizing baseline SCP coverage for IAM user restrictions, protection of core security services, and denial of `organizations:LeaveOrganization`.
+
+* Completed **E03-S010** by implementing and attaching a region restriction SCP for the `Workloads` OU, limited to approved regions `us-east-1` and `us-west-2`.
+
+* Added a lockout-safe SCP exemption for IAM Identity Center administrator sessions using the role pattern `arn:aws:iam::*:role/AWSReservedSSO_AWSAdministratorAccess_*` after verifying the active admin path with `aws sts get-caller-identity --profile infra-lab`.
+
+* Completed the missing sandbox attachment for the security-protection SCP.
+
+* Normalized Control Tower landing zone manifest retention values from strings to integers to eliminate repeated `manifest_json` drift and unnecessary long-running landing zone updates.
+
 ### Next Steps
 
-* **Epic E03 / Story S009**: Define and attach SCPs (deny IAM users, deny disabling logs/config, deny leaving org).
+* **Epic E03 / Story S011**: Log bucket immutability / Object Lock / retention guardrails.
 
-* **Epic E03 / Story S010**: Configure IAM Identity Center.
-
----
+* **Epic E04**: Continue with IAM Identity Center / shared services follow-on work already started outside the strict E03 order.
