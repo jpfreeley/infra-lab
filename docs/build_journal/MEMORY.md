@@ -284,6 +284,39 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 ### Session Update: 2026-03-22
 
+* **Epic E03 / Story S010**: Configure IAM Identity Center.
+
+---
+
+## Session Update: 2026-03-21
+
+### Infrastructure & Governance Progress (Epic E03)
+
+* **SCPs (S009)**: Successfully implemented and applied hardened Service Control Policies across the organization.
+
+* **IAM User Prevention**: Expanded the IAM-user-deny SCP to block creation and management of IAM users, login profiles, access keys, signing certificates, and service-specific credentials to reinforce IAM Identity Center adoption.
+
+* **Security Service Protection**: Replaced the earlier security-protection SCP with a more granular policy that denies mutation or disabling of CloudTrail, AWS Config, and GuardDuty.
+
+* **Organization Retention**: Replaced the prior leave-organization SCP with a standardized, tagged policy preventing member accounts from leaving the AWS Organization.
+
+* **Administrative Exemptions / Break-Glass**: Added `ArnNotLike` exemptions for `AWSControlTowerExecution`, `AWSCloudFormationStackSetExecutionRole`, and `OrganizationAccountAccessRole` so automation and break-glass administration remain functional.
+
+* **Attachment Strategy**: Applied the leave-organization SCP at the Organization Root and applied the security-protection SCP to the Security, Infrastructure, and Workloads OUs. Updated the existing IAM-user SCP in place.
+
+* **Control Tower Centralized Logging**: Successfully updated the Control Tower Landing Zone manifest to enable `centralizedLogging` targeting the Log Archive account (`172134854767`) after correcting manifest schema/type issues.
+
+### Lessons Learned (2026-03-21)
+
+* **Control Tower Manifest Types**: `retentionDays` values in the Landing Zone manifest must be integers, not strings, or the Control Tower API returns a schema `ValidationException`.
+
+* **GuardDuty Delegation Constraint**: After delegation is enabled, the Management account cannot update delegated GuardDuty detector properties such as `finding_publishing_frequency`; Terraform must stop managing those mutable fields from the Management account context.
+
+* **Provider Auth Pattern**: The `audit` provider must use the Management account profile (`infra-lab`) as the source for `assume_role` into `OrganizationAccountAccessRole`; attempting to assume that role from an Audit-account SSO session results in `AccessDenied`.
+
+* **SCP Safety Model**: Verified that SCPs do not apply to the Management account and that break-glass access remains available through `OrganizationAccountAccessRole`, reducing lockout risk.
+
+* **Long-Running Apply Behavior**: Control Tower Landing Zone updates can legitimately take ~24 minutes through Terraform; extended `Still modifying...` output is normal.
 * Completed **E03-S009** by finalizing baseline SCP coverage for IAM user restrictions, protection of core security services, and denial of `organizations:LeaveOrganization`.
 
 * Completed **E03-S010** by implementing and attaching a region restriction SCP for the `Workloads` OU, limited to approved regions `us-east-1` and `us-west-2`.
