@@ -45,7 +45,7 @@ module "secure_bucket" {
 
 ## Requirements
 
-| Name      | Version |
-|-----------|---------|
+| Name      | Version  |
+| :-------- | :------- |
 | terraform | >= 1.7.0 |
-| aws       | ~> 5.0  |
+| aws       | ~> 5.0   |
