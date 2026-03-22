@@ -11,12 +11,12 @@ locals {
   }
 
   # Roles that should be exempt from SCP restrictions to prevent lockout
-  # (Moved from scps.tf to keep locals together)
   scp_exempt_role_arns = concat(
     [
       "arn:aws:iam::*:role/AWSControlTowerExecution",
       "arn:aws:iam::*:role/AWSCloudFormationStackSetExecutionRole",
-      "arn:aws:iam::*:role/OrganizationAccountAccessRole"
+      "arn:aws:iam::*:role/OrganizationAccountAccessRole",
+      "arn:aws:iam::*:role/AWSReservedSSO_AWSAdministratorAccess_*"
     ],
     var.scp_exempt_role_arns
   )
