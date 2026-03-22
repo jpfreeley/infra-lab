@@ -419,8 +419,8 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 * **Control Tower Log Buckets & Object Lock**:
   Control Tower-managed S3 log buckets do not have Object Lock enabled and cannot be retrofitted with Object Lock after creation. Log immutability must be achieved via:
-  - versioning
-  - lifecycle retention policies
-  - SCP-based delete protections
+  * versioning
+  * lifecycle retention policies
+  * SCP-based delete protections
 
   This is an intentional architectural constraint. Object Lock would require a greenfield bucket and is not compatible with Control Tower-managed logging.
