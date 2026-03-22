@@ -332,3 +332,87 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 * **Epic E03 / Story S011**: Log bucket immutability / Object Lock / retention guardrails.
 
 * **Epic E04**: Continue with IAM Identity Center / shared services follow-on work already started outside the strict E03 order.
+
+## Session Update: 2026-03-22 (Foundation Validation Harness)
+
+### Validation Harness Delivered
+
+* Added a single Python validation script: `scripts/validate_foundation.py`.
+
+* Purpose: provide a repo-specific validation harness for all completed work from E01 through E03-S010.
+
+* The script validates:
+  * **E01**: repository structure, SDLC scaffolding, GitHub workflow presence, pre-commit baseline.
+  * **E02**: Terraform layout, module interface completeness, formatting, validate, local pre-commit execution, remote state backend controls.
+  * **E03**: AWS Organization, Control Tower, OU structure, CloudTrail, Config aggregator, GuardDuty, Security Hub, budgets/anomaly detection, and SCP attachments.
+
+* The validator now includes visible progress output for long-running stages so execution does not appear hung.
+
+* The validator was refined to be repo-specific for `infra-lab`:
+  * `infra/live/shared` is the active live root currently validated.
+  * Terraform roots validated:
+    * `infra/mgmt/backend`
+    * `infra/mgmt/org`
+    * `infra/live/shared`
+  * Module interface checks aligned to the actual modules present in `infra/modules`.
+
+### Linting / Quality Notes
+
+* Added Python linting awareness to local workflow and validated the script against strict `flake8` settings.
+
+* Resolved `flake8` issues including:
+  * line length (`E501`)
+  * docstring requirements (`D101`, `D102`, `D103`, `D400`, `D401`)
+
+* Confirmed `pre-commit run --all-files` passes locally after updates.
+
+### Validation Baseline Outcome
+
+* Final validator result:
+  * **Total Checks**: 73
+  * **Pass**: 68
+  * **Warn**: 5
+  * **Fail**: 0
+
+* Known warnings remaining are expected / acceptable:
+  * changelog or release drafter scaffold not yet created
+  * `docs/adr` scaffold not yet created
+  * docs site scaffold not yet created
+  * terraform-docs config not yet present
+  * Control Tower-managed CloudTrail KMS key visibility limitation
+
+### Security Hub Validation Lesson Learned
+
+* `aws_securityhub_finding_aggregator` was already correctly deployed in Terraform in `infra/mgmt/org/securityhub_standards.tf` using the delegated admin (`aws.audit`) provider.
+
+* Initial validator result was a false negative because Security Hub checks were performed only with the Management account profile.
+
+* Correct validation model for Security Hub:
+  * **Management profile (`infra-lab`)** for `list-organization-admin-accounts`
+  * **Audit profile (`infra-lab-security-audit`)** for:
+    * `get-enabled-standards`
+    * `list-finding-aggregators`
+
+* This split-profile validation accurately reflects the delegated admin architecture.
+
+### SDLC Hardening Added During This Session
+
+* Added root `LICENSE`.
+
+* Added `.github/ISSUE_TEMPLATE/` scaffolding.
+
+* Added `.github/pull_request_template.md`.
+
+* Added `.github/dependabot.yml`.
+
+* Fixed markdownlint issues in `.github/pull_request_template.md`.
+
+* Identified and corrected a Markdown table alignment issue in `infra/modules/s3_secure_bucket/README.md` to satisfy `markdownlint` rule `MD060`.
+
+### Carry-Forward Notes
+
+* Preserve `scripts/validate_foundation.py` as a reusable baseline contract test for future epics.
+
+* Future changes to org/security architecture should update the validator in parallel to keep the contract current.
+
+* Do not remove historical notes from this document without explicit approval.
