@@ -21,7 +21,7 @@ resource "aws_guardduty_detector" "mgmt_replica" {
   # checkov:skip=CKV2_AWS_3:GuardDuty is enabled and delegated to the Security/Log Archive account per best practices.
   provider                     = aws.replica
   enable                       = true
-  finding_publishing_frequency = "SIX_HOURS"
+  finding_publishing_frequency = "FIFTEEN_MINUTES"
 }
 
 # 2. Delegate GuardDuty Administration to the Log Archive Account

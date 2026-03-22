@@ -18,10 +18,10 @@ resource "aws_controltower_landing_zone" "main" {
       enabled   = true
       configurations = {
         loggingBucket = {
-          retentionDays = 365 # Integer, no quotes
+          retentionDays = "365"
         }
         accessLoggingBucket = {
-          retentionDays = 3650 # Integer, no quotes
+          retentionDays = "3650"
         }
       }
     }
@@ -30,10 +30,10 @@ resource "aws_controltower_landing_zone" "main" {
       enabled   = true
       configurations = {
         loggingBucket = {
-          retentionDays = 365 # Integer, no quotes
+          retentionDays = "365"
         }
         accessLoggingBucket = {
-          retentionDays = 3650 # Integer, no quotes
+          retentionDays = "3650"
         }
       }
     }

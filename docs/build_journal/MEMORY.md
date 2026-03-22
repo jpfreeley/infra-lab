@@ -50,11 +50,17 @@
 
 ```json
 {
-    "UserId": "USERID",
+    "UserId": "AROAYAZI2DXYQE6O3PTRO:jpf321@gmail.com",
     "Account": "551452024305",
-    "Arn": "arn:aws:iam::551452024305:user/terraform-admin"
+    "Arn": "arn:aws:sts::551452024305:assumed-role/AWSReservedSSO_AWSAdministratorAccess_eea6c19cac23d161/jpf321@gmail.com"
 }
 ```
+
+### AWS Administrative Access Notes
+
+* The active administrative path for the `infra-lab` profile is IAM Identity Center / AWS SSO via the reserved role pattern `AWSReservedSSO_AWSAdministratorAccess_*`.
+
+* Break-glass and SCP-safe exemption handling must include the IAM Identity Center administrator role pattern in addition to Control Tower execution roles, StackSets execution roles, and `OrganizationAccountAccessRole`.
 
 ## Project Backlog
 
@@ -66,7 +72,7 @@
 
 * **Current Epic**: E03
 
-* **Current Story**: S010 (Configure IAM Identity Center)
+* **Current Story**: S011 (Log bucket immutability / Object Lock / retention guardrails)
 
 ## Repository & Workflow
 
@@ -174,7 +180,7 @@
 
 * **Current Epic**: E03 (AWS Organization + Control Tower)
 
-* **Current Story**: S010 (Configure IAM Identity Center)
+* **Current Story**: S011 (Log bucket immutability / Object Lock / retention guardrails)
 
 * **Completed in E03**:
 
@@ -190,13 +196,15 @@
 
   * S006: AWS Config Aggregator.
 
-  * S007: Enable GuardDuty and Delegate Administration.
+  * S007: GuardDuty delegated administration.
 
-  * S008: Enable Security Hub and Finding Aggregator.
+  * S008: Security Hub and Finding Aggregator.
 
-  * S009: Define and attach Service Control Policies (SCPs).
+  * S009: Baseline SCPs (IAM user restrictions, security service protection, deny leave organization).
 
-  * S013: Implement Cost Budgets and Anomaly Detection.
+  * S010: Region restriction SCP for approved workload regions.
+
+  * S013: Cost budgets and anomaly detection.
 
 ---
 
@@ -274,7 +282,7 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 * **Credential Management**: Resolved `ExpiredToken` errors by refreshing AWS SSO/STS sessions for the `infra-lab` profile.
 
-### Next Steps
+### Session Update: 2026-03-22
 
 * **Epic E03 / Story S010**: Configure IAM Identity Center.
 
@@ -309,3 +317,18 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 * **SCP Safety Model**: Verified that SCPs do not apply to the Management account and that break-glass access remains available through `OrganizationAccountAccessRole`, reducing lockout risk.
 
 * **Long-Running Apply Behavior**: Control Tower Landing Zone updates can legitimately take ~24 minutes through Terraform; extended `Still modifying...` output is normal.
+* Completed **E03-S009** by finalizing baseline SCP coverage for IAM user restrictions, protection of core security services, and denial of `organizations:LeaveOrganization`.
+
+* Completed **E03-S010** by implementing and attaching a region restriction SCP for the `Workloads` OU, limited to approved regions `us-east-1` and `us-west-2`.
+
+* Added a lockout-safe SCP exemption for IAM Identity Center administrator sessions using the role pattern `arn:aws:iam::*:role/AWSReservedSSO_AWSAdministratorAccess_*` after verifying the active admin path with `aws sts get-caller-identity --profile infra-lab`.
+
+* Completed the missing sandbox attachment for the security-protection SCP.
+
+* Normalized Control Tower landing zone manifest retention values from strings to integers to eliminate repeated `manifest_json` drift and unnecessary long-running landing zone updates.
+
+### Next Steps
+
+* **Epic E03 / Story S011**: Log bucket immutability / Object Lock / retention guardrails.
+
+* **Epic E04**: Continue with IAM Identity Center / shared services follow-on work already started outside the strict E03 order.
