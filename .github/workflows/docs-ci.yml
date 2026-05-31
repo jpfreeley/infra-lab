@@ -26,7 +26,7 @@ jobs:
 
       # Markdownlint-cli2 is the standard for MD linting
       - name: Markdown Lint
-        uses: davidanson/markdownlint-cli2-action@v22
+        uses: davidanson/markdownlint-cli2-action@v23
         with:
           globs: |
             **/*.md
