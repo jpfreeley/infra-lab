@@ -180,7 +180,7 @@
 
 * **Current Epic**: E03 (AWS Organization + Control Tower)
 
-* **Current Story**: S012 (Landing zone hardening: AWS Config conformance packs)
+* **Current Story**: S014 (Landing zone hardening: S3 access logs for central buckets)
 
 * **Completed in E03**:
 
@@ -205,6 +205,8 @@
   * S010: Region restriction SCP for approved workload regions.
 
   * S011: Log bucket immutability (resolved via guardrails, Object Lock not feasible).
+
+  * S012: AWS Config conformance packs (16 rules, org-wide).
 
   * S013: Cost budgets and anomaly detection.
 
@@ -333,7 +335,7 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 ### Next Steps
 
-* **Epic E03 / Story S012**: Landing zone hardening: AWS Config conformance packs.
+* **Epic E03 / Story S014**: Landing zone hardening: S3 access logs for central buckets.
 
 * **Epic E04**: Continue with IAM Identity Center / shared services follow-on work already started outside the strict E03 order.
 
@@ -468,3 +470,15 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 * **Secret Scanning**: Updated `gitleaks-action` from v2 to v3 (Dependabot PR #63). Switched from `secrets.GITLEAKS_PAT` to `secrets.GITHUB_TOKEN` for Dependabot compatibility.
 * **Docs CI**: Updated `markdownlint-cli2-action` from v22 to v23.
+
+### Config Conformance Packs (S012)
+
+* Deployed organization conformance pack `infra-lab-security-baseline` with 16 Config rules.
+* Successfully deployed to Log Archive (`172134854767`) and Audit (`881413600100`) accounts.
+* Excluded Management (`551452024305`) and test-env (`970353898303`) — no Config Recorders.
+* Rules cover: S3 encryption/public access/versioning/logging, EBS encryption, RDS encryption, CloudTrail (enabled/encrypted/multi-region), root account security (MFA/access keys), IAM password policy, VPC flow logs, SSH restriction, required tags (EC2 + S3).
+
+### Lessons Learned (Config Conformance Packs)
+
+* **Config Recorder Requirement**: Organization conformance packs require a Config Recorder in every target account. Accounts without recorders must be in `excluded_accounts` or deploy fails with `NoAvailableConfigurationRecorder`.
+* **Deploy Timing**: Conformance pack creation takes ~2-3 minutes after the API call. Terraform may time out on first create — verify status via `describe-organization-conformance-pack-statuses`.
