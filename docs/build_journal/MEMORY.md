@@ -180,7 +180,7 @@
 
 * **Current Epic**: E03 (AWS Organization + Control Tower)
 
-* **Current Story**: S011 (Log bucket immutability / Object Lock / retention guardrails)
+* **Current Story**: S012 (Landing zone hardening: AWS Config conformance packs)
 
 * **Completed in E03**:
 
@@ -204,7 +204,11 @@
 
   * S010: Region restriction SCP for approved workload regions.
 
+  * S011: Log bucket immutability (resolved via guardrails, Object Lock not feasible).
+
   * S013: Cost budgets and anomaly detection.
+
+  * S020: Org-wide tag policies (enforced on 6 resource types).
 
 ---
 
@@ -329,7 +333,7 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 ### Next Steps
 
-* **Epic E03 / Story S011**: Log bucket immutability / Object Lock / retention guardrails.
+* **Epic E03 / Story S012**: Landing zone hardening: AWS Config conformance packs.
 
 * **Epic E04**: Continue with IAM Identity Center / shared services follow-on work already started outside the strict E03 order.
 
@@ -424,3 +428,43 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
   * SCP-based delete protections
 
   This is an intentional architectural constraint. Object Lock would require a greenfield bucket and is not compatible with Control Tower-managed logging.
+
+---
+
+## Session Update: 2026-06-03
+
+### Infrastructure Progress (Epic E03)
+
+* **Tag Policies (S020)**: Implemented and deployed org-wide tag policies.
+  * Enabled `TAG_POLICY` in Organization `enabled_policy_types`.
+  * Created `infra-lab-mgmt-mandatory-tags` policy (ID: `p-957vhypbso`).
+  * Enforced `Project`, `ManagedBy`, `Environment` with controlled values on 6 resource types.
+  * `Owner` defined as required key (freeform, no enforcement).
+  * Attached at Organization root for full coverage.
+
+* **S011 (Log Bucket Immutability)**: Confirmed complete. Object Lock cannot be retrofitted; immutability achieved via versioning + lifecycle + SCPs.
+
+* **GuardDuty Fix**: Added `lifecycle { ignore_changes = [finding_publishing_frequency] }` to `mgmt_replica` detector. Management account cannot update properties after delegation.
+
+* **CloudTrail Drift**: Re-enabled CloudTrail organization trail logging (had drifted to disabled).
+
+### AWS Profile Migration
+
+* Migrated `infra-lab-log-archive` and `infra-lab-security-audit` profiles from static credentials (`~/.aws/credentials`) to SSO-based profiles (`~/.aws/config`).
+* Both profiles now use `jpf_devel` SSO session with `AWSAdministratorAccess` role.
+* Removed stale static credential entries that were overriding SSO config.
+
+### Lessons Learned (2026-06-03)
+
+* **Tag Policy `rds:db` limitation**: `rds:db` is NOT a valid `enforced_for` resource type in AWS Organizations tag policies despite appearing functional in isolation. Causes `MalformedPolicyDocumentException` when combined with other resource types. Use AWS Config rules for RDS tagging compliance.
+
+* **Tag Policy Structure**: Policy key (lowercase) under `tags` must differ from `tag_key` value only in case. Tags without `tag_value` defined cannot use `enforced_for` — enforcement only works when compliant values are specified.
+
+* **AWS Credentials Precedence**: `~/.aws/credentials` static entries take precedence over `~/.aws/config` SSO profiles. When migrating to SSO, stale credential entries MUST be removed or the SDK (including Terraform) will use expired static tokens.
+
+* **GuardDuty Delegation + Terraform**: After delegating GuardDuty administration, Management account detectors cannot have mutable properties (like `finding_publishing_frequency`) updated. Use `lifecycle { ignore_changes }` to prevent Terraform from attempting these updates.
+
+### CI/CD Update
+
+* **Secret Scanning**: Updated `gitleaks-action` from v2 to v3 (Dependabot PR #63). Switched from `secrets.GITLEAKS_PAT` to `secrets.GITHUB_TOKEN` for Dependabot compatibility.
+* **Docs CI**: Updated `markdownlint-cli2-action` from v22 to v23.
