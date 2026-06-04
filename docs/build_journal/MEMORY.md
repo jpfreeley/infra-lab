@@ -178,9 +178,9 @@
 
 ### Current Project State Update
 
-* **Current Epic**: E03 (AWS Organization + Control Tower)
+* **Current Epic**: E04 (Identity + Access + CI/CD Auth)
 
-* **Current Story**: S014 (Landing zone hardening: S3 access logs for central buckets)
+* **E03 Status**: COMPLETE (all stories delivered)
 
 * **Completed in E03**:
 
@@ -210,7 +210,23 @@
 
   * S013: Cost budgets and anomaly detection.
 
+  * S014: S3 access logs for central buckets (verified compliant).
+
+  * S015: KMS key policy standardization (module enhanced with standard template).
+
+  * S016: Account factory customization (documentation).
+
+  * S017: SCP exceptions process (runbook).
+
+  * S018: IAM password policy (SSO-only, strict, applied).
+
+  * S019: Detective controls runbooks (GuardDuty/SecurityHub/Config).
+
   * S020: Org-wide tag policies (enforced on 6 resource types).
+
+  * S021: AWS Backup org policies (daily 35d + monthly 365d retention).
+
+  * S022: Duplicate of S012 (already complete).
 
 ---
 
@@ -335,9 +351,9 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 ### Next Steps
 
-* **Epic E03 / Story S014**: Landing zone hardening: S3 access logs for central buckets.
+* **Epic E04**: Identity + Access + CI/CD Auth (IAM Identity Center permission sets, GitHub OIDC, role chaining).
 
-* **Epic E04**: Continue with IAM Identity Center / shared services follow-on work already started outside the strict E03 order.
+* E03 is complete. All landing zone hardening stories delivered.
 
 ## Session Update: 2026-03-22 (Foundation Validation Harness)
 
