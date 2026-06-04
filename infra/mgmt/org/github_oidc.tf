@@ -52,7 +52,11 @@ resource "aws_iam_role" "github_actions_deploy" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:jpfreeley/infra-lab:*"
+            # E04-S017: Tightened to main branch and pull_request events only
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:jpfreeley/infra-lab:ref:refs/heads/main",
+              "repo:jpfreeley/infra-lab:pull_request",
+            ]
           }
         }
       }
