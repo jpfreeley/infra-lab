@@ -178,7 +178,9 @@
 
 ### Current Project State Update
 
-* **Current Epic**: E04 (Identity + Access + CI/CD Auth)
+* **Current Epic**: E05 (Networking - Dual VPC per env)
+
+* **E04 Status**: COMPLETE (all stories delivered)
 
 * **E03 Status**: COMPLETE (all stories delivered)
 
@@ -351,9 +353,9 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 ### Next Steps
 
-* **Epic E04**: Identity + Access + CI/CD Auth (IAM Identity Center permission sets, GitHub OIDC, role chaining).
+* **Epic E05**: Networking (Dual VPC per env) — Per-env Control+Execution VPCs, subnets, endpoints, NACL/SG, PrivateLink.
 
-* E03 is complete. All landing zone hardening stories delivered.
+* E03 and E04 are complete. All governance, identity, and CI/CD auth stories delivered.
 
 ## Session Update: 2026-03-22 (Foundation Validation Harness)
 
@@ -498,3 +500,43 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 * **Config Recorder Requirement**: Organization conformance packs require a Config Recorder in every target account. Accounts without recorders must be in `excluded_accounts` or deploy fails with `NoAvailableConfigurationRecorder`.
 * **Deploy Timing**: Conformance pack creation takes ~2-3 minutes after the API call. Terraform may time out on first create — verify status via `describe-organization-conformance-pack-statuses`.
+
+---
+
+## Session Update: 2026-06-03 (Epic E04 Complete)
+
+### Identity + Access + CI/CD Auth Delivered
+
+* **Permission Sets (S002)**: Deployed 5 permission sets to IAM Identity Center:
+  * AdministratorAccess (4h session, break-glass only)
+  * PlatformEngineer (PowerUserAccess + IAMReadOnly, 8h)
+  * Developer (Lambda + ECS + S3 + DynamoDB + CloudWatch + Logs, 8h)
+  * SecurityAuditor (ReadOnly + SecurityHub + GuardDuty, 8h)
+  * ReadOnlyAccess (8h)
+
+* **GitHub OIDC (S005/S006)**: Keyless CI/CD authentication established.
+  * OIDC provider: `token.actions.githubusercontent.com`
+  * Deploy role ARN: `arn:aws:iam::551452024305:role/infra-lab-github-actions-deploy`
+  * Trust scoped to `repo:jpfreeley/infra-lab` (main branch + PRs only)
+
+* **SSO Group Assignments (S003)**: Admin, SecurityAuditor, and ReadOnly access assigned across Management, Log Archive, and Audit accounts.
+
+* **IAM Access Analyzer (S010)**: Organization-level analyzer `infra-lab-org-analyzer` deployed.
+
+* **Root User SCP (S012)**: Blocks root IAM/Org/Account/Billing actions in Workloads, Sandbox, Infrastructure OUs.
+
+* **OIDC Tightening (S017)**: Deploy role restricted to main branch pushes and pull_request events only.
+
+* **Documentation (S004, S007-S009, S011, S013-S016, S018)**: Comprehensive IAM runbook created at `docs/runbooks/iam-identity-access.md`.
+
+### Lessons Learned (E04)
+
+* **SSO Permission Set Descriptions**: Cannot contain em dashes or non-ASCII characters. Only printable ASCII `[\u0020-\u007E]` is valid.
+
+* **AmazonGuardDutyFullAccess**: This managed policy does NOT exist. Use `AmazonGuardDutyReadOnlyAccess`.
+
+* **IAM Access Analyzer**: Requires `access-analyzer.amazonaws.com` in the Organization's `aws_service_access_principals` before creating an ORGANIZATION-type analyzer.
+
+* **CloudTrail Lake**: No longer accepts new customers as of 2026. Cannot create new Event Data Stores. Use existing Organization Trail for Insights.
+
+* **CloudTrail Insights Data Store**: Cannot be multi-region (`InvalidParameterException`).
