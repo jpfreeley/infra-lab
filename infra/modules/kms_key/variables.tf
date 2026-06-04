@@ -27,9 +27,39 @@ variable "enable_key_rotation" {
 }
 
 variable "policy" {
-  description = "A valid KMS key policy JSON document. If not specified, AWS will use a default policy."
+  description = "A valid KMS key policy JSON document. If not specified and use_standard_policy is true, the standard policy template will be used."
   type        = string
   default     = null
+}
+
+variable "use_standard_policy" {
+  description = "Use the standardized key policy template instead of a custom policy. Ignored if 'policy' is provided."
+  type        = bool
+  default     = true
+}
+
+variable "key_administrator_arns" {
+  description = "List of IAM ARNs that can administer the key (manage lifecycle, not use for encryption)."
+  type        = list(string)
+  default     = []
+}
+
+variable "key_user_arns" {
+  description = "List of IAM ARNs that can use the key for encryption/decryption."
+  type        = list(string)
+  default     = []
+}
+
+variable "service_principal_arns" {
+  description = "List of AWS service principals that need access to the key (e.g., cloudtrail.amazonaws.com)."
+  type        = list(string)
+  default     = []
+}
+
+variable "cross_account_arns" {
+  description = "List of cross-account ARNs that need decrypt/describe access to the key."
+  type        = list(string)
+  default     = []
 }
 
 variable "tags" {
