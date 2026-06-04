@@ -139,9 +139,17 @@ resource "aws_ssoadmin_managed_policy_attachment" "readonly_attach" {
 #
 # Assigns SSO groups to permission sets in specific accounts.
 # Groups are managed in IAM Identity Center directory.
+#
+# Group IDs:
+# - 02672018-... AWSSecurityAuditPowerUsers (admin access)
+# - 0e97bc18-... AWSLogArchiveAdmins
+# - 17e639ec-... AWSAuditAccountAdmins
+# - 644182e3-... AWSSecurityAuditors (read-only security)
+# - a3143d78-... AWSControlTowerAdmins
+# - a3218d5e-... AWSLogArchiveViewers
 ####
 
-# Assign AdministratorAccess to admin group in Management account
+# Admin access to Management account
 resource "aws_ssoadmin_account_assignment" "admin_group_management" {
   instance_arn       = local.sso_instance_arn
   permission_set_arn = aws_ssoadmin_permission_set.admin_access.arn
@@ -151,12 +159,70 @@ resource "aws_ssoadmin_account_assignment" "admin_group_management" {
   target_type        = "AWS_ACCOUNT"
 }
 
-# Assign ReadOnlyAccess to audit group in Audit account
+# Admin access to Log Archive account
+resource "aws_ssoadmin_account_assignment" "admin_group_log_archive" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.admin_access.arn
+  principal_id       = "0e97bc18-e40a-410a-a8e1-39f29d09d7d8" # AWSLogArchiveAdmins
+  principal_type     = "GROUP"
+  target_id          = "172134854767" # Log Archive account
+  target_type        = "AWS_ACCOUNT"
+}
+
+# Admin access to Audit account
+resource "aws_ssoadmin_account_assignment" "admin_group_audit" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.admin_access.arn
+  principal_id       = "17e639ec-e64d-4718-8c06-f9e87c679d38" # AWSAuditAccountAdmins
+  principal_type     = "GROUP"
+  target_id          = "881413600100" # Audit account
+  target_type        = "AWS_ACCOUNT"
+}
+
+# Security auditor read-only to all accounts
+resource "aws_ssoadmin_account_assignment" "security_auditors_management" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.security_auditor.arn
+  principal_id       = "644182e3-2012-40e1-9532-40c1fe4f7662" # AWSSecurityAuditors
+  principal_type     = "GROUP"
+  target_id          = "551452024305" # Management account
+  target_type        = "AWS_ACCOUNT"
+}
+
+resource "aws_ssoadmin_account_assignment" "security_auditors_log_archive" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.security_auditor.arn
+  principal_id       = "644182e3-2012-40e1-9532-40c1fe4f7662" # AWSSecurityAuditors
+  principal_type     = "GROUP"
+  target_id          = "172134854767" # Log Archive account
+  target_type        = "AWS_ACCOUNT"
+}
+
+resource "aws_ssoadmin_account_assignment" "security_auditors_audit" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.security_auditor.arn
+  principal_id       = "644182e3-2012-40e1-9532-40c1fe4f7662" # AWSSecurityAuditors
+  principal_type     = "GROUP"
+  target_id          = "881413600100" # Audit account
+  target_type        = "AWS_ACCOUNT"
+}
+
+# ReadOnly access to Audit account (existing, preserved)
 resource "aws_ssoadmin_account_assignment" "readonly_user_audit" {
   instance_arn       = local.sso_instance_arn
   permission_set_arn = aws_ssoadmin_permission_set.read_only_access.arn
   principal_id       = "17e639ec-e64d-4718-8c06-f9e87c679d38" # AWSAuditAccountAdmins
   principal_type     = "GROUP"
   target_id          = "881413600100" # Audit account
+  target_type        = "AWS_ACCOUNT"
+}
+
+# Log Archive viewers
+resource "aws_ssoadmin_account_assignment" "log_archive_viewers" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.read_only_access.arn
+  principal_id       = "a3218d5e-8948-4d9f-8e8b-1a39cf88f095" # AWSLogArchiveViewers
+  principal_type     = "GROUP"
+  target_id          = "172134854767" # Log Archive account
   target_type        = "AWS_ACCOUNT"
 }

@@ -1,5 +1,6 @@
 resource "aws_organizations_organization" "org" {
   aws_service_access_principals = [
+    "access-analyzer.amazonaws.com",
     "config-multiaccountsetup.amazonaws.com",
     "controltower.amazonaws.com",
     "iam.amazonaws.com",
