@@ -49,6 +49,17 @@ resource "aws_rds_cluster_parameter_group" "this" {
     value = "ddl,role"
   }
 
+  # Query logging for compliance (CKV2_AWS_27)
+  parameter {
+    name  = "log_statement"
+    value = "all"
+  }
+
+  parameter {
+    name  = "log_min_duration_statement"
+    value = "1000"
+  }
+
   dynamic "parameter" {
     for_each = var.db_parameters
     content {
