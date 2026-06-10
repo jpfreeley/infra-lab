@@ -1,9 +1,11 @@
 # VPC Endpoints
 # Epic: E05 - Networking (Dual VPC per env)
-# Stories: S010-S019 - VPC endpoints for private AWS API access
+#
+# NOTE: Interface endpoints disabled for cost optimization.
+# Only free S3 Gateway endpoints are active.
 
 ###############################################################################
-# S3 Gateway Endpoint (Control VPC)
+# S3 Gateway Endpoint (Control VPC) - FREE
 ###############################################################################
 
 module "endpoint_s3_control" {
@@ -24,7 +26,7 @@ module "endpoint_s3_control" {
 }
 
 ###############################################################################
-# S3 Gateway Endpoint (Execution VPC)
+# S3 Gateway Endpoint (Execution VPC) - FREE
 ###############################################################################
 
 module "endpoint_s3_execution" {
@@ -45,7 +47,7 @@ module "endpoint_s3_execution" {
 }
 
 ###############################################################################
-# Interface Endpoints Security Group (Control VPC)
+# Endpoint Security Groups (FREE - kept ready for re-enabling endpoints)
 ###############################################################################
 
 module "endpoint_sg_control" {
@@ -78,30 +80,6 @@ module "endpoint_sg_control" {
   tags = local.common_tags
 }
 
-###############################################################################
-# Interface Endpoints (Control VPC)
-###############################################################################
-
-module "interface_endpoints_control" {
-  source   = "../../modules/vpc_endpoint"
-  for_each = toset(local.interface_endpoints)
-
-  vpc_id              = module.control_vpc.vpc_id
-  service_name        = each.value
-  endpoint_type       = "Interface"
-  private_dns_enabled = true
-  security_group_ids  = [module.endpoint_sg_control.id]
-  subnet_ids          = module.control_vpc.private_subnet_ids
-
-  tags = merge(local.common_tags, {
-    "Name" = "${local.name_prefix}-control-${split(".", each.value)[4]}-endpoint"
-  })
-}
-
-###############################################################################
-# CloudWatch Logs Endpoint (Execution VPC)
-###############################################################################
-
 module "endpoint_sg_execution" {
   source = "../../modules/security_group"
 
@@ -130,19 +108,4 @@ module "endpoint_sg_execution" {
   ]
 
   tags = local.common_tags
-}
-
-module "endpoint_logs_execution" {
-  source = "../../modules/vpc_endpoint"
-
-  vpc_id              = module.execution_vpc.vpc_id
-  service_name        = "com.amazonaws.us-east-1.logs"
-  endpoint_type       = "Interface"
-  private_dns_enabled = true
-  security_group_ids  = [module.endpoint_sg_execution.id]
-  subnet_ids          = module.execution_vpc.private_subnet_ids
-
-  tags = merge(local.common_tags, {
-    "Name" = "${local.name_prefix}-execution-logs-endpoint"
-  })
 }

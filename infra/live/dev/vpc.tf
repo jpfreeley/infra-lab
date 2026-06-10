@@ -13,7 +13,7 @@ module "control_vpc" {
   cidr_block = local.control_vpc_cidr
 
   enable_internet_gateway = true
-  nat_gateway_count       = 1 # Single NAT for dev (cost optimization)
+  nat_gateway_count       = 0 # No NAT — cost optimization until workloads deployed
 
   public_subnets  = local.control_public_subnets
   private_subnets = local.control_private_subnets
@@ -23,9 +23,8 @@ module "control_vpc" {
   peer_vpc_id   = module.execution_vpc.vpc_id
   peer_vpc_cidr = local.execution_vpc_cidr
 
-  # Flow logs
-  enable_flow_logs         = true
-  flow_log_destination_arn = module.flow_logs_bucket.bucket_arn
+  # Flow logs disabled — cost optimization until workloads deployed
+  enable_flow_logs = false
 
   tags = local.common_tags
 }
@@ -41,15 +40,14 @@ module "execution_vpc" {
   cidr_block = local.execution_vpc_cidr
 
   enable_internet_gateway = true
-  nat_gateway_count       = 1 # Single NAT for dev (cost optimization)
+  nat_gateway_count       = 0 # No NAT — cost optimization until workloads deployed
 
   public_subnets  = local.execution_public_subnets
   private_subnets = local.execution_private_subnets
   data_subnets    = local.execution_data_subnets
 
-  # Flow logs
-  enable_flow_logs         = true
-  flow_log_destination_arn = module.flow_logs_bucket.bucket_arn
+  # Flow logs disabled — cost optimization until workloads deployed
+  enable_flow_logs = false
 
   tags = local.common_tags
 }

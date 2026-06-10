@@ -1,13 +1,12 @@
-feat(networking): implement E05 dual VPC per environment
+chore(networking): disable paid resources for cost optimization
 
-- Create reusable VPC module (infra/modules/vpc)
-- Add dev/staging/prod Terraform roots with Control + Execution VPCs
-- CIDR plan: non-overlapping /20 blocks across 6 VPCs
-- 3-AZ subnets per VPC (public/private/data tiers)
-- VPC peering between Control and Execution per environment
-- 10 VPC endpoints (S3 GW + 9 Interface in Control VPCs)
-- RFC1918 egress denial NACLs on Execution private subnets
-- Least-privilege security group matrices (ALB/ECS/RDS)
-- VPC flow logs to per-env S3 with KMS encryption
-- NAT strategy: single (dev/staging), per-AZ HA (prod)
-- Full CIDR plan documentation and E05 build journal
+Disable all resources that incur idle costs until workloads are deployed:
+- NAT Gateways: set to 0 in all environments (was $259/mo)
+- Interface Endpoints: commented out in all environments (was $216/mo)
+- Flow Logs + KMS keys: commented out in all environments (was $3/mo)
+
+Remaining cost: $0/mo (VPCs, subnets, route tables, peering, SGs, NACLs,
+IGWs, and S3 Gateway endpoints are all free).
+
+All paid resources are preserved as commented code with clear re-enable
+instructions for when workloads are deployed.
