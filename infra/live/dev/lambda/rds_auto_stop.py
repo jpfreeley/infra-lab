@@ -41,25 +41,47 @@ def handler(event, context):
         response = ssm.get_parameter(Name=SSM_PARAMETER)
         enabled = response["Parameter"]["Value"].lower() == "true"
     except ssm.exceptions.ParameterNotFound:
-        logger.warning("SSM parameter %s not found, defaulting to enabled", SSM_PARAMETER)
+        logger.warning(
+            "SSM parameter %s not found, defaulting to enabled",
+            SSM_PARAMETER,
+        )
         enabled = True
     except Exception as e:
         logger.error("Error reading SSM parameter: %s", str(e))
         enabled = True  # Fail-safe: stop the cluster
 
     if not enabled:
-        logger.info("Auto-stop is DISABLED via SSM parameter. Cluster will remain running.")
-        return {"action": "skipped", "reason": "disabled via SSM", "cluster": source_identifier}
+        logger.info(
+            "Auto-stop DISABLED via SSM. Cluster remains running."
+        )
+        return {
+            "action": "skipped",
+            "reason": "disabled via SSM",
+            "cluster": source_identifier,
+        }
 
     # Stop the cluster
-    logger.info("Auto-stop ENABLED. Stopping cluster: %s", source_identifier)
+    logger.info(
+        "Auto-stop ENABLED. Stopping cluster: %s", source_identifier
+    )
     try:
         rds.stop_db_cluster(DBClusterIdentifier=source_identifier)
-        logger.info("Successfully initiated stop for cluster: %s", source_identifier)
+        logger.info(
+            "Successfully initiated stop for cluster: %s",
+            source_identifier,
+        )
         return {"action": "stopped", "cluster": source_identifier}
     except rds.exceptions.InvalidDBClusterStateFault:
-        logger.warning("Cluster %s is not in a stoppable state", source_identifier)
-        return {"action": "skipped", "reason": "not stoppable", "cluster": source_identifier}
+        logger.warning(
+            "Cluster %s is not in a stoppable state",
+            source_identifier,
+        )
+        return {
+            "action": "skipped",
+            "reason": "not stoppable",
+            "cluster": source_identifier,
+        }
     except Exception as e:
-        logger.error("Error stopping cluster %s: %s", source_identifier, str(e))
+        logger.error("Error stopping cluster %s: %s",
+                     source_identifier, str(e))
         raise
