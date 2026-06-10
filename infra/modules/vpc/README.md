@@ -44,7 +44,7 @@ module "control_vpc" {
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | name | Name prefix for all resources | string | - | yes |
 | cidr_block | VPC CIDR block | string | - | yes |
 | enable_internet_gateway | Create IGW | bool | true | no |
@@ -63,7 +63,7 @@ module "control_vpc" {
 ## Outputs
 
 | Name | Description |
-|---|---|
+| --- | --- |
 | vpc_id | VPC ID |
 | vpc_arn | VPC ARN |
 | vpc_cidr_block | VPC CIDR |
