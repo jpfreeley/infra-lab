@@ -9,7 +9,7 @@ tenant workloads with restricted egress.
 ## CIDR Allocation
 
 | Environment | VPC | CIDR | Usable IPs |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | dev | Control | 10.0.0.0/20 | 4,094 |
 | dev | Execution | 10.0.16.0/20 | 4,094 |
 | staging | Control | 10.0.32.0/20 | 4,094 |
@@ -23,7 +23,7 @@ tenant workloads with restricted egress.
 Each /20 VPC is divided into subnet tiers across 3 AZs:
 
 | Tier | Purpose | Size | AZ-a | AZ-b | AZ-c |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | public | NAT GW, ALB | /24 | .0.0/24 | .1.0/24 | .2.0/24 |
 | private | Compute (ECS/Lambda) | /22 | .4.0/22 | .8.0/22 | .12.0/22 |
 | data | RDS, ElastiCache | /26 | .3.0/26 | .3.64/26 | .3.128/26 |
@@ -31,7 +31,7 @@ Each /20 VPC is divided into subnet tiers across 3 AZs:
 ### Dev Control VPC (10.0.0.0/20)
 
 | Tier | AZ | CIDR |
-|---|---|---|
+| --- | --- | --- |
 | public | us-east-1a | 10.0.0.0/24 |
 | public | us-east-1b | 10.0.1.0/24 |
 | public | us-east-1c | 10.0.2.0/24 |
@@ -45,7 +45,7 @@ Each /20 VPC is divided into subnet tiers across 3 AZs:
 ### Dev Execution VPC (10.0.16.0/20)
 
 | Tier | AZ | CIDR |
-|---|---|---|
+| --- | --- | --- |
 | public | us-east-1a | 10.0.16.0/24 |
 | public | us-east-1b | 10.0.17.0/24 |
 | public | us-east-1c | 10.0.18.0/24 |
@@ -59,7 +59,7 @@ Each /20 VPC is divided into subnet tiers across 3 AZs:
 ### Staging Control VPC (10.0.32.0/20)
 
 | Tier | AZ | CIDR |
-|---|---|---|
+| --- | --- | --- |
 | public | us-east-1a | 10.0.32.0/24 |
 | public | us-east-1b | 10.0.33.0/24 |
 | public | us-east-1c | 10.0.34.0/24 |
@@ -73,7 +73,7 @@ Each /20 VPC is divided into subnet tiers across 3 AZs:
 ### Staging Execution VPC (10.0.48.0/20)
 
 | Tier | AZ | CIDR |
-|---|---|---|
+| --- | --- | --- |
 | public | us-east-1a | 10.0.48.0/24 |
 | public | us-east-1b | 10.0.49.0/24 |
 | public | us-east-1c | 10.0.50.0/24 |
@@ -87,7 +87,7 @@ Each /20 VPC is divided into subnet tiers across 3 AZs:
 ### Prod Control VPC (10.0.64.0/20)
 
 | Tier | AZ | CIDR |
-|---|---|---|
+| --- | --- | --- |
 | public | us-east-1a | 10.0.64.0/24 |
 | public | us-east-1b | 10.0.65.0/24 |
 | public | us-east-1c | 10.0.66.0/24 |
@@ -101,7 +101,7 @@ Each /20 VPC is divided into subnet tiers across 3 AZs:
 ### Prod Execution VPC (10.0.80.0/20)
 
 | Tier | AZ | CIDR |
-|---|---|---|
+| --- | --- | --- |
 | public | us-east-1a | 10.0.80.0/24 |
 | public | us-east-1b | 10.0.81.0/24 |
 | public | us-east-1c | 10.0.82.0/24 |
@@ -129,7 +129,7 @@ Control VPCs get Interface endpoints for private AWS API access:
 ## NAT Gateway Strategy
 
 | Environment | NAT GWs | Rationale |
-|---|---|---|
+| --- | --- | --- |
 | dev | 1 (single AZ) | Cost optimization |
 | staging | 1 (single AZ) | Cost optimization |
 | prod | 3 (per AZ) | High availability |

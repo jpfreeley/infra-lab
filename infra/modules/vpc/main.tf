@@ -19,6 +19,20 @@ resource "aws_vpc" "this" {
 }
 
 ###############################################################################
+# Default Security Group (restrict all traffic per CKV2_AWS_12)
+###############################################################################
+
+resource "aws_default_security_group" "this" {
+  vpc_id = aws_vpc.this.id
+
+  tags = merge(var.tags, {
+    "Name"      = "${var.name}-default-restricted"
+    "ManagedBy" = "terraform"
+    "Project"   = var.project
+  })
+}
+
+###############################################################################
 # Internet Gateway (optional - only for VPCs with public subnets)
 ###############################################################################
 

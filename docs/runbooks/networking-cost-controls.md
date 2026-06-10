@@ -9,7 +9,7 @@ remains in place at zero cost, ready to activate when needed.
 ## What Is Disabled
 
 | Resource | Files Affected | Saved |
-|---|---|---|
+| --- | --- | --- |
 | NAT Gateways | `infra/live/{dev,staging,prod}/vpc.tf` | $259.20/mo |
 | Interface VPC Endpoints | `infra/live/{dev,staging,prod}/endpoints.tf` | $216.00/mo |
 | VPC Flow Logs | `infra/live/{dev,staging,prod}/vpc.tf` | $0 (no data) |
@@ -81,7 +81,7 @@ module "flow_logs_bucket" {
 }
 ```
 
-2. Update `vpc.tf` in both VPC modules:
+1. Update `vpc.tf` in both VPC modules:
 
 ```hcl
 enable_flow_logs         = true
@@ -106,7 +106,7 @@ Repeat for staging and prod as needed.
 When starting E06 (Compute), re-enable only what is needed for dev:
 
 | Phase | Resources | Monthly Cost |
-|---|---|---|
+| --- | --- | --- |
 | Minimal dev | 1 NAT + ECR/Logs/S3 endpoints only | ~$54/mo |
 | Full dev | 1 NAT + all endpoints + flow logs | ~$106/mo |
 | Add staging | Same as dev | +$106/mo |
@@ -131,7 +131,7 @@ This gives ECS tasks the ability to pull images and ship logs for ~$54/mo.
 ## Cost Reference (us-east-1)
 
 | Resource | Hourly | Monthly (730h) |
-|---|---|---|
+| --- | --- | --- |
 | NAT Gateway | $0.045 | $32.40 |
 | NAT Data Processing | $0.045/GB | variable |
 | Interface Endpoint (per AZ) | $0.01 | $7.20 |

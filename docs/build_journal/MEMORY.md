@@ -543,7 +543,6 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 * **CloudTrail Insights Data Store**: Cannot be multi-region (`InvalidParameterException`).
 
-
 ---
 
 ## Session Update: 2026-06-09
@@ -588,7 +587,7 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 
 * **Deferred Stories (S026-S036)**: Transit Gateway, Network Firewall, Direct Connect, IPv6, VPN, and advanced DNS depend on infrastructure not yet deployed. Documented as architecture decisions for future implementation.
 
-### Next Steps
+### What's Next (Post-E05)
 
 * **Epic E06**: Compute (ECS Fargate API + Workers) - ECS clusters, task definitions, ALB, blue/green deployment.
 * E05 PrivateLink (S021) will be completed during E06 when ALB/NLB resources exist.
