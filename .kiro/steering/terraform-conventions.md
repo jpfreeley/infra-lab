@@ -34,6 +34,8 @@
   - `CKV_AWS_91` — ALB access logs (disabled in dev for cost)
   - `CKV_AWS_224` — ECS exec logging CMK (optional in dev)
 - **CKV2_AWS_12**: Every VPC module must include `aws_default_security_group` with no ingress/egress rules to restrict the default SG
+- **CKV2_AWS_28**: WAF for public ALB — global skip in `.checkov.yml` (deferred to prod)
+- **CKV2 graph checks**: Inline `# checkov:skip=CKV2_XXX` does NOT work. Must use `.checkov.yml` `skip-check` list.
 - Graph checks (`CKV2_*`) need full directory context (`checkov -d infra/`) to resolve cross-resource relationships
 
 ## Markdown Linting (CI + Local)
