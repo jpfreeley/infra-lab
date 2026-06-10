@@ -115,6 +115,53 @@ In production (future):
 
 ---
 
+## Full Platform Idle Cost Summary (E01-E09)
+
+### By Epic
+
+| Epic | Layer | Idle Cost/mo | Notes |
+| --- | --- | --- | --- |
+| E01-E02 | Repo + State | ~$2 | KMS key ($1) + S3/DDB trivial |
+| E03 | Governance | ~$15-25 | CloudTrail, Config, GuardDuty, Security Hub |
+| E04 | Identity | $0 | IAM Identity Center, OIDC — no hourly charges |
+| E05 | Networking | $0 | No NAT, no flow logs, no interface endpoints |
+| E06 | Compute | ~$31 | ALB ($16) + 1 API task ($15) |
+| E07 | Data (stopped) | ~$3-6 | Aurora storage only + KMS key |
+| E08 | Orchestration | $0 | SQS + Step Functions are pay-per-use |
+| E09 | Secrets | ~$1 | 3 secrets × $0.40 |
+| **Total** | | **~$52-65/mo** | |
+
+### Governance Cost Breakdown (E03)
+
+| Service | Approx Cost | Reducible? |
+| --- | --- | --- |
+| CloudTrail (org trail) | ~$2/mo | No — audit requirement |
+| Config rules (16 rules, conformance pack) | ~$8-10/mo | Yes — can pause pack |
+| GuardDuty | ~$5/mo | Not recommended |
+| Security Hub | ~$3-5/mo | Not recommended |
+| KMS key (CloudTrail) | ~$1/mo | No — fixed per-key |
+
+### Cost Reduction Options
+
+| Option | Savings | Risk |
+| --- | --- | --- |
+| Stop Aurora clusters | ~$85/mo | Must start before dev work (1-3 min) |
+| Disable Config conformance pack | ~$8-10/mo | No drift detection until re-enabled |
+| Remove ALB (no real API) | ~$16/mo | Must recreate for integration testing |
+| Scale API to 0 tasks | ~$15/mo | No service available until scaled up |
+
+### Minimum Possible Cost (Everything Paused)
+
+If all optional resources are stopped/removed:
+
+- Governance (fixed): ~$10-15/mo
+- KMS keys: ~$3/mo
+- S3 storage: ~$1/mo
+- Secrets: ~$1/mo
+- **Absolute floor: ~$15-20/mo**
+
+---
+
 ## Aurora Database Cost Controls
 
 ### Cost Reduction Approach
