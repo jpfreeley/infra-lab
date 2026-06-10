@@ -112,3 +112,93 @@ In production (future):
 | worker-nano | CPU | 60% | 0 | 5 |
 | worker-medium | CPU | 60% | 0 | 10 |
 | worker-xlarge | CPU | 50% | 0 | 5 |
+
+---
+
+## Aurora Database Cost Controls
+
+### Cost Reduction Approach
+
+Aurora Serverless v2 has a minimum of 0.5 ACU (~$44/mo per cluster) that cannot be
+reduced. The only way to eliminate idle Aurora cost is to **stop the clusters** when
+not actively developing.
+
+RDS Proxy is omitted from dev entirely — it's only needed when ECS tasks run at scale.
+The `rds_proxy` module exists for staging/prod use.
+
+### Idle Cost (Clusters Running)
+
+| Resource | Monthly |
+| --- | --- |
+| Aurora control (0.5 ACU) | ~$44 |
+| Aurora execution (0.5 ACU) | ~$44 |
+| KMS key (evidence) | ~$1 |
+| **Total** | **~$89/mo** |
+
+### Idle Cost (Clusters Stopped)
+
+| Resource | Monthly |
+| --- | --- |
+| Aurora storage (both clusters) | ~$2-5 |
+| KMS key (evidence) | ~$1 |
+| **Total** | **~$3-6/mo** |
+
+### Stopping Clusters
+
+Aurora clusters can be stopped for up to 7 days. After 7 days, AWS auto-restarts them.
+
+```bash
+# Stop both clusters
+aws rds stop-db-cluster \
+  --db-cluster-identifier infra-lab-dev-control-db \
+  --profile infra-lab
+
+aws rds stop-db-cluster \
+  --db-cluster-identifier infra-lab-dev-execution-db \
+  --profile infra-lab
+```
+
+### Starting Clusters
+
+```bash
+# Start both clusters (takes 1-3 minutes)
+aws rds start-db-cluster \
+  --db-cluster-identifier infra-lab-dev-control-db \
+  --profile infra-lab
+
+aws rds start-db-cluster \
+  --db-cluster-identifier infra-lab-dev-execution-db \
+  --profile infra-lab
+
+# Wait for available status
+aws rds wait db-cluster-available \
+  --db-cluster-identifier infra-lab-dev-control-db \
+  --profile infra-lab
+```
+
+### Adding RDS Proxy (When Needed)
+
+RDS Proxy is omitted from dev to save ~$22/mo. When running load tests or deploying
+services that need connection pooling, add proxy configuration to `database.tf`:
+
+```hcl
+module "rds_proxy_control" {
+  source = "../../modules/rds_proxy"
+
+  proxy_name         = "${local.name_prefix}-control-proxy"
+  cluster_identifier = module.aurora_control.cluster_id
+  subnet_ids         = module.control_vpc.data_subnet_ids
+  security_group_ids = [module.sg_rds_control.id]
+  secret_arns        = [module.aurora_control.master_user_secret_arn]
+  aws_region         = var.aws_region
+  tags               = local.common_tags
+}
+```
+
+Then `terraform apply`. Remove and apply again when done to stop the charges.
+
+### Terraform Compatibility
+
+Stopping/starting Aurora clusters does NOT cause Terraform drift. The cluster state
+is not tracked by Terraform — only the configuration is. `terraform plan` will show
+no changes on a stopped cluster.
