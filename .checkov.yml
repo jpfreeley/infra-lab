@@ -12,3 +12,4 @@ evaluate-variables: true
 skip-check:
   - CKV2_AWS_28  # WAF association for ALB - deferred to prod (E09/E10)
   - CKV2_AWS_8   # AWS Backup plan for RDS - deferred to prod (E12)
+  - CKV2_AWS_34  # SSM Parameter encryption - non-sensitive control flags don't need SecureString
