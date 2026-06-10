@@ -4,10 +4,8 @@
 
 locals {
   project     = "infra-lab"
-  environment = "dev"
+  environment = var.environment
   name_prefix = "${local.project}-${local.environment}"
-
-  azs = ["us-east-1a", "us-east-1b", "us-east-1c"]
 
   # Control VPC - management/orchestration workloads
   control_vpc_cidr = "10.0.0.0/20"
@@ -43,19 +41,6 @@ locals {
     { cidr = "10.0.19.0/26", az = "us-east-1a" },
     { cidr = "10.0.19.64/26", az = "us-east-1b" },
     { cidr = "10.0.19.128/26", az = "us-east-1c" },
-  ]
-
-  # VPC Endpoint services for Control VPC
-  interface_endpoints = [
-    "com.amazonaws.us-east-1.ecr.api",
-    "com.amazonaws.us-east-1.ecr.dkr",
-    "com.amazonaws.us-east-1.logs",
-    "com.amazonaws.us-east-1.monitoring",
-    "com.amazonaws.us-east-1.secretsmanager",
-    "com.amazonaws.us-east-1.sqs",
-    "com.amazonaws.us-east-1.ssm",
-    "com.amazonaws.us-east-1.kms",
-    "com.amazonaws.us-east-1.sts",
   ]
 
   common_tags = {
