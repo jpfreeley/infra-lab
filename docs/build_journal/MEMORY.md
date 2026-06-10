@@ -178,7 +178,9 @@
 
 ### Current Project State Update
 
-* **Current Epic**: E05 (Networking - Dual VPC per env)
+* **Current Epic**: E06 (Compute - ECS Fargate API + Workers)
+
+* **E05 Status**: COMPLETE (S001-S025 delivered, S026-S036 deferred to future epics)
 
 * **E04 Status**: COMPLETE (all stories delivered)
 
@@ -540,3 +542,53 @@ This resolves the previous issues with GuardDuty delegation and CloudTrail loggi
 * **CloudTrail Lake**: No longer accepts new customers as of 2026. Cannot create new Event Data Stores. Use existing Organization Trail for Insights.
 
 * **CloudTrail Insights Data Store**: Cannot be multi-region (`InvalidParameterException`).
+
+
+---
+
+## Session Update: 2026-06-09
+
+### Infrastructure Progress (Epic E05 - Networking)
+
+* **VPC Module Created**: Reusable `infra/modules/vpc` supporting configurable subnets, NAT GWs, flow logs, and VPC peering.
+
+* **CIDR Plan Documented**: Full allocation at `docs/networking-cidr-plan.md` covering dev/staging/prod Control + Execution VPCs.
+
+* **Dev Environment (S001-S003)**: Dual VPC deployed with 3-AZ subnets, single NAT, VPC peering, flow logs.
+
+* **Staging Environment (S004-S006)**: Same architecture as dev with staging CIDRs.
+
+* **Prod Environment (S007-S009, S024)**: Same architecture with 3 NAT GWs per VPC for HA.
+
+* **VPC Endpoints (S010-S019)**: S3 Gateway in all VPCs, 9 Interface endpoints in Control VPCs, Logs endpoint in Execution VPCs.
+
+* **NACLs (S020)**: RFC1918 egress denial on Execution VPC private subnets across all environments.
+
+* **Flow Logs (S022)**: Per-environment S3 buckets with KMS encryption.
+
+* **Security Groups (S025)**: Least-privilege matrices for ALB, ECS, RDS in both VPC planes.
+
+* **NAT HA (S024)**: Single NAT in dev/staging, per-AZ NAT in prod.
+
+### Terraform Roots Created
+
+* `infra/live/dev` — state key `live/dev/terraform.tfstate`
+* `infra/live/staging` — state key `live/staging/terraform.tfstate`
+* `infra/live/prod` — state key `live/prod/terraform.tfstate`
+
+### Lessons Learned (E05)
+
+* **Security Group Cycles**: Cross-referencing SGs via module outputs creates Terraform dependency cycles. Use `aws_security_group_rule` resources for cross-SG references instead of inline `security_groups` lists.
+
+* **NAT Gateway + Route Tables**: When `nat_gateway_count > 1`, each NAT needs its own route table for AZ-local routing. Private subnets are distributed across route tables using modulo assignment.
+
+* **VPC Peering Auto-Accept**: Works only for same-account, same-region peering. For cross-account, manual acceptance or Lambda automation is required.
+
+* **NACL Rule Ordering**: Rules evaluated in number order. Allow specific internal traffic (100-120) before broad deny (200-220) before catch-all allow (900).
+
+* **Deferred Stories (S026-S036)**: Transit Gateway, Network Firewall, Direct Connect, IPv6, VPN, and advanced DNS depend on infrastructure not yet deployed. Documented as architecture decisions for future implementation.
+
+### Next Steps
+
+* **Epic E06**: Compute (ECS Fargate API + Workers) - ECS clusters, task definitions, ALB, blue/green deployment.
+* E05 PrivateLink (S021) will be completed during E06 when ALB/NLB resources exist.
