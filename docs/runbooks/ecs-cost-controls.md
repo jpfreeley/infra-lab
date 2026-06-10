@@ -98,10 +98,56 @@ aws ecs update-service \
 In production (future):
 
 - API min_capacity = 2 (HA across AZs)
+- ALB always deployed (enable_alb = true)
 - Worker nano/medium min_capacity = 1 (always warm)
 - ALB has deletion protection enabled
 - WAF associated (CKV2_AWS_28)
 - Flow logs and access logs enabled
+
+## Bringing Up the Full Compute Stack
+
+To bring the entire compute layer online for development:
+
+```bash
+# 1. Enable ALB (requires terraform apply)
+cd infra/live/dev
+terraform apply -var="enable_alb=true"
+
+# 2. Disable RDS auto-stop
+aws ssm put-parameter --name /infra-lab/rds-auto-stop/enabled \
+  --value false --overwrite --profile infra-lab
+
+# 3. Start Aurora clusters
+aws rds start-db-cluster --db-cluster-identifier infra-lab-dev-control-db --profile infra-lab
+aws rds start-db-cluster --db-cluster-identifier infra-lab-dev-execution-db --profile infra-lab
+
+# 4. Scale API and workers
+aws ecs update-service --cluster infra-lab-dev-control --service infra-lab-dev-api --desired-count 1 --profile infra-lab
+aws ecs update-service --cluster infra-lab-dev-execution --service infra-lab-dev-worker-nano --desired-count 1 --profile infra-lab
+```
+
+## Shutting Everything Down
+
+```bash
+# 1. Scale all ECS services to 0
+for cluster in control execution; do
+  for svc in $(aws ecs list-services --cluster "infra-lab-dev-${cluster}" --query 'serviceArns[*]' --output text --profile infra-lab); do
+    aws ecs update-service --cluster "infra-lab-dev-${cluster}" --service "${svc}" --desired-count 0 --profile infra-lab
+  done
+done
+
+# 2. Stop Aurora clusters
+aws rds stop-db-cluster --db-cluster-identifier infra-lab-dev-control-db --profile infra-lab
+aws rds stop-db-cluster --db-cluster-identifier infra-lab-dev-execution-db --profile infra-lab
+
+# 3. Re-enable RDS auto-stop
+aws ssm put-parameter --name /infra-lab/rds-auto-stop/enabled \
+  --value true --overwrite --profile infra-lab
+
+# 4. Remove ALB (saves $16/mo)
+cd infra/live/dev
+terraform apply -var="enable_alb=false"
+```
 
 ## Autoscaling Configuration
 

@@ -33,3 +33,9 @@ variable "acm_certificate_arn" {
   type        = string
   default     = ""
 }
+
+variable "enable_alb" {
+  description = "Whether to deploy the ALB (false = off by default for cost savings)"
+  type        = bool
+  default     = false
+}

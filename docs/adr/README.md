@@ -44,3 +44,4 @@ Each ADR follows a lightweight format:
 | [027](027-tag-based-backup-selection.md) | Tag-based backup selection | Accepted | E12 |
 | [028](028-pre-commit-ci-parity.md) | Pre-commit local/CI parity | Accepted | E01 |
 | [029](029-rds-auto-stop-mechanism.md) | RDS auto-stop via EventBridge + Lambda | Accepted | E07 |
+| [030](030-compute-off-by-default.md) | Compute layer off by default in dev | Accepted | E06 |

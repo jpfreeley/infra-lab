@@ -8,7 +8,7 @@
 
 resource "aws_appautoscaling_target" "api" {
   max_capacity       = 10
-  min_capacity       = 1
+  min_capacity       = 0
   resource_id        = "service/${module.control_cluster.cluster_name}/${module.api_service.service_name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"

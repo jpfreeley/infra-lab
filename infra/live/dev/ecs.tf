@@ -49,7 +49,7 @@ module "api_service" {
   cpu    = 512
   memory = 1024
 
-  desired_count = 1
+  desired_count = 0 # Off by default in dev (cost optimization)
 
   execution_role_arn = aws_iam_role.ecs_task_execution.arn
   task_role_arn      = aws_iam_role.ecs_task_api.arn
@@ -57,8 +57,8 @@ module "api_service" {
   subnet_ids         = module.control_vpc.private_subnet_ids
   security_group_ids = [module.sg_ecs_control.id]
 
-  target_group_arn  = aws_lb_target_group.api_blue.arn
-  enable_blue_green = true
+  target_group_arn  = var.enable_alb ? aws_lb_target_group.api_blue[0].arn : null
+  enable_blue_green = var.enable_alb
 
   health_check_command = "curl -f http://localhost:8080/health || exit 1"
 

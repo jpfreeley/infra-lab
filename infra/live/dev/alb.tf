@@ -1,6 +1,9 @@
 # Application Load Balancer
 # Epic: E06 - Compute (ECS Fargate API + Workers)
 # Story: S003 - API Service: ALB + target groups + health checks
+#
+# Off by default in dev (var.enable_alb = false). Set to true when testing.
+# Saves ~$16/mo when disabled.
 
 ###############################################################################
 # ALB
@@ -9,6 +12,8 @@
 resource "aws_lb" "api" {
   # checkov:skip=CKV_AWS_150: "Deletion protection disabled in dev for teardown flexibility"
   # checkov:skip=CKV_AWS_91: "ALB access logs disabled in dev for cost optimization"
+  count = var.enable_alb ? 1 : 0
+
   name               = "${local.name_prefix}-api-alb"
   internal           = false
   load_balancer_type = "application"
@@ -28,6 +33,8 @@ resource "aws_lb" "api" {
 ###############################################################################
 
 resource "aws_lb_target_group" "api_blue" {
+  count = var.enable_alb ? 1 : 0
+
   name        = "${local.name_prefix}-api-blue"
   port        = 8080
   protocol    = "HTTP"
@@ -57,6 +64,8 @@ resource "aws_lb_target_group" "api_blue" {
 ###############################################################################
 
 resource "aws_lb_target_group" "api_green" {
+  count = var.enable_alb ? 1 : 0
+
   name        = "${local.name_prefix}-api-green"
   port        = 8080
   protocol    = "HTTP"
@@ -86,7 +95,9 @@ resource "aws_lb_target_group" "api_green" {
 ###############################################################################
 
 resource "aws_lb_listener" "api_https" {
-  load_balancer_arn = aws_lb.api.arn
+  count = var.enable_alb ? 1 : 0
+
+  load_balancer_arn = aws_lb.api[0].arn
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
@@ -94,7 +105,7 @@ resource "aws_lb_listener" "api_https" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.api_blue.arn
+    target_group_arn = aws_lb_target_group.api_blue[0].arn
   }
 
   lifecycle {
@@ -109,7 +120,9 @@ resource "aws_lb_listener" "api_https" {
 ###############################################################################
 
 resource "aws_lb_listener" "api_http_redirect" {
-  load_balancer_arn = aws_lb.api.arn
+  count = var.enable_alb ? 1 : 0
+
+  load_balancer_arn = aws_lb.api[0].arn
   port              = 80
   protocol          = "HTTP"
 
@@ -130,7 +143,9 @@ resource "aws_lb_listener" "api_http_redirect" {
 ###############################################################################
 
 resource "aws_lb_listener" "api_test" {
-  load_balancer_arn = aws_lb.api.arn
+  count = var.enable_alb ? 1 : 0
+
+  load_balancer_arn = aws_lb.api[0].arn
   port              = 8443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
@@ -138,7 +153,7 @@ resource "aws_lb_listener" "api_test" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.api_green.arn
+    target_group_arn = aws_lb_target_group.api_green[0].arn
   }
 
   lifecycle {
