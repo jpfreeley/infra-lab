@@ -193,6 +193,7 @@ The `rds_proxy` module exists for staging/prod use.
 ### Stopping Clusters
 
 Aurora clusters can be stopped for up to 7 days. After 7 days, AWS auto-restarts them.
+**The RDS auto-stop Lambda will immediately re-stop them** (unless disabled).
 
 ```bash
 # Stop both clusters
@@ -203,6 +204,25 @@ aws rds stop-db-cluster \
 aws rds stop-db-cluster \
   --db-cluster-identifier infra-lab-dev-execution-db \
   --profile infra-lab
+```
+
+### RDS Auto-Stop Toggle
+
+The auto-stop Lambda is **enabled by default**. It re-stops clusters after the
+7-day AWS forced restart, preventing cost accumulation.
+
+```bash
+# Disable auto-stop (allow clusters to run for development)
+aws ssm put-parameter --name /infra-lab/rds-auto-stop/enabled \
+  --value false --overwrite --profile infra-lab
+
+# Re-enable auto-stop (default — clusters stay stopped)
+aws ssm put-parameter --name /infra-lab/rds-auto-stop/enabled \
+  --value true --overwrite --profile infra-lab
+
+# Check current state
+aws ssm get-parameter --name /infra-lab/rds-auto-stop/enabled \
+  --query 'Parameter.Value' --output text --profile infra-lab
 ```
 
 ### Starting Clusters
