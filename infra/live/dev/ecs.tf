@@ -49,7 +49,7 @@ module "api_service" {
   cpu    = 512
   memory = 1024
 
-  desired_count = 2
+  desired_count = 1
 
   execution_role_arn = aws_iam_role.ecs_task_execution.arn
   task_role_arn      = aws_iam_role.ecs_task_api.arn
@@ -91,7 +91,7 @@ module "worker_nano" {
   cpu    = 256
   memory = 512
 
-  desired_count = 1
+  desired_count = 0 # Scale-from-zero in dev (cost optimization)
 
   execution_role_arn = aws_iam_role.ecs_task_execution.arn
   task_role_arn      = aws_iam_role.ecs_task_worker.arn
@@ -125,7 +125,7 @@ module "worker_medium" {
   cpu    = 1024
   memory = 2048
 
-  desired_count = 1
+  desired_count = 0 # Scale-from-zero in dev (cost optimization)
 
   execution_role_arn = aws_iam_role.ecs_task_execution.arn
   task_role_arn      = aws_iam_role.ecs_task_worker.arn

@@ -8,7 +8,7 @@
 
 resource "aws_appautoscaling_target" "api" {
   max_capacity       = 10
-  min_capacity       = 2
+  min_capacity       = 1
   resource_id        = "service/${module.control_cluster.cluster_name}/${module.api_service.service_name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
@@ -54,7 +54,7 @@ resource "aws_appautoscaling_policy" "api_memory" {
 
 resource "aws_appautoscaling_target" "worker_nano" {
   max_capacity       = 5
-  min_capacity       = 1
+  min_capacity       = 0
   resource_id        = "service/${module.execution_cluster.cluster_name}/${module.worker_nano.service_name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
@@ -83,7 +83,7 @@ resource "aws_appautoscaling_policy" "worker_nano_cpu" {
 
 resource "aws_appautoscaling_target" "worker_medium" {
   max_capacity       = 10
-  min_capacity       = 1
+  min_capacity       = 0
   resource_id        = "service/${module.execution_cluster.cluster_name}/${module.worker_medium.service_name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
