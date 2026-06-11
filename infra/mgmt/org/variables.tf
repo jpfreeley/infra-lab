@@ -29,3 +29,9 @@ variable "scp_exempt_role_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "org_email_domain" {
+  description = "Email domain used for account root emails (e.g., example.com)"
+  type        = string
+  default     = "infra-lab.dev"
+}

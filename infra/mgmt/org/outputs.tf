@@ -17,3 +17,8 @@ output "enabled_standards" {
     aws_securityhub_standards_subscription.cis.standards_arn
   ]
 }
+
+output "workspaces_account_id" {
+  description = "The AWS Account ID of the dedicated WorkSpaces account"
+  value       = aws_organizations_account.workspaces.id
+}
