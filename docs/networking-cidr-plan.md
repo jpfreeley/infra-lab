@@ -16,7 +16,8 @@ tenant workloads with restricted egress.
 | staging | Execution | 10.0.48.0/20 | 4,094 |
 | prod | Control | 10.0.64.0/20 | 4,094 |
 | prod | Execution | 10.0.80.0/20 | 4,094 |
-| reserved | future | 10.0.96.0/19 | 8,190 |
+| workspaces | WorkSpaces | 10.0.96.0/20 | 4,094 |
+| reserved | future | 10.0.112.0/20 | 4,094 |
 
 ## Subnet Layout (per VPC, 3 AZs)
 
@@ -112,6 +113,17 @@ Each /20 VPC is divided into subnet tiers across 3 AZs:
 | private | us-east-1b | 10.0.88.0/22 |
 | private | us-east-1c | 10.0.92.0/22 |
 
+### WorkSpaces VPC (10.0.96.0/20)
+
+| Tier | AZ | CIDR |
+| --- | --- | --- |
+| public | us-east-1a | 10.0.96.0/24 |
+| public | us-east-1b | 10.0.97.0/24 |
+| data | us-east-1a | 10.0.99.0/26 |
+| data | us-east-1b | 10.0.99.64/26 |
+| private | us-east-1a | 10.0.100.0/22 |
+| private | us-east-1b | 10.0.104.0/22 |
+
 ## VPC Endpoint Strategy
 
 Control VPCs get Interface endpoints for private AWS API access:
@@ -133,6 +145,7 @@ Control VPCs get Interface endpoints for private AWS API access:
 | dev | 1 (single AZ) | Cost optimization |
 | staging | 1 (single AZ) | Cost optimization |
 | prod | 3 (per AZ) | High availability |
+| workspaces | 1 (single AZ) | Cost optimization |
 
 ## VPC Peering
 

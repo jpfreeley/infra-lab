@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-03-05T20:37:44.344788",
-  "total": 236,
+  "total": 250,
   "epics": [
     [
       "E01",
@@ -61,6 +61,11 @@
       "E12",
       "Reliability + Ops + Compliance",
       "Backup/DR, incident mgmt, SOC2 evidence, patching, change control"
+    ],
+    [
+      "E13",
+      "AWS WorkSpaces Account",
+      "Dedicated account for WorkSpaces: account vending, networking, directory, provisioning, security, observability"
     ]
   ],
   "stories": [
@@ -6792,6 +6797,447 @@
       ],
       "links": [],
       "value_prop": "As a infrastructure engineer, I want to granular buildout: reliability + ops + compliance - component #18 so that I can meet reliability and compliance needs with runbooks, evidence, and DR readiness and improve delivery speed and reliability."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S001",
+      "title": "Provision dedicated WorkSpaces account via Account Factory",
+      "priority": "P0",
+      "owner": "Infra",
+      "points": 5,
+      "description": "Create a new AWS account dedicated to WorkSpaces under the Workloads OU using Control Tower Account Factory.",
+      "acceptance_criteria": [
+        "Account created under Workloads OU with standardized name (e.g., infra-lab-workspaces)",
+        "Account registered in Control Tower with baseline guardrails applied",
+        "Account ID documented in project configuration",
+        "Cross-account AssumeRole (hccp-cloud-operator, hccp-cloud-admin) functional",
+        "Platform tags applied: application=infra-lab, service=workspaces, env=prod"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "Docs updated (README/runbook/module docs)",
+        "Account accessible via role chain from access account",
+        "Rollback documented (account closure procedure)"
+      ],
+      "subtasks": [
+        "Define account parameters (name, email, OU placement)",
+        "Provision via Account Factory / Terraform",
+        "Validate cross-account role access",
+        "Update steering docs with new account ID and profile"
+      ],
+      "links": [],
+      "value_prop": "As an infrastructure engineer, I want to provision a dedicated workspaces account so that WorkSpaces resources are isolated from application workloads with independent blast radius and cost tracking."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S002",
+      "title": "Configure Terraform state backend for WorkSpaces account",
+      "priority": "P0",
+      "owner": "Infra",
+      "points": 3,
+      "description": "Set up remote state storage (S3 + DynamoDB) for the WorkSpaces account Terraform root.",
+      "acceptance_criteria": [
+        "S3 bucket created with versioning, encryption (SSE-KMS), and bucket policy",
+        "DynamoDB table created for state locking",
+        "Backend configured in providers.tf for the workspaces live root",
+        "terraform init succeeds with remote backend"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "State backend functional with lock/unlock cycle tested"
+      ],
+      "subtasks": [
+        "Create S3 bucket and DynamoDB table (bootstrap)",
+        "Configure backend block in providers.tf",
+        "Validate init + plan cycle",
+        "Document state backend details"
+      ],
+      "links": [],
+      "value_prop": "As an infrastructure engineer, I want a dedicated state backend for the workspaces account so that state is isolated, locked, and versioned independently from other environments."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S003",
+      "title": "Create WorkSpaces VPC with public/private subnets",
+      "priority": "P0",
+      "owner": "Networking",
+      "points": 8,
+      "description": "Deploy a VPC for WorkSpaces with private subnets (for WorkSpaces instances) and public subnets (for NAT gateway internet access).",
+      "acceptance_criteria": [
+        "VPC created with CIDR from reserved range (10.0.96.0/19 or sub-allocation)",
+        "Private subnets in 2+ AZs for WorkSpaces placement",
+        "Public subnets for NAT Gateway(s)",
+        "NAT Gateway deployed (single for cost optimization)",
+        "Route tables configured: private to NAT, public to IGW",
+        "Default security group restricted (no ingress/egress) per CKV2_AWS_12",
+        "VPC flow logs enabled, shipped to central log bucket"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "Connectivity validated (instances in private subnet can reach internet via NAT)",
+        "CIDR plan updated in docs/networking-cidr-plan.md"
+      ],
+      "subtasks": [
+        "Allocate CIDR from reserved block",
+        "Implement VPC module call with subnets",
+        "Deploy NAT Gateway + route tables",
+        "Enable flow logs",
+        "Restrict default security group",
+        "Update CIDR plan documentation"
+      ],
+      "links": [],
+      "value_prop": "As an infrastructure engineer, I want a purpose-built VPC for WorkSpaces so that desktop instances have controlled network access with proper segmentation from other workloads."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S004",
+      "title": "Deploy AWS Directory Service for WorkSpaces authentication",
+      "priority": "P0",
+      "owner": "Identity",
+      "points": 8,
+      "description": "Deploy a directory (AWS Managed Microsoft AD or Simple AD) for WorkSpaces user authentication and workspace provisioning.",
+      "acceptance_criteria": [
+        "Directory deployed in private subnets across 2 AZs",
+        "Directory type chosen and documented (AD Connector for existing AD, or AWS Managed Microsoft AD for standalone)",
+        "Directory registered with WorkSpaces service",
+        "Security group restricts directory traffic to WorkSpaces subnets",
+        "DNS resolution configured for directory domain"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "Directory status ACTIVE and reachable from WorkSpaces subnets",
+        "Docs updated with directory architecture decision"
+      ],
+      "subtasks": [
+        "Decide directory type (ADR if needed)",
+        "Implement directory Terraform resource",
+        "Configure security groups for directory ports",
+        "Register directory with WorkSpaces",
+        "Validate connectivity",
+        "Document"
+      ],
+      "links": [],
+      "value_prop": "As an infrastructure engineer, I want a managed directory service so that WorkSpaces can authenticate users against a centralized identity source without managing domain controllers."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S005",
+      "title": "Create WorkSpaces security groups",
+      "priority": "P0",
+      "owner": "Security",
+      "points": 3,
+      "description": "Define security groups for WorkSpaces instances controlling inbound/outbound traffic.",
+      "acceptance_criteria": [
+        "WorkSpaces SG allows outbound HTTPS (443) for AWS service access",
+        "WorkSpaces SG allows outbound to directory ports (389, 636, 88, 53)",
+        "Inbound restricted to WSP/PCoIP streaming ports from client IP ranges",
+        "No broad 0.0.0.0/0 ingress rules",
+        "SG uses reference-based rules where possible"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "Security group rules documented"
+      ],
+      "subtasks": [
+        "Define ingress/egress rules",
+        "Implement using security group module",
+        "Validate connectivity with test workspace",
+        "Document allowed traffic flows"
+      ],
+      "links": [],
+      "value_prop": "As a security engineer, I want purpose-built security groups for WorkSpaces so that desktop instances only have access to approved network paths and services."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S006",
+      "title": "Register WorkSpaces directory and configure workspace defaults",
+      "priority": "P1",
+      "owner": "Infra",
+      "points": 5,
+      "description": "Register the directory with WorkSpaces and configure default workspace creation settings (bundle, running mode, encryption).",
+      "acceptance_criteria": [
+        "Directory registered with WorkSpaces service in target subnets",
+        "Default bundle selected (Standard/Performance/Power) and documented",
+        "Running mode set (AUTO_STOP for cost optimization or ALWAYS_ON for persistent)",
+        "Root and user volume encryption enabled (KMS)",
+        "Self-service permissions configured (restart, rebuild, volume size)"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "Test workspace can be launched with defaults",
+        "Docs updated with bundle/mode decisions"
+      ],
+      "subtasks": [
+        "Register directory with WorkSpaces",
+        "Configure workspace defaults (bundle, mode, encryption)",
+        "Set self-service permissions",
+        "Validate by launching a test workspace",
+        "Document configuration decisions"
+      ],
+      "links": [],
+      "value_prop": "As an infrastructure engineer, I want standardized workspace defaults so that every provisioned workspace meets security and performance baselines without manual configuration."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S007",
+      "title": "Configure KMS encryption for WorkSpaces volumes",
+      "priority": "P0",
+      "owner": "Security",
+      "points": 5,
+      "description": "Create and configure KMS keys for encrypting WorkSpaces root and user volumes at rest.",
+      "acceptance_criteria": [
+        "Customer-managed KMS key created for WorkSpaces volume encryption",
+        "Key policy grants WorkSpaces service principal access",
+        "Key alias defined (alias/workspaces-volumes)",
+        "Key rotation enabled (annual)",
+        "Both root and user volumes encrypted by default"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "Encryption verified on test workspace volumes",
+        "Key policy documented"
+      ],
+      "subtasks": [
+        "Create KMS key with appropriate policy",
+        "Configure WorkSpaces to use CMK for volume encryption",
+        "Validate encryption on provisioned workspace",
+        "Document key management procedures"
+      ],
+      "links": [],
+      "value_prop": "As a security engineer, I want KMS-encrypted volumes for all WorkSpaces so that data at rest meets compliance requirements and key access is auditable."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S008",
+      "title": "Implement IP access control groups for WorkSpaces",
+      "priority": "P1",
+      "owner": "Security",
+      "points": 3,
+      "description": "Create IP access control groups to restrict which client IP ranges can connect to WorkSpaces.",
+      "acceptance_criteria": [
+        "IP access control group created with corporate/VPN CIDR ranges",
+        "Group associated with WorkSpaces directory",
+        "Connections from unauthorized IPs are blocked",
+        "Process documented for adding/removing IP ranges"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "Access tested from approved and unapproved IPs",
+        "Runbook for IP range management created"
+      ],
+      "subtasks": [
+        "Define approved IP ranges (corporate egress, VPN)",
+        "Create IP access control group resource",
+        "Associate with directory",
+        "Validate access restrictions",
+        "Document IP management process"
+      ],
+      "links": [],
+      "value_prop": "As a security engineer, I want IP-based access controls so that WorkSpaces can only be accessed from approved network locations (corporate, VPN)."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S009",
+      "title": "Create IAM roles and policies for WorkSpaces administration",
+      "priority": "P0",
+      "owner": "Identity",
+      "points": 5,
+      "description": "Define IAM roles for WorkSpaces administration, including cross-account access and service-linked roles.",
+      "acceptance_criteria": [
+        "WorkSpaces service-linked role created (if not auto-created)",
+        "Admin role with permissions for workspace CRUD operations",
+        "Read-only role for monitoring/helpdesk teams",
+        "Cross-account trust from management/shared-services accounts",
+        "All roles use session tags and conditions where applicable"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "Role assumption tested from access account",
+        "Permission boundaries documented"
+      ],
+      "subtasks": [
+        "Define admin role with WorkSpaces permissions",
+        "Define read-only role for helpdesk",
+        "Configure cross-account trust policies",
+        "Validate AssumeRole from access account",
+        "Document role purposes and access patterns"
+      ],
+      "links": [],
+      "value_prop": "As an infrastructure engineer, I want well-scoped IAM roles so that WorkSpaces administration follows least-privilege and cross-account access is auditable."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S010",
+      "title": "Configure CloudWatch monitoring and alarms for WorkSpaces",
+      "priority": "P1",
+      "owner": "Observability",
+      "points": 5,
+      "description": "Set up CloudWatch metrics, dashboards, and alarms for WorkSpaces health and usage monitoring.",
+      "acceptance_criteria": [
+        "CloudWatch metrics enabled for WorkSpaces (ConnectionAttempt, ConnectionSuccess, ConnectionFailure, SessionDisconnect)",
+        "Alarm for high connection failure rate (>10% over 5 min)",
+        "Alarm for unhealthy workspace count",
+        "Dashboard with workspace utilization, connection stats, and health status",
+        "Log group for WorkSpaces access events"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "Alarms validated with test conditions",
+        "Dashboard accessible and documented"
+      ],
+      "subtasks": [
+        "Enable WorkSpaces CloudWatch metrics",
+        "Create alarms (connection failures, unhealthy count)",
+        "Build CloudWatch dashboard",
+        "Configure log group with appropriate retention",
+        "Document alerting thresholds and response procedures"
+      ],
+      "links": [],
+      "value_prop": "As an infrastructure engineer, I want observability into WorkSpaces health so that I can detect unhealthy desktops, connection failures, and capacity issues before users are impacted."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S011",
+      "title": "Implement cost controls (auto-stop, usage reporting, budgets)",
+      "priority": "P1",
+      "owner": "FinOps",
+      "points": 5,
+      "description": "Configure cost optimization controls including auto-stop mode, usage-based reporting, and budget alerts.",
+      "acceptance_criteria": [
+        "Default running mode set to AUTO_STOP with configurable timeout",
+        "AWS Budgets alert configured for WorkSpaces spend",
+        "Cost allocation tags applied (service=workspaces, cost-center, owner-email)",
+        "Monthly utilization report mechanism documented"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "Budget alert fires on test threshold",
+        "Tags visible in Cost Explorer"
+      ],
+      "subtasks": [
+        "Configure AUTO_STOP running mode with timeout",
+        "Create AWS Budget with notification thresholds",
+        "Apply cost allocation tags to all resources",
+        "Document utilization reporting process",
+        "Validate tags in Cost Explorer"
+      ],
+      "links": [],
+      "value_prop": "As a finance stakeholder, I want cost controls on WorkSpaces so that idle desktops are stopped automatically and spending is visible and capped."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S012",
+      "title": "Create Terraform live root for WorkSpaces account (infra/live/workspaces/)",
+      "priority": "P0",
+      "owner": "Infra",
+      "points": 3,
+      "description": "Create the Terraform live environment root following project conventions with providers, variables, locals, and domain-specific files.",
+      "acceptance_criteria": [
+        "Directory infra/live/workspaces/ created with standard files (providers.tf, variables.tf, locals.tf)",
+        "Provider configured with AssumeRole into WorkSpaces account",
+        "Locals follow naming convention (name_prefix, environment, common_tags)",
+        "terraform init -backend=false succeeds",
+        "terraform validate passes",
+        "Pre-commit hooks pass (fmt, tflint, checkov)"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "CI pipeline validates the new root"
+      ],
+      "subtasks": [
+        "Create directory structure with standard files",
+        "Configure provider with AssumeRole",
+        "Define locals (name_prefix, tags)",
+        "Validate with init + validate + lint"
+      ],
+      "links": [],
+      "value_prop": "As an infrastructure engineer, I want a standardized Terraform root for the WorkSpaces account so that it follows the same patterns as other environments and is maintainable by the team."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S013",
+      "title": "Implement SCPs and guardrails for WorkSpaces account",
+      "priority": "P1",
+      "owner": "Security",
+      "points": 5,
+      "description": "Apply account-level SCPs and guardrails specific to the WorkSpaces account (region restriction, service boundary, deny dangerous actions).",
+      "acceptance_criteria": [
+        "Region restriction SCP applied (us-east-1 only, or as required)",
+        "Service boundary SCP limits to WorkSpaces, Directory Service, EC2 (for ENIs), KMS, CloudWatch, and IAM",
+        "Deny deletion of flow logs, CloudTrail, Config",
+        "SCP attached to correct OU or account"
+      ],
+      "definition_of_done": [
+        "IaC validated (fmt, validate, lint) and applied",
+        "Change reviewed (PR) + checks green",
+        "SCP enforcement validated (denied API call returns AccessDenied)",
+        "Docs updated with SCP rationale"
+      ],
+      "subtasks": [
+        "Define service boundary SCP",
+        "Define region restriction SCP",
+        "Attach SCPs to account/OU",
+        "Validate enforcement",
+        "Document SCP decisions"
+      ],
+      "links": [],
+      "value_prop": "As a security engineer, I want account-level guardrails so that the WorkSpaces account cannot be used for unintended purposes and risky API calls are blocked at the org level."
+    },
+    {
+      "epic_id": "E13",
+      "epic_name": "AWS WorkSpaces Account",
+      "key": "E13-S014",
+      "title": "Create runbook for WorkSpaces operations (provisioning, troubleshooting, decommission)",
+      "priority": "P1",
+      "owner": "Ops",
+      "points": 3,
+      "description": "Document operational runbooks for day-2 WorkSpaces management including user provisioning, common troubleshooting, and workspace lifecycle.",
+      "acceptance_criteria": [
+        "Runbook covers: provision new workspace for user, rebuild workspace, troubleshoot connection failures, decommission workspace",
+        "CLI commands documented with correct profile/role patterns",
+        "Escalation paths defined",
+        "Runbook stored in docs/runbooks/"
+      ],
+      "definition_of_done": [
+        "Change reviewed (PR) + checks green",
+        "Markdown lint passes",
+        "Peer-reviewed by at least one team member",
+        "Runbook tested end-to-end with a real workspace lifecycle"
+      ],
+      "subtasks": [
+        "Write provisioning procedures",
+        "Write troubleshooting guide (connection failures, unhealthy status)",
+        "Write decommissioning procedure",
+        "Write rebuild/migration procedure",
+        "Peer review"
+      ],
+      "links": [],
+      "value_prop": "As an operations engineer, I want documented runbooks so that workspace provisioning, troubleshooting, and decommissioning follow repeatable processes and reduce MTTR."
     }
   ]
 }

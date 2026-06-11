@@ -1,0 +1,26 @@
+feat(E13): add dedicated workspaces account with DCV dev desktop
+
+Implements Epic E13 - AWS WorkSpaces Account (pivoted to EC2 + NICE DCV
+for cost optimization).
+
+Infrastructure:
+- Provision dedicated AWS account (815802018602) under Workloads OU
+- Service boundary SCP restricting to relevant AWS services
+- VPC (10.0.96.0/20) with public/private subnets in us-east-1a/b
+- EC2 Spot instance (t3.large) with DCV for graphical desktop
+- Persistent 50GB EBS data volume surviving spot interruptions
+- Security group with IP-restricted access (DCV, SSH, dev ports)
+- IAM role with SSM + DCV license S3 access
+
+Tooling on AMI (ami-0f618edd4b848eb44):
+- Docker 25 + Compose v5.1 + Buildx v0.21
+- Supabase CLI 2.105
+- Git 2.47
+- NICE DCV server (auto-licensed on EC2)
+
+Documentation:
+- ADR-031: Dedicated account decision + EC2+DCV rationale
+- Runbook: Full operations guide (connect, start/stop, spot recovery)
+- Onboarding: Beginner-friendly new developer guide
+- Updated: architecture.md, networking-cidr-plan.md, infra/README.md
+- Epic E13 HTML + backlog JSON with 14 stories
