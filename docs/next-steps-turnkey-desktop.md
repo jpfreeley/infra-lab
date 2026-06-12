@@ -1,4 +1,4 @@
-# TODO: Turnkey Desktop — Items Needed From You
+# Next Steps: Turnkey Desktop — Items Needed From You
 
 ## Goal
 
