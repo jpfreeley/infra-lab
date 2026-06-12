@@ -222,6 +222,19 @@ resource "aws_spot_instance_request" "dcv_desktop" {
     sleep 5
     dcv create-session --owner dcvuser --type virtual console 2>/dev/null || true
 
+    ###########################################################################
+    # PHASE 5: Auto-start services for returning users
+    ###########################################################################
+    if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
+      cd $MOUNT_POINT/home/dcvuser/development
+      sg docker -c "docker compose up -d" || true
+    fi
+
+    if [ -d $MOUNT_POINT/home/dcvuser/development/supabase ]; then
+      cd $MOUNT_POINT/home/dcvuser/development
+      sg docker -c "supabase start" || true
+    fi
+
     echo "=== User data complete at $(date) ==="
   EOF
   )

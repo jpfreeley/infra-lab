@@ -222,6 +222,18 @@ systemctl enable dcvserver
 systemctl start dcvserver
 sleep 5
 dcv create-session --owner dcvuser --type virtual console 2>/dev/null || true
+
+# Auto-start services if returning user (docker-compose.yml exists)
+if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
+  cd $MOUNT_POINT/home/dcvuser/development
+  sg docker -c "docker compose up -d" || true
+fi
+
+# Auto-start supabase if it was previously initialized
+if [ -d $MOUNT_POINT/home/dcvuser/development/supabase ]; then
+  cd $MOUNT_POINT/home/dcvuser/development
+  sg docker -c "supabase start" || true
+fi
 """
 
     import base64
