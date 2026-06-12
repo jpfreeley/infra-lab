@@ -70,7 +70,20 @@ resource "aws_iam_role_policy" "dcv_license" {
           "s3:GetObject",
         ]
         Resource = "arn:aws:s3:::dcv-license.${var.aws_region}/*"
-      }
+      },
+      {
+        Sid    = "SelfStop"
+        Effect = "Allow"
+        Action = [
+          "ec2:StopInstances",
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "ec2:ResourceTag/Project" = "infra-lab"
+          }
+        }
+      },
     ]
   })
 }
@@ -234,6 +247,38 @@ resource "aws_spot_instance_request" "dcv_desktop" {
       cd $MOUNT_POINT/home/dcvuser/development
       sg docker -c "supabase start" || true
     fi
+
+    ###########################################################################
+    # PHASE 6: Idle auto-stop (30 min no DCV connections → stop instance)
+    ###########################################################################
+    cat > /usr/local/bin/idle-check.sh << 'IDLE'
+    #!/bin/bash
+    IDLE_THRESHOLD_MINUTES=30
+    STATE_FILE="/var/run/last-dcv-activity"
+    INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+    REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+    CONNECTIONS=$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{sum += $2} END {print sum+0}')
+    if [ "$CONNECTIONS" -gt 0 ]; then
+      date +%s > "$STATE_FILE"
+      exit 0
+    fi
+    if [ ! -f "$STATE_FILE" ]; then
+      date +%s > "$STATE_FILE"
+      exit 0
+    fi
+    LAST_ACTIVITY=$(cat "$STATE_FILE")
+    NOW=$(date +%s)
+    IDLE_MINUTES=$(( (NOW - LAST_ACTIVITY) / 60 ))
+    if [ "$IDLE_MINUTES" -ge "$IDLE_THRESHOLD_MINUTES" ]; then
+      logger -t idle-check "No DCV connections for $${IDLE_MINUTES}min. Stopping."
+      aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
+    fi
+    IDLE
+    chmod +x /usr/local/bin/idle-check.sh
+    # Initialize activity state (boot counts as activity)
+    date +%s > /var/run/last-dcv-activity
+    # Run every 5 minutes
+    echo "*/5 * * * * root /usr/local/bin/idle-check.sh" > /etc/cron.d/idle-check
 
     echo "=== User data complete at $(date) ==="
   EOF

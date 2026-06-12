@@ -234,6 +234,34 @@ if [ -d $MOUNT_POINT/home/dcvuser/development/supabase ]; then
   cd $MOUNT_POINT/home/dcvuser/development
   sg docker -c "supabase start" || true
 fi
+
+# Idle auto-stop: stop instance after 30 min of no DCV connections
+cat > /usr/local/bin/idle-check.sh << 'IDLE'
+#!/bin/bash
+IDLE_THRESHOLD_MINUTES=30
+STATE_FILE="/var/run/last-dcv-activity"
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+CONNECTIONS=$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{{sum += $2}} END {{print sum+0}}')
+if [ "$CONNECTIONS" -gt 0 ]; then
+  date +%s > "$STATE_FILE"
+  exit 0
+fi
+if [ ! -f "$STATE_FILE" ]; then
+  date +%s > "$STATE_FILE"
+  exit 0
+fi
+LAST_ACTIVITY=$(cat "$STATE_FILE")
+NOW=$(date +%s)
+IDLE_MINUTES=$(( (NOW - LAST_ACTIVITY) / 60 ))
+if [ "$IDLE_MINUTES" -ge "$IDLE_THRESHOLD_MINUTES" ]; then
+  logger -t idle-check "No DCV connections for ${{IDLE_MINUTES}}min. Stopping."
+  aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
+fi
+IDLE
+chmod +x /usr/local/bin/idle-check.sh
+date +%s > /var/run/last-dcv-activity
+echo "*/5 * * * * root /usr/local/bin/idle-check.sh" > /etc/cron.d/idle-check
 """
 
     import base64
