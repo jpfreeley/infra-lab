@@ -192,6 +192,55 @@ resource "aws_api_gateway_integration" "get_desktops" {
   uri                     = aws_lambda_function.desktop_provisioner.invoke_arn
 }
 
+# OPTIONS /desktops (CORS preflight)
+resource "aws_api_gateway_method" "options_desktops" {
+  rest_api_id   = aws_api_gateway_rest_api.desktops.id
+  resource_id   = aws_api_gateway_resource.desktops.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "options_desktops" {
+  rest_api_id = aws_api_gateway_rest_api.desktops.id
+  resource_id = aws_api_gateway_resource.desktops.id
+  http_method = aws_api_gateway_method.options_desktops.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "options_200" {
+  rest_api_id = aws_api_gateway_rest_api.desktops.id
+  resource_id = aws_api_gateway_resource.desktops.id
+  http_method = aws_api_gateway_method.options_desktops.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+
+  response_models = {
+    "application/json" = "Empty"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options_200" {
+  rest_api_id = aws_api_gateway_rest_api.desktops.id
+  resource_id = aws_api_gateway_resource.desktops.id
+  http_method = aws_api_gateway_method.options_desktops.http_method
+  status_code = aws_api_gateway_method_response.options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-API-Key'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
 # Deploy
 resource "aws_api_gateway_deployment" "desktops" {
   rest_api_id = aws_api_gateway_rest_api.desktops.id
@@ -199,6 +248,7 @@ resource "aws_api_gateway_deployment" "desktops" {
   depends_on = [
     aws_api_gateway_integration.post_desktops,
     aws_api_gateway_integration.get_desktops,
+    aws_api_gateway_integration.options_desktops,
   ]
 
   lifecycle {
