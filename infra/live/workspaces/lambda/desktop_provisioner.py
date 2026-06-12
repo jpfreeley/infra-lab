@@ -218,21 +218,97 @@ chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser
 ln -sfn $MOUNT_POINT/home/dcvuser/development /home/dcvuser/development
 chown -h dcvuser:dcvuser /home/dcvuser/development
 
+# First-boot: clone repos and set up dev environment if not already done
+if [ ! -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
+  REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+  GH_PAT=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/github-pat" --query SecretString --output text --region $REGION 2>/dev/null || echo "")
+
+  if [ -n "$GH_PAT" ]; then
+    cd $MOUNT_POINT/home/dcvuser/development
+
+    # Clone repos via HTTPS + PAT
+    if [ ! -d "MagNet-Agents-Backend" ]; then
+      git clone https://x-access-token:$GH_PAT@github.com/avinair108/MagNet-Agents-Backend.git
+    fi
+    if [ ! -d "magnet-app-front" ]; then
+      git clone https://x-access-token:$GH_PAT@github.com/avinair108/magnet-app-front.git
+    fi
+
+    # Create docker-compose.yml
+    cat > docker-compose.yml << 'COMPOSE'
+services:
+  backend:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./MagNet-Agents-Backend:/app
+    env_file:
+      - ./MagNet-Agents-Backend/.env
+    network_mode: host
+    command: bash -c "pip install -r requirements.txt && python app.py"
+    restart: unless-stopped
+
+  frontend:
+    image: node:20-slim
+    working_dir: /app
+    volumes:
+      - ./magnet-app-front:/app
+      - frontend-node-modules:/app/node_modules
+    network_mode: host
+    env_file:
+      - ./magnet-app-front/.env
+    command: bash -c "npm install --legacy-peer-deps && npm run dev -- --host 0.0.0.0"
+    restart: unless-stopped
+
+volumes:
+  frontend-node-modules:
+COMPOSE
+
+    # Create backend .env
+    cat > MagNet-Agents-Backend/.env << 'ENVFILE'
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_KEY=REPLACE_AFTER_SUPABASE_START
+SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
+OPENAI_API_KEY=sk-REPLACE_ME
+TAVILY_API_KEY=tvly-REPLACE_ME
+APIFY_API_TOKEN=apify_api_REPLACE_ME
+DEBUG=True
+FLASK_DEBUG=1
+ENVFILE
+
+    # Create frontend .env
+    INSTANCE_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+    cat > magnet-app-front/.env << ENVFILE
+VITE_SUPABASE_URL=http://127.0.0.1:54321
+VITE_SUPABASE_ANON_KEY=REPLACE_AFTER_SUPABASE_START
+VITE_MICROSOFT_CLIENT_ID=REPLACE_ME
+VITE_MICROSOFT_TENANT_ID=common
+VITE_MICROSOFT_REDIRECT_URI=http://$INSTANCE_IP:5173/contact
+VITE_APOLLO_CLIENT_ID=
+VITE_APOLLO_CLIENT_SECRET=
+VITE_API_BASE_URL=http://$INSTANCE_IP:5000
+ENVFILE
+
+    # Fix ownership
+    chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser/development
+  fi
+fi
+
 systemctl enable dcvserver
 systemctl start dcvserver
 sleep 5
 dcv create-session --owner dcvuser --type virtual console 2>/dev/null || true
 
-# Auto-start services if returning user (docker-compose.yml exists)
+# Auto-start services (both first boot and returning users)
 if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
   cd $MOUNT_POINT/home/dcvuser/development
-  sg docker -c "docker compose up -d" || true
-fi
 
-# Auto-start supabase if it was previously initialized
-if [ -d $MOUNT_POINT/home/dcvuser/development/supabase ]; then
-  cd $MOUNT_POINT/home/dcvuser/development
+  # Start Supabase
   sg docker -c "supabase start" || true
+
+  # Pull images + start backend/frontend
+  sg docker -c "docker compose pull" || true
+  sg docker -c "docker compose up -d" || true
 fi
 
 # Idle auto-stop: stop instance after 30 min of no DCV connections

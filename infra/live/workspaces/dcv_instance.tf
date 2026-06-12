@@ -84,6 +84,14 @@ resource "aws_iam_role_policy" "dcv_license" {
           }
         }
       },
+      {
+        Sid    = "SecretsAccess"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+        ]
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:infra-lab/desktop/*"
+      },
     ]
   })
 }
