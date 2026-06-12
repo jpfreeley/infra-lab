@@ -129,18 +129,22 @@ resource "aws_spot_instance_request" "dcv_desktop" {
   user_data = base64encode(<<-EOF
     #!/bin/bash
     set -x
+    exec > /var/log/user-data.log 2>&1
 
-    # Mount persistent data volume
+    ###########################################################################
+    # PHASE 1: Mount persistent data volume
+    ###########################################################################
     DATA_DEVICE="/dev/xvdf"
     MOUNT_POINT="/data"
 
-    # Wait for the volume to be attached
-    while [ ! -e $DATA_DEVICE ]; do
-      echo "Waiting for data volume..."
+    # Wait for the volume to be attached (can take a few seconds after boot)
+    for i in $(seq 1 30); do
+      [ -e $DATA_DEVICE ] && break
+      echo "Waiting for data volume ($i/30)..."
       sleep 2
     done
 
-    # Format if new (no filesystem)
+    # Format if new (no filesystem detected)
     if ! blkid $DATA_DEVICE; then
       mkfs.xfs $DATA_DEVICE
     fi
@@ -148,48 +152,77 @@ resource "aws_spot_instance_request" "dcv_desktop" {
     mkdir -p $MOUNT_POINT
     mount $DATA_DEVICE $MOUNT_POINT
 
-    # Add to fstab for remounts
-    grep -q "$MOUNT_POINT" /etc/fstab || echo "$DATA_DEVICE $MOUNT_POINT xfs defaults,nofail 0 2" >> /etc/fstab
+    # Add to fstab for auto-mount on reboot
+    grep -q "$MOUNT_POINT" /etc/fstab || \
+      echo "$DATA_DEVICE $MOUNT_POINT xfs defaults,nofail 0 2" >> /etc/fstab
 
-    # Create directory structure on data volume
-    mkdir -p $MOUNT_POINT/home/dcvuser
-    mkdir -p $MOUNT_POINT/docker
+    ###########################################################################
+    # PHASE 2: Install tools (idempotent — safe to re-run)
+    ###########################################################################
 
-    # Setup dcvuser
-    useradd -m dcvuser 2>/dev/null || true
-    echo "dcvuser:ChangeMeOnFirstLogin!" | chpasswd
+    # Git
+    yum install -y git
 
-    # Bind mount dcvuser home to persistent volume
-    if [ ! -L /home/dcvuser/development ]; then
-      mkdir -p $MOUNT_POINT/home/dcvuser/development
-      ln -sfn $MOUNT_POINT/home/dcvuser/development /home/dcvuser/development
-      chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser
-      chown -h dcvuser:dcvuser /home/dcvuser/development
+    # Docker
+    if ! command -v docker &>/dev/null; then
+      amazon-linux-extras install -y docker
+      systemctl enable docker
     fi
 
-    # Point Docker data to persistent volume
-    if [ ! -d $MOUNT_POINT/docker/data ]; then
-      mkdir -p $MOUNT_POINT/docker/data
-    fi
-    if [ ! -f /etc/docker/daemon.json ] || ! grep -q "$MOUNT_POINT/docker/data" /etc/docker/daemon.json; then
-      mkdir -p /etc/docker
-      cat > /etc/docker/daemon.json << 'DOCKER'
+    # Configure Docker to use persistent volume for data
+    mkdir -p $MOUNT_POINT/docker/data /etc/docker
+    cat > /etc/docker/daemon.json << 'DOCKER'
     {
       "data-root": "/data/docker/data"
     }
     DOCKER
-      systemctl restart docker 2>/dev/null || true
+    systemctl start docker
+
+    # Docker Compose v2
+    if [ ! -f /usr/local/lib/docker/cli-plugins/docker-compose ]; then
+      mkdir -p /usr/local/lib/docker/cli-plugins
+      curl -SL -o /usr/local/lib/docker/cli-plugins/docker-compose \
+        https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64
+      chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
     fi
 
-    # Ensure DCV server is running
+    # Docker Buildx
+    if [ ! -f /usr/local/lib/docker/cli-plugins/docker-buildx ]; then
+      curl -SL -o /usr/local/lib/docker/cli-plugins/docker-buildx \
+        "https://github.com/docker/buildx/releases/download/v0.21.2/buildx-v0.21.2.linux-amd64"
+      chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+    fi
+
+    # Supabase CLI (two co-located binaries: supabase + supabase-go)
+    if [ ! -f /usr/local/share/supabase/supabase ]; then
+      mkdir -p /usr/local/share/supabase
+      curl -sL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz \
+        | tar xz -C /usr/local/share/supabase
+      ln -sf /usr/local/share/supabase/supabase /usr/local/bin/supabase
+    fi
+
+    ###########################################################################
+    # PHASE 3: Setup dcvuser
+    ###########################################################################
+    useradd -m dcvuser 2>/dev/null || true
+    echo "dcvuser:ChangeMeOnFirstLogin!" | chpasswd
+    usermod -aG docker dcvuser
+
+    # Symlink development directory to persistent volume
+    mkdir -p $MOUNT_POINT/home/dcvuser/development
+    chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser
+    ln -sfn $MOUNT_POINT/home/dcvuser/development /home/dcvuser/development
+    chown -h dcvuser:dcvuser /home/dcvuser/development
+
+    ###########################################################################
+    # PHASE 4: Start DCV
+    ###########################################################################
     systemctl enable dcvserver
     systemctl start dcvserver
-
-    # Wait for DCV server to be ready
     sleep 5
-
-    # Create a virtual session for dcvuser
     dcv create-session --owner dcvuser --type virtual console 2>/dev/null || true
+
+    echo "=== User data complete at $(date) ==="
   EOF
   )
 
