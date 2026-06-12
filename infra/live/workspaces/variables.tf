@@ -36,3 +36,10 @@ variable "allowed_ip_cidrs" {
   type        = list(string)
   default     = [] # Set via tfvars — your public IP
 }
+
+variable "api_secret" {
+  description = "Shared secret for the desktop provisioning API (X-API-Key header)"
+  type        = string
+  sensitive   = true
+  default     = "change-me-to-a-real-secret"
+}

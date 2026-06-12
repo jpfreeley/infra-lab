@@ -45,3 +45,8 @@ output "spot_request_id" {
   description = "Spot instance request ID"
   value       = aws_spot_instance_request.dcv_desktop.id
 }
+
+output "api_url" {
+  description = "Desktop provisioning API URL"
+  value       = "${aws_api_gateway_stage.prod.invoke_url}/desktops"
+}

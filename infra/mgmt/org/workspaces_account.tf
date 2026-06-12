@@ -69,6 +69,13 @@ data "aws_iam_policy_document" "scp_workspaces_service_boundary" {
       # S3 for flow logs and state
       "s3:*",
 
+      # DynamoDB for desktop tracking
+      "dynamodb:*",
+
+      # Lambda for self-service API
+      "lambda:*",
+      "apigateway:*",
+
       # Support
       "support:*",
       "trustedadvisor:*",
