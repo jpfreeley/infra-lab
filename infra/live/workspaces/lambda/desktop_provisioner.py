@@ -311,6 +311,8 @@ services:
       - -c
       - |
         export OPENVSCODE_SERVER_ROOT=/home/.openvscode-server
+        mkdir -p $$HOME/.openvscode-server/extensions
+        chown -R 1000:1000 $$HOME/.openvscode-server 2>/dev/null || true
         apt-get update -qq && apt-get install -y -qq pipx python3-venv curl >/dev/null 2>&1 || true
         pipx install 'hermes-agent[acp]' 2>/dev/null || true
         pipx ensurepath 2>/dev/null || true
