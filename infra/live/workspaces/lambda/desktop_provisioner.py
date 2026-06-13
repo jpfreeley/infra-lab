@@ -226,6 +226,11 @@ if [ ! -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
   if [ -n "$GH_PAT" ]; then
     cd $MOUNT_POINT/home/dcvuser/development
 
+    # Fetch API keys from Secrets Manager
+    OPENAI_KEY=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/openai-key" --query SecretString --output text --region $REGION 2>/dev/null || echo "sk-REPLACE_ME")
+    TAVILY_KEY=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/tavily-key" --query SecretString --output text --region $REGION 2>/dev/null || echo "tvly-REPLACE_ME")
+    APIFY_TOKEN=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/apify-token" --query SecretString --output text --region $REGION 2>/dev/null || echo "apify_api_REPLACE_ME")
+
     # Clone repos via HTTPS + PAT
     if [ ! -d "MagNet-Agents-Backend" ]; then
       git clone https://x-access-token:$GH_PAT@github.com/avinair108/MagNet-Agents-Backend.git
@@ -265,13 +270,13 @@ volumes:
 COMPOSE
 
     # Create backend .env
-    cat > MagNet-Agents-Backend/.env << 'ENVFILE'
+    cat > MagNet-Agents-Backend/.env << ENVFILE
 SUPABASE_URL=http://127.0.0.1:54321
 SUPABASE_KEY=REPLACE_AFTER_SUPABASE_START
 SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
-OPENAI_API_KEY=sk-REPLACE_ME
-TAVILY_API_KEY=tvly-REPLACE_ME
-APIFY_API_TOKEN=apify_api_REPLACE_ME
+OPENAI_API_KEY=$OPENAI_KEY
+TAVILY_API_KEY=$TAVILY_KEY
+APIFY_API_TOKEN=$APIFY_TOKEN
 DEBUG=True
 FLASK_DEBUG=1
 ENVFILE
