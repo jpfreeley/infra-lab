@@ -256,6 +256,15 @@ resource "aws_api_gateway_integration_response" "options_200" {
 resource "aws_api_gateway_deployment" "desktops" {
   rest_api_id = aws_api_gateway_rest_api.desktops.id
 
+  triggers = {
+    redeployment = sha1(join(",", [
+      jsonencode(aws_api_gateway_integration.post_desktops),
+      jsonencode(aws_api_gateway_integration.get_desktops),
+      jsonencode(aws_api_gateway_integration.options_desktops),
+      jsonencode(aws_api_gateway_integration_response.options_200),
+    ]))
+  }
+
   depends_on = [
     aws_api_gateway_integration.post_desktops,
     aws_api_gateway_integration.get_desktops,
