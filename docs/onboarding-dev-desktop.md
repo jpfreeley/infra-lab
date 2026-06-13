@@ -49,8 +49,8 @@ VS Code 1.85 is pre-installed on the desktop with the **Continue** AI extension.
 1. Right-click the desktop → "Open Terminal Here"
 1. Run: `code ~/development`
 1. VS Code opens with your project files
-1. The Continue extension (sidebar icon) provides AI chat and autocomplete
-   powered by the shared Ollama server
+1. The Continue extension (sidebar icon) provides AI chat, autocomplete,
+   and agent features (bring your own Anthropic API key — see below)
 
 ## Step 4: Everything is Already Running
 
