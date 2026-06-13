@@ -250,6 +250,8 @@ chown -h dcvuser:dcvuser /home/dcvuser/development
 if [ ! -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
   REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
   GH_PAT=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/github-pat" --query SecretString --output text --region $REGION 2>/dev/null | tr -d "\\n")
+  OLLAMA_IP_SSM=$(aws ssm get-parameter --name "/infra-lab/desktop/ollama-ip" --query "Parameter.Value" --output text --region $REGION 2>/dev/null | tr -d "\\n")
+  if [ -z "$OLLAMA_IP_SSM" ]; then OLLAMA_IP_SSM="10.0.96.100"; fi
 
   if [ -n "$GH_PAT" ]; then
     cd $MOUNT_POINT/home/dcvuser/development
@@ -300,10 +302,18 @@ services:
     volumes:
       - .:/home/coder/workspace
       - code-server-config:/home/coder/.local
+      - /data/home/dcvuser/.hermes:/home/coder/.hermes
     environment:
       - PASSWORD=magnet123
+      - OLLAMA_HOST=http://OLLAMA_IP_PLACEHOLDER:11434
     command: >
       bash -c "
+        sudo apt-get update -qq && sudo apt-get install -y -qq pipx python3-venv >/dev/null 2>&1;
+        pipx install 'hermes-agent[acp]' 2>/dev/null;
+        pipx ensurepath 2>/dev/null;
+        export PATH=\\$$PATH:/home/coder/.local/bin;
+        mkdir -p /home/coder/.local/share/code-server/extensions;
+        echo '[]' > /home/coder/.local/share/code-server/extensions/extensions.json 2>/dev/null;
         code-server --install-extension vampozo.hermes-ai-agent-vampozo 2>/dev/null;
         code-server --auth password --bind-addr 0.0.0.0:8080 /home/coder/workspace
       "
@@ -313,6 +323,9 @@ volumes:
   frontend-node-modules:
   code-server-config:
 COMPOSE
+
+    # Replace Ollama IP placeholder in docker-compose
+    sed -i "s|OLLAMA_IP_PLACEHOLDER|$OLLAMA_IP_SSM|g" docker-compose.yml
 
     # Create backend .env
     cat > MagNet-Agents-Backend/.env << ENVFILE
