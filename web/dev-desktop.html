@@ -240,9 +240,10 @@ async function launchDesktop() {
     startCountdown();
     startPolling();
 
-    // If instance was already running, check immediately
-    if (data.status === 'running') {
-      countdownSeconds = 30;
+    // If instance was already running AND status says so, shorter countdown
+    if (data.status === 'running' && data.note === undefined) {
+      countdownSeconds = 60;
+      updateCountdownDisplay();
       SERVICES.filter(s => s.checkable).forEach(svc => checkService(svc));
     }
 
