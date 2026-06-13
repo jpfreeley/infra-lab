@@ -127,8 +127,9 @@ resource "aws_instance" "ollama" {
     BOOT_TIME=$BOOT_TIME
     GRACE_MINUTES=60
     STATE_FILE="/var/run/last-ollama-activity"
-    INSTANCE_ID=\$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-    REGION=\$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+    IMDS_TOKEN=\$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+    INSTANCE_ID=\$(curl -s -H "X-aws-ec2-metadata-token: \$IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+    REGION=\$(curl -s -H "X-aws-ec2-metadata-token: \$IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
 
     # Grace period — don't stop within first hour
     NOW=\$(date +%s)

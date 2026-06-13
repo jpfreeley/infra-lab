@@ -248,7 +248,8 @@ chown -h dcvuser:dcvuser /home/dcvuser/development
 
 # First-boot: clone repos and set up dev environment if not already done
 if [ ! -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
-  REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+  IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+  REGION=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
   GH_PAT=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/github-pat" --query SecretString --output text --region $REGION 2>/dev/null | tr -d "\\n")
   OLLAMA_IP_SSM=$(aws ssm get-parameter --name "/infra-lab/desktop/ollama-ip" --query "Parameter.Value" --output text --region $REGION 2>/dev/null | tr -d "\\n")
   if [ -z "$OLLAMA_IP_SSM" ]; then OLLAMA_IP_SSM="10.0.96.100"; fi
@@ -341,7 +342,7 @@ FLASK_DEBUG=1
 ENVFILE
 
     # Create frontend .env
-    INSTANCE_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+    INSTANCE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
     cat > magnet-app-front/.env << ENVFILE
 VITE_SUPABASE_URL=http://127.0.0.1:54321
 VITE_SUPABASE_ANON_KEY=REPLACE_AFTER_SUPABASE_START
@@ -426,8 +427,9 @@ cat > /usr/local/bin/idle-check.sh << 'IDLE'
 #!/bin/bash
 IDLE_THRESHOLD_MINUTES=30
 STATE_FILE="/var/run/last-dcv-activity"
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+REGION=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
 CONNECTIONS=$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{{sum += $2}} END {{print sum+0}}')
 if [ "$CONNECTIONS" -gt 0 ]; then
   date +%s > "$STATE_FILE"
@@ -611,6 +613,7 @@ def handler(event, context):
                             "instance_id": instance_id,
                             "public_ip": public_ip,
                             "endpoints": build_endpoints(public_ip),
+                            "ollama": ollama_info,
                             "credentials": {
                                 "dcv_user": "dcvuser",
                                 "dcv_password": "(set by user)",
@@ -665,6 +668,7 @@ def handler(event, context):
                     "instance_id": instance_id,
                     "public_ip": public_ip,
                     "endpoints": build_endpoints(public_ip),
+                    "ollama": ollama_info,
                     "credentials": {
                         "dcv_user": "dcvuser",
                         "dcv_password": "ChangeMeOnFirstLogin!",
