@@ -411,6 +411,15 @@ OLLAMA_HOST=http://$OLLAMA_IP_SSM:11434
 HERMES_PROVIDER=ollama
 HERMES_MODEL=qwen2.5-coder:14b
 HERMESENV
+cat > $MOUNT_POINT/home/dcvuser/.hermes/config.yaml << HERMESCONFIG
+model:
+  provider: ollama
+  default: qwen2.5-coder:14b
+  base_url: http://$OLLAMA_IP_SSM:11434
+
+terminal:
+  backend: local
+HERMESCONFIG
 ln -sfn $MOUNT_POINT/home/dcvuser/.hermes /home/dcvuser/.hermes 2>/dev/null
 chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser/.hermes
 chown -h dcvuser:dcvuser /home/dcvuser/.hermes
