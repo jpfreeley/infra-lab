@@ -419,6 +419,7 @@ model:
   provider: ollama
   default: qwen2.5-coder:14b
   base_url: http://$OLLAMA_IP_SSM:11434
+  context_length: 65000
 
 terminal:
   backend: local
