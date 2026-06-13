@@ -8,11 +8,10 @@ desktop from scratch. No prior AWS or Docker experience required.
 A remote Linux desktop in the cloud with:
 
 - A full graphical desktop you access through your browser (DCV)
-- VS Code (native, with Continue AI extension connected to Ollama)
+- VS Code (native, with Continue AI extension — bring your own Claude key)
 - A browser-based code editor on port 8080 (OpenVSCode Server)
 - Python 3.11 for backend development (via Docker)
 - Local Supabase database (PostgreSQL + auth + storage + dashboard)
-- Shared Ollama GPU server for AI-assisted coding (qwen2.5-coder:14b)
 - All the MagNet Legal code, ready to run
 
 ## Prerequisites
@@ -84,29 +83,32 @@ From your local computer's browser:
 | OpenVSCode Server | `http://<IP>:8080` | Browser code editor (no password) |
 | Supabase Studio | `http://<IP>:54323` | Database dashboard |
 
-## AI-Assisted Coding (Continue + Ollama)
+## AI-Assisted Coding (Continue + Bring Your Own Key)
 
-Your desktop comes with the **Continue** VS Code extension pre-configured
-to use a shared Ollama GPU server running `qwen2.5-coder:14b`.
+Your desktop comes with the **Continue** VS Code extension pre-installed.
+To use AI features, bring your own Anthropic (Claude) API key.
 
-**What works:**
+**Setup (one time):**
+
+1. Open VS Code on the DCV desktop
+1. Open Continue settings: click the gear icon in the Continue sidebar
+1. Add your Anthropic API key when prompted
+1. Select Claude Sonnet as your model
+
+**What you get with Claude:**
 
 - **Chat**: Ask questions, get code suggestions, explain code
 - **Tab autocomplete**: Ghost text suggestions while you type
 - **Code edit**: Select code → Cmd+I → describe changes
+- **Agent mode**: Autonomous coding, terminal commands, file edits
+- **MCP**: Tool server integration
 
-**What doesn't work (local model limitation):**
+**Note about Ollama (GPU server):**
 
-- Agent mode (autonomous coding, running terminal commands)
-- MCP tool integration
-
-For agent/MCP features, add a Claude API key to Continue's config
-(ask your team lead).
-
-**If Continue isn't responding:** The Ollama server auto-stops after
-10 minutes of inactivity. It auto-starts when you launch a desktop,
-but takes ~5 minutes to download the model on first boot. Be patient
-on the first query.
+The infrastructure includes a shared Ollama GPU server (g4dn.xlarge) defined
+in Terraform, but it is currently **disabled** (not auto-started). It exists
+for future use if you want local/free LLM inference. Contact your team lead
+if you want to explore this option.
 
 ## Day-to-Day Workflow
 
@@ -168,7 +170,6 @@ a persistent disk.
 | Restart backend | `cd ~/development && docker compose restart backend` |
 | Restart frontend | `cd ~/development && docker compose restart frontend` |
 | Open VS Code | `code ~/development` |
-| Test Ollama | `curl http://10.0.96.100:11434/api/tags` |
 | Check Docker containers | `docker ps` |
 | Check disk space | `df -h` |
 
@@ -194,7 +195,6 @@ Ask your team lead for the actual key values.
 | --- | --- |
 | "Permission denied" on docker | Run `newgrp docker` first |
 | Can't connect to desktop | Relaunch from self-service page |
-| Continue not responding | Ollama may be starting up — wait 2-3 min, try again |
 | Backend not starting | Check logs: `docker compose logs backend` |
 | Frontend npm error | Usually dependency issues — ask team lead |
 | "Port in use" error | `docker compose down` then `docker compose up -d` |
@@ -207,12 +207,13 @@ Ask your team lead for the actual key values.
 ## Architecture (for team leads)
 
 - **Desktop instance**: t3.large, Amazon Linux 2, DCV AMI
-- **Ollama GPU**: g4dn.xlarge (on-demand), Amazon Linux 2023, 10-min idle auto-stop
+- **Ollama GPU** (dormant): g4dn.xlarge defined in Terraform but not auto-started.
+  Available for future local LLM use if needed.
 - **Provisioning**: Lambda + API Gateway, self-service via web page
 - **State**: DynamoDB tracks active desktops
 - **Networking**: VPC 10.0.96.0/20, desktops in public subnet, SG restricts by IP
-- **Ollama IP**: Fixed at 10.0.96.100 (private, within VPC)
-- **Idle auto-stop**: Desktop (30 min, DCV + code-server connections), Ollama (10 min, API requests)
+- **LLM**: Bring-your-own Anthropic API key (Continue extension)
+- **Idle auto-stop**: Desktop (30 min, DCV + code-server connections)
 - **Persistent storage**: 50GB EBS volume at /data, survives stop/start
 
 ## Getting Help

@@ -25,7 +25,6 @@ INSTANCE_PROFILE_ARN = os.environ["INSTANCE_PROFILE_ARN"]
 API_SECRET = os.environ["API_SECRET"]
 TABLE_NAME = os.environ["TABLE_NAME"]
 RATE_LIMIT_SECONDS = int(os.environ.get("RATE_LIMIT_SECONDS", "180"))
-OLLAMA_INSTANCE_ID = os.environ.get("OLLAMA_INSTANCE_ID", "")
 
 ec2 = boto3.client("ec2")
 ssm = boto3.client("ssm")
@@ -49,31 +48,6 @@ def build_endpoints(public_ip):
         name: f"{info['protocol']}://{public_ip}:{info['port']}"
         for name, info in ENDPOINTS.items()
     }
-
-
-def get_ollama_status():
-    """Check Ollama instance state and ensure it's running."""
-    if not OLLAMA_INSTANCE_ID:
-        return {"status": "not_configured"}
-    try:
-        result = ec2.describe_instances(InstanceIds=[OLLAMA_INSTANCE_ID])
-        state = result["Reservations"][0]["Instances"][0]["State"]["Name"]
-        if state == "stopped":
-            # Auto-start Ollama
-            ec2.start_instances(InstanceIds=[OLLAMA_INSTANCE_ID])
-            return {"status": "starting"}
-        return {"status": state}
-    except Exception:
-        return {"status": "unknown"}
-
-
-def get_ollama_ip():
-    """Get Ollama private IP from SSM."""
-    try:
-        result = ssm.get_parameter(Name="/infra-lab/desktop/ollama-ip")
-        return result["Parameter"]["Value"]
-    except Exception:
-        return "10.0.96.100"  # fallback to fixed IP
 
 
 def response(status_code, body):
@@ -250,8 +224,6 @@ if [ ! -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
   IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
   REGION=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
   GH_PAT=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/github-pat" --query SecretString --output text --region $REGION 2>/dev/null | tr -d "\\n")
-  OLLAMA_IP_SSM=$(aws ssm get-parameter --name "/infra-lab/desktop/ollama-ip" --query "Parameter.Value" --output text --region $REGION 2>/dev/null | tr -d "\\n")
-  if [ -z "$OLLAMA_IP_SSM" ]; then OLLAMA_IP_SSM="10.0.96.100"; fi
 
   if [ -n "$GH_PAT" ]; then
     cd $MOUNT_POINT/home/dcvuser/development
@@ -303,7 +275,6 @@ services:
       - .:/home/workspace/workspace
       - code-server-config:/home/workspace/.openvscode-server
     environment:
-      - OLLAMA_HOST=http://OLLAMA_IP_PLACEHOLDER:11434
       - HOME=/home/workspace
     entrypoint: /bin/bash
     command:
@@ -322,7 +293,7 @@ volumes:
 COMPOSE
 
     # Replace Ollama IP placeholder in docker-compose
-    sed -i "s|OLLAMA_IP_PLACEHOLDER|$OLLAMA_IP_SSM|g" docker-compose.yml
+    # (Ollama integration disabled — bring your own API key for LLM features)
 
     # Create backend .env
     cat > MagNet-Agents-Backend/.env << ENVFILE
@@ -381,38 +352,22 @@ fi
 # Install Continue extension in VS Code for dcvuser
 sudo -u dcvuser code --install-extension Continue.continue 2>/dev/null || true
 
-# Configure Continue to use Ollama
-OLLAMA_IP_SSM=$(aws ssm get-parameter --name "/infra-lab/desktop/ollama-ip" --query "Parameter.Value" --output text --region $REGION 2>/dev/null | tr -d "\\n")
-if [ -z "$OLLAMA_IP_SSM" ]; then OLLAMA_IP_SSM="10.0.96.100"; fi
+# Write default Continue config (user brings their own Claude API key)
 mkdir -p /home/dcvuser/.continue
-printf '{"models":[{"title":"Qwen 2.5 Coder 14B","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"http://%s:11434"}],"tabAutocompleteModel":{"title":"Qwen Autocomplete","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"http://%s:11434"}}' "$OLLAMA_IP_SSM" "$OLLAMA_IP_SSM" > /home/dcvuser/.continue/config.json
 cat > /home/dcvuser/.continue/config.yaml << CONTINUECONF
 name: Local Config
 version: 1.0.0
 schema: v1
 models:
-  - name: Qwen 2.5 Coder 14B
-    provider: ollama
-    model: qwen2.5-coder:14b
-    apiBase: http://$OLLAMA_IP_SSM:11434
+  - name: Claude Sonnet
+    provider: anthropic
+    model: claude-sonnet-4-20250514
     roles:
       - chat
       - edit
       - apply
-  - name: Qwen 2.5 Coder 14B Autocomplete
-    provider: ollama
-    model: qwen2.5-coder:14b
-    apiBase: http://$OLLAMA_IP_SSM:11434
-    roles:
-      - autocomplete
 CONTINUECONF
 chown -R dcvuser:dcvuser /home/dcvuser/.continue
-
-# Set OLLAMA_HOST for dcvuser (all shells)
-grep -q OLLAMA_HOST /home/dcvuser/.bashrc 2>/dev/null || cat >> /home/dcvuser/.bashrc << BASHRC
-export OLLAMA_HOST="http://$OLLAMA_IP_SSM:11434"
-export OLLAMA_BASE_URL="http://$OLLAMA_IP_SSM:11434"
-BASHRC
 
 # Idle auto-stop: stop instance after 30 min of no DCV connections
 cat > /usr/local/bin/idle-check.sh << 'IDLE'
@@ -528,9 +483,6 @@ def handler(event, context):
     username = body.get("username", "").strip().lower()
 
     if http_method == "POST":
-        # Auto-start Ollama if stopped
-        ollama_info = get_ollama_status()
-
         # Validate input
         if not username or not username.isalnum():
             return response(400, {"error": "username required (alphanumeric only)"})
@@ -573,7 +525,6 @@ def handler(event, context):
                         "instance_id": instance_id,
                         "public_ip": public_ip,
                         "endpoints": build_endpoints(public_ip),
-                        "ollama": ollama_info,
                         "credentials": {
                             "dcv_user": "dcvuser",
                             "dcv_password": "(set by user)",
@@ -604,7 +555,6 @@ def handler(event, context):
                             "instance_id": instance_id,
                             "public_ip": public_ip,
                             "endpoints": build_endpoints(public_ip),
-                            "ollama": ollama_info,
                             "credentials": {
                                 "dcv_user": "dcvuser",
                                 "dcv_password": "(set by user)",
@@ -659,7 +609,6 @@ def handler(event, context):
                     "instance_id": instance_id,
                     "public_ip": public_ip,
                     "endpoints": build_endpoints(public_ip),
-                    "ollama": ollama_info,
                     "credentials": {
                         "dcv_user": "dcvuser",
                         "dcv_password": "ChangeMeOnFirstLogin!",
