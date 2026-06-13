@@ -266,8 +266,21 @@ services:
     command: bash -c "npm install --legacy-peer-deps && npm run dev -- --host 0.0.0.0"
     restart: unless-stopped
 
+  code-server:
+    image: codercom/code-server:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/home/coder/workspace
+      - code-server-config:/home/coder/.local
+    environment:
+      - PASSWORD=magnet123
+    command: --auth password --bind-addr 0.0.0.0:8080 /home/coder/workspace
+    restart: unless-stopped
+
 volumes:
   frontend-node-modules:
+  code-server-config:
 COMPOSE
 
     # Create backend .env
@@ -320,24 +333,33 @@ fi
 # Install Hermes Agent (via pipx in a container, exposed as host script)
 if [ ! -f /usr/local/bin/hermes ]; then
   # Create a wrapper that runs hermes inside a Python 3.11 container
-  cat > /usr/local/bin/hermes << 'HERMES'
+  cat > /usr/local/bin/hermes << HERMES
 #!/bin/bash
-exec docker run --rm -it \
-  --network host \
-  -v "$HOME:/root" \
-  -v "$(pwd):/workspace" \
-  -w /workspace \
-  -e OLLAMA_HOST=http://{OLLAMA_IP}:11434 \
-  -e OLLAMA_BASE_URL=http://{OLLAMA_IP}:11434 \
-  ghcr.io/nousresearch/hermes-agent:latest \
-  "$@"
+exec docker run --rm -it \\
+  --network host \\
+  -v "\$HOME:/root" \\
+  -v "\$(pwd):/workspace" \\
+  -w /workspace \\
+  -e OLLAMA_HOST=http://{OLLAMA_IP}:11434 \\
+  -e OLLAMA_BASE_URL=http://{OLLAMA_IP}:11434 \\
+  -e MEMPALACE_DIR=/root/.mempalace \\
+  python:3.11 bash -c "pip install -q hermes-agent mempalace 2>/dev/null && hermes \\"\\\$@\\""
 HERMES
   chmod +x /usr/local/bin/hermes
 fi
 
+# Install MemPalace on persistent volume
+if [ ! -d $MOUNT_POINT/home/dcvuser/.mempalace ]; then
+  mkdir -p $MOUNT_POINT/home/dcvuser/.mempalace
+fi
+ln -sfn $MOUNT_POINT/home/dcvuser/.mempalace /home/dcvuser/.mempalace 2>/dev/null
+chown -h dcvuser:dcvuser /home/dcvuser/.mempalace
+
 # Set OLLAMA_HOST for dcvuser (all shells)
-grep -q OLLAMA_HOST /home/dcvuser/.bashrc 2>/dev/null || \
-  echo 'export OLLAMA_HOST="http://{OLLAMA_IP}:11434"' >> /home/dcvuser/.bashrc
+grep -q OLLAMA_HOST /home/dcvuser/.bashrc 2>/dev/null || cat >> /home/dcvuser/.bashrc << BASHRC
+export OLLAMA_HOST="http://{OLLAMA_IP}:11434"
+export OLLAMA_BASE_URL="http://{OLLAMA_IP}:11434"
+BASHRC
 
 # Idle auto-stop: stop instance after 30 min of no DCV connections
 cat > /usr/local/bin/idle-check.sh << 'IDLE'

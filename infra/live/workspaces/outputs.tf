@@ -53,10 +53,10 @@ output "api_url" {
 
 output "ollama_instance_id" {
   description = "Ollama GPU instance ID"
-  value       = aws_spot_instance_request.ollama.spot_instance_id
+  value       = aws_instance.ollama.id
 }
 
 output "ollama_private_ip" {
   description = "Ollama instance private IP (accessible from VPC)"
-  value       = aws_spot_instance_request.ollama.private_ip
+  value       = aws_instance.ollama.private_ip
 }

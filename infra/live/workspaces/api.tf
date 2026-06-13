@@ -55,7 +55,7 @@ resource "aws_lambda_function" "desktop_provisioner" {
       API_SECRET           = var.api_secret
       TABLE_NAME           = aws_dynamodb_table.desktops.name
       RATE_LIMIT_SECONDS   = "180"
-      OLLAMA_PRIVATE_IP    = aws_spot_instance_request.ollama.private_ip
+      OLLAMA_PRIVATE_IP    = aws_instance.ollama.private_ip
     }
   }
 

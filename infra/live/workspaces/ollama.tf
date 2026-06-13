@@ -63,10 +63,10 @@ module "ollama_sg" {
 }
 
 ###############################################################################
-# Ollama Instance (Spot GPU)
+# Ollama Instance (On-Demand GPU — switch to spot when quota approved)
 ###############################################################################
 
-resource "aws_spot_instance_request" "ollama" {
+resource "aws_instance" "ollama" {
   ami                    = data.aws_ami.gpu.id
   instance_type          = "g4dn.xlarge"
   subnet_id              = module.workspaces_vpc.public_subnet_ids[0]
@@ -75,12 +75,8 @@ resource "aws_spot_instance_request" "ollama" {
 
   associate_public_ip_address = true
 
-  spot_type                      = "persistent"
-  instance_interruption_behavior = "stop"
-  wait_for_fulfillment           = true
-
   root_block_device {
-    volume_size = 100 # Need space for model weights
+    volume_size = 100
     volume_type = "gp3"
     encrypted   = true
   }
