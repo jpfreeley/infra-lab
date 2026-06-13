@@ -683,7 +683,7 @@ def handler(event, context):
                         "dcv_password": "ChangeMeOnFirstLogin!",
                         "code_server_password": "magnet123",
                     },
-                    "note": "New desktop provisioning — fully ready in ~5 minutes",
+                    "note": "New desktop provisioning — fully ready in ~10 minutes",
                 },
             )
         return response(
