@@ -302,7 +302,11 @@ services:
       - code-server-config:/home/coder/.local
     environment:
       - PASSWORD=magnet123
-    command: --auth password --bind-addr 0.0.0.0:8080 /home/coder/workspace
+    command: >
+      bash -c "
+        code-server --install-extension joaompfp.hermes-ai-agent 2>/dev/null;
+        code-server --auth password --bind-addr 0.0.0.0:8080 /home/coder/workspace
+      "
     restart: unless-stopped
 
 volumes:
