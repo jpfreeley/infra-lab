@@ -297,8 +297,7 @@ services:
 
   code-server:
     image: codercom/code-server:latest
-    ports:
-      - "8080:8080"
+    network_mode: host
     volumes:
       - .:/home/coder/workspace
       - code-server-config:/home/coder/.local
