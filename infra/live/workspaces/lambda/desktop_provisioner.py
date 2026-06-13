@@ -319,7 +319,7 @@ services:
         code-server --install-extension vampozo.hermes-ai-agent-vampozo 2>/dev/null
         code-server --install-extension Continue.continue 2>/dev/null
         mkdir -p /home/coder/.continue
-        printf '{"models":[{"title":"Qwen 2.5 Coder 14B","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}],"tabAutocompleteModel":{"title":"Qwen Autocomplete","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}}' "$OLLAMA_HOST" "$OLLAMA_HOST" > /home/coder/.continue/config.json
+        printf '{"models":[{"title":"Qwen 2.5 Coder 14B","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}],"tabAutocompleteModel":{"title":"Qwen Autocomplete","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}}' "$$OLLAMA_HOST" "$$OLLAMA_HOST" > /home/coder/.continue/config.json
         exec code-server --auth password --bind-addr 0.0.0.0:8080 /home/coder/workspace
     restart: unless-stopped
 
