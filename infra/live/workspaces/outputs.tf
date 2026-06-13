@@ -50,3 +50,13 @@ output "api_url" {
   description = "Desktop provisioning API URL"
   value       = "${aws_api_gateway_stage.prod.invoke_url}/desktops"
 }
+
+output "ollama_instance_id" {
+  description = "Ollama GPU instance ID"
+  value       = aws_spot_instance_request.ollama.spot_instance_id
+}
+
+output "ollama_private_ip" {
+  description = "Ollama instance private IP (accessible from VPC)"
+  value       = aws_spot_instance_request.ollama.private_ip
+}

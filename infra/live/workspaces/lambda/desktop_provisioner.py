@@ -159,6 +159,7 @@ def wait_for_ip(instance_id, max_wait=60):
 
 def launch_new_instance(username):
     """Launch a new desktop instance from AMI."""
+    OLLAMA_IP = os.environ.get("OLLAMA_PRIVATE_IP", "10.0.96.100")
     user_data = f"""#!/bin/bash
 set -x
 exec > /var/log/user-data.log 2>&1
@@ -315,6 +316,28 @@ if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
   sg docker -c "docker compose pull" || true
   sg docker -c "docker compose up -d" || true
 fi
+
+# Install Hermes Agent (via pipx in a container, exposed as host script)
+if [ ! -f /usr/local/bin/hermes ]; then
+  # Create a wrapper that runs hermes inside a Python 3.11 container
+  cat > /usr/local/bin/hermes << 'HERMES'
+#!/bin/bash
+exec docker run --rm -it \
+  --network host \
+  -v "$HOME:/root" \
+  -v "$(pwd):/workspace" \
+  -w /workspace \
+  -e OLLAMA_HOST=http://{OLLAMA_IP}:11434 \
+  -e OLLAMA_BASE_URL=http://{OLLAMA_IP}:11434 \
+  ghcr.io/nousresearch/hermes-agent:latest \
+  "$@"
+HERMES
+  chmod +x /usr/local/bin/hermes
+fi
+
+# Set OLLAMA_HOST for dcvuser (all shells)
+grep -q OLLAMA_HOST /home/dcvuser/.bashrc 2>/dev/null || \
+  echo 'export OLLAMA_HOST="http://{OLLAMA_IP}:11434"' >> /home/dcvuser/.bashrc
 
 # Idle auto-stop: stop instance after 30 min of no DCV connections
 cat > /usr/local/bin/idle-check.sh << 'IDLE'
