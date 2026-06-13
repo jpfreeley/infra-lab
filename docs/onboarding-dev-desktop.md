@@ -53,59 +53,26 @@ VS Code 1.85 is pre-installed on the desktop with the **Continue** AI extension.
 1. The Continue extension (sidebar icon) provides AI chat and autocomplete
    powered by the shared Ollama server
 
-## Step 4: Set Up Docker Access
+## Step 4: Everything is Already Running
 
-Run this once (needed every time you open a new terminal session):
+The boot script automatically starts all services:
 
-```bash
-newgrp docker
-```
+- Docker + `docker compose up -d` (backend, frontend, OpenVSCode Server)
+- Supabase (PostgreSQL, auth, storage, dashboard)
+- DCV session
 
-Verify it works:
+No manual commands needed. Just wait for the self-service page checkmarks
+to turn green (~10 minutes on first boot, ~2 minutes on restart).
 
-```bash
-docker --version
-# Should show: Docker version 25.x.x
-```
-
-## Step 5: Start Supabase (Local Database)
-
-```bash
-supabase start
-```
-
-First time takes 3-5 minutes (downloading database images). After that,
-it's instant.
-
-When it finishes, you'll see credentials. The important ones:
-
-- **Dashboard**: `http://localhost:54323` (open in Firefox on the desktop)
-- **API URL**: `http://localhost:54321`
-- **Database**: `postgresql://postgres:postgres@localhost:54322/postgres`
-
-## Step 6: Start the Application
-
-```bash
-cd ~/development
-docker compose up -d
-```
-
-This starts:
-
-- **Backend** (Python/Flask) on port 5000
-- **Frontend** (React/Vite) on port 5173
-- **OpenVSCode Server** on port 8080
-
-First time takes 2-3 minutes (installing dependencies). After that,
-restarts are fast.
-
-Check they're running:
+Verify from a terminal on the desktop:
 
 ```bash
 docker compose ps
 ```
 
-## Step 7: Access Services
+You should see all containers running.
+
+## Step 5: Access Services
 
 From your local computer's browser:
 
@@ -145,9 +112,8 @@ on the first query.
 
 ### Starting your day
 
-Launch your desktop from the self-service page. If your desktop was
-stopped (idle auto-stop after 30 minutes), it restarts in ~2 minutes.
-First-time boot takes ~10 minutes.
+Launch your desktop from the self-service page. Everything starts
+automatically — just wait for the checkmarks to go green.
 
 ### Editing code
 
@@ -165,13 +131,6 @@ automatically at `http://<IP>:5173`.
 Your desktop automatically stops after 30 minutes of inactivity (no DCV
 or code-server connections). No action needed — your files are safe on
 a persistent disk.
-
-To manually stop:
-
-```bash
-cd ~/development && docker compose down
-supabase stop
-```
 
 ### If the desktop won't connect
 
@@ -203,8 +162,7 @@ supabase stop
 
 | What | Command |
 | --- | --- |
-| Start everything | `newgrp docker && supabase start && cd ~/development && docker compose up -d` |
-| Stop everything | `cd ~/development && docker compose down && supabase stop` |
+| Check running services | `docker compose ps` |
 | View backend logs | `cd ~/development && docker compose logs -f backend` |
 | View frontend logs | `cd ~/development && docker compose logs -f frontend` |
 | Restart backend | `cd ~/development && docker compose restart backend` |
