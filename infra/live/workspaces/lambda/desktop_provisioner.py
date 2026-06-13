@@ -302,7 +302,6 @@ services:
     volumes:
       - .:/home/workspace/workspace
       - code-server-config:/home/workspace/.openvscode-server
-      - /data/home/dcvuser/.hermes:/home/workspace/.hermes
     environment:
       - OLLAMA_HOST=http://OLLAMA_IP_PLACEHOLDER:11434
       - HOME=/home/workspace
@@ -313,13 +312,7 @@ services:
         export OPENVSCODE_SERVER_ROOT=/home/.openvscode-server
         mkdir -p $$HOME/.openvscode-server/extensions
         chown -R 1000:1000 $$HOME/.openvscode-server 2>/dev/null || true
-        apt-get update -qq && apt-get install -y -qq pipx python3-venv curl >/dev/null 2>&1 || true
-        pipx install 'hermes-agent[acp]' 2>/dev/null || true
-        pipx ensurepath 2>/dev/null || true
-        export PATH=$$PATH:$$HOME/.local/bin
         $$OPENVSCODE_SERVER_ROOT/bin/openvscode-server --install-extension Continue.continue 2>/dev/null || true
-        mkdir -p $$HOME/.continue
-        printf '{"models":[{"title":"Qwen 2.5 Coder 14B","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}],"tabAutocompleteModel":{"title":"Qwen Autocomplete","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}}' "$$OLLAMA_HOST" "$$OLLAMA_HOST" > $$HOME/.continue/config.json
         exec $$OPENVSCODE_SERVER_ROOT/bin/openvscode-server --host 0.0.0.0 --port 8080 --without-connection-token $$HOME/workspace
     restart: unless-stopped
 
@@ -378,57 +371,42 @@ if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
   sg docker -c "docker compose up -d" || true
 fi
 
-# Install Hermes Agent (via pipx in a container, exposed as host script)
-if [ ! -f /usr/local/bin/hermes ]; then
-  # Create a wrapper that runs hermes inside a Python 3.11 container
-  cat > /usr/local/bin/hermes << 'HERMES'
-#!/bin/bash
-OLLAMA_IP=$(cat /home/dcvuser/.hermes/.env 2>/dev/null | grep OLLAMA_HOST | cut -d/ -f3 | cut -d: -f1)
-[ -z "$OLLAMA_IP" ] && OLLAMA_IP="10.0.96.100"
-exec docker run --rm -it \
-  --network host \
-  -v "$HOME:/root" \
-  -v "$(pwd):/workspace" \
-  -w /workspace \
-  -e OLLAMA_HOST=http://$OLLAMA_IP:11434 \
-  -e OLLAMA_BASE_URL=http://$OLLAMA_IP:11434 \
-  -e MEMPALACE_DIR=/root/.mempalace \
-  python:3.11 bash -c "pip install -q hermes-agent mempalace 2>/dev/null && hermes \"\\$@\""
-HERMES
-  chmod +x /usr/local/bin/hermes
+# Install VS Code 1.85 (last version compatible with AL2 glibc 2.26)
+if ! command -v code &> /dev/null; then
+  cd /tmp && curl -L -o code-1.85.2.rpm 'https://update.code.visualstudio.com/1.85.2/linux-rpm-x64/stable' 2>/dev/null
+  yum install -y /tmp/code-1.85.2.rpm 2>/dev/null
+  rm -f /tmp/code-1.85.2.rpm
 fi
 
-# Install MemPalace on persistent volume
-if [ ! -d $MOUNT_POINT/home/dcvuser/.mempalace ]; then
-  mkdir -p $MOUNT_POINT/home/dcvuser/.mempalace
-fi
-ln -sfn $MOUNT_POINT/home/dcvuser/.mempalace /home/dcvuser/.mempalace 2>/dev/null
-chown -h dcvuser:dcvuser /home/dcvuser/.mempalace
+# Install Continue extension in VS Code for dcvuser
+sudo -u dcvuser code --install-extension Continue.continue 2>/dev/null || true
 
-# Write Hermes config with Ollama IP from SSM
+# Configure Continue to use Ollama
 OLLAMA_IP_SSM=$(aws ssm get-parameter --name "/infra-lab/desktop/ollama-ip" --query "Parameter.Value" --output text --region $REGION 2>/dev/null | tr -d "\\n")
 if [ -z "$OLLAMA_IP_SSM" ]; then OLLAMA_IP_SSM="10.0.96.100"; fi
-mkdir -p $MOUNT_POINT/home/dcvuser/.hermes
-cat > $MOUNT_POINT/home/dcvuser/.hermes/.env << HERMESENV
-OLLAMA_HOST=http://$OLLAMA_IP_SSM:11434
-HERMES_PROVIDER=ollama
-HERMES_MODEL=qwen2.5-coder:14b
-HERMESENV
-cat > $MOUNT_POINT/home/dcvuser/.hermes/config.yaml << HERMESCONFIG
-model:
-  provider: ollama
-  default: qwen2.5-coder:14b
-  base_url: http://$OLLAMA_IP_SSM:11434/v1
-  context_length: 65536
-  ollama_num_ctx: 65536
-
-terminal:
-  backend: local
-HERMESCONFIG
-ln -sfn $MOUNT_POINT/home/dcvuser/.hermes /home/dcvuser/.hermes 2>/dev/null
-chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser/.hermes
-chmod -R 777 $MOUNT_POINT/home/dcvuser/.hermes
-chown -h dcvuser:dcvuser /home/dcvuser/.hermes
+mkdir -p /home/dcvuser/.continue
+printf '{"models":[{"title":"Qwen 2.5 Coder 14B","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"http://%s:11434"}],"tabAutocompleteModel":{"title":"Qwen Autocomplete","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"http://%s:11434"}}' "$OLLAMA_IP_SSM" "$OLLAMA_IP_SSM" > /home/dcvuser/.continue/config.json
+cat > /home/dcvuser/.continue/config.yaml << CONTINUECONF
+name: Local Config
+version: 1.0.0
+schema: v1
+models:
+  - name: Qwen 2.5 Coder 14B
+    provider: ollama
+    model: qwen2.5-coder:14b
+    apiBase: http://$OLLAMA_IP_SSM:11434
+    roles:
+      - chat
+      - edit
+      - apply
+  - name: Qwen 2.5 Coder 14B Autocomplete
+    provider: ollama
+    model: qwen2.5-coder:14b
+    apiBase: http://$OLLAMA_IP_SSM:11434
+    roles:
+      - autocomplete
+CONTINUECONF
+chown -R dcvuser:dcvuser /home/dcvuser/.continue
 
 # Set OLLAMA_HOST for dcvuser (all shells)
 grep -q OLLAMA_HOST /home/dcvuser/.bashrc 2>/dev/null || cat >> /home/dcvuser/.bashrc << BASHRC
