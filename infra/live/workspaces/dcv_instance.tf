@@ -265,7 +265,7 @@ resource "aws_spot_instance_request" "dcv_desktop" {
     fi
 
     ###########################################################################
-    # PHASE 6: Idle auto-stop (30 min no DCV connections → stop instance)
+    # PHASE 6: Idle auto-stop (30 min no DCV/code-server connections → stop instance)
     ###########################################################################
     cat > /usr/local/bin/idle-check.sh << 'IDLE'
     #!/bin/bash
@@ -273,11 +273,19 @@ resource "aws_spot_instance_request" "dcv_desktop" {
     STATE_FILE="/var/run/last-dcv-activity"
     INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
     REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
-    CONNECTIONS=$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{sum += $2} END {print sum+0}')
-    if [ "$CONNECTIONS" -gt 0 ]; then
+
+    # Check DCV connections
+    DCV_CONN=$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{sum += $2} END {print sum+0}')
+
+    # Check code-server connections (established TCP on port 8080)
+    CS_CONN=$(ss -tn state established 2>/dev/null | grep -c ':8080' || echo 0)
+
+    # If either has active connections, mark active
+    if [ "$DCV_CONN" -gt 0 ] || [ "$CS_CONN" -gt 0 ]; then
       date +%s > "$STATE_FILE"
       exit 0
     fi
+
     if [ ! -f "$STATE_FILE" ]; then
       date +%s > "$STATE_FILE"
       exit 0
@@ -286,7 +294,7 @@ resource "aws_spot_instance_request" "dcv_desktop" {
     NOW=$(date +%s)
     IDLE_MINUTES=$(( (NOW - LAST_ACTIVITY) / 60 ))
     if [ "$IDLE_MINUTES" -ge "$IDLE_THRESHOLD_MINUTES" ]; then
-      logger -t idle-check "No DCV connections for $${IDLE_MINUTES}min. Stopping."
+      logger -t idle-check "No connections for $${IDLE_MINUTES}min. Stopping."
       aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
     fi
     IDLE
