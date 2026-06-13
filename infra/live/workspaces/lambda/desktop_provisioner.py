@@ -304,7 +304,7 @@ services:
       - PASSWORD=magnet123
     command: >
       bash -c "
-        code-server --install-extension joaompfp.hermes-ai-agent 2>/dev/null;
+        code-server --install-extension vampozo.hermes-ai-agent-vampozo 2>/dev/null;
         code-server --auth password --bind-addr 0.0.0.0:8080 /home/coder/workspace
       "
     restart: unless-stopped
