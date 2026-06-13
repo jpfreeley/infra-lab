@@ -12,7 +12,7 @@ data "aws_ami" "gpu" {
 
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["Deep Learning Base OSS Nvidia Driver AMI (Amazon Linux 2) *"]
   }
 
   filter {
@@ -87,11 +87,7 @@ resource "aws_instance" "ollama" {
     set -x
     exec > /var/log/user-data.log 2>&1
 
-    # Install NVIDIA drivers
-    yum install -y gcc kernel-devel-$(uname -r)
-    aws s3 cp --region us-east-1 s3://ec2-linux-nvidia-drivers/latest/NVIDIA-Linux-x86_64.run /tmp/NVIDIA-install.run
-    chmod +x /tmp/NVIDIA-install.run
-    /tmp/NVIDIA-install.run --silent --disable-nouveau
+    # NVIDIA drivers are pre-installed in the Deep Learning AMI
     nvidia-smi
 
     # Install Ollama
@@ -109,38 +105,46 @@ resource "aws_instance" "ollama" {
     systemctl start ollama
 
     # Wait for Ollama to be ready
-    for i in $(seq 1 30); do
+    for i in $(seq 1 60); do
       curl -s http://localhost:11434/api/tags && break
-      sleep 2
+      sleep 5
     done
 
     # Pull models
     ollama pull qwen2.5-coder:14b
 
     # Idle auto-stop: no API requests for 30 min → stop
-    cat > /usr/local/bin/ollama-idle-check.sh << 'IDLE'
+    # Grace period: don't stop within first 60 min of boot
+    BOOT_TIME=$(date +%s)
+    cat > /usr/local/bin/ollama-idle-check.sh << IDLE
     #!/bin/bash
     IDLE_THRESHOLD_MINUTES=30
+    BOOT_TIME=$BOOT_TIME
+    GRACE_MINUTES=60
     STATE_FILE="/var/run/last-ollama-activity"
-    INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-    REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+    INSTANCE_ID=\$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+    REGION=\$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
 
-    # Check if any requests in the last interval (via Ollama logs)
-    RECENT=$(journalctl -u ollama --since "5 min ago" --no-pager 2>/dev/null | grep -c "POST\|completion")
-    if [ "$RECENT" -gt 0 ]; then
-      date +%s > "$STATE_FILE"
+    # Grace period — don't stop within first hour
+    NOW=\$(date +%s)
+    UPTIME_MIN=\$(( (NOW - BOOT_TIME) / 60 ))
+    if [ "\$UPTIME_MIN" -lt "\$GRACE_MINUTES" ]; then exit 0; fi
+
+    # Check if any requests in the last interval
+    RECENT=\$(journalctl -u ollama --since "5 min ago" --no-pager 2>/dev/null | grep -c "POST\|completion")
+    if [ "\$RECENT" -gt 0 ]; then
+      date +%s > "\$STATE_FILE"
       exit 0
     fi
-    if [ ! -f "$STATE_FILE" ]; then
-      date +%s > "$STATE_FILE"
+    if [ ! -f "\$STATE_FILE" ]; then
+      date +%s > "\$STATE_FILE"
       exit 0
     fi
-    LAST_ACTIVITY=$(cat "$STATE_FILE")
-    NOW=$(date +%s)
-    IDLE_MINUTES=$(( (NOW - LAST_ACTIVITY) / 60 ))
-    if [ "$IDLE_MINUTES" -ge "$IDLE_THRESHOLD_MINUTES" ]; then
-      logger -t ollama-idle "No requests for $IDLE_MINUTES min. Stopping."
-      aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
+    LAST_ACTIVITY=\$(cat "\$STATE_FILE")
+    IDLE_MINUTES=\$(( (NOW - LAST_ACTIVITY) / 60 ))
+    if [ "\$IDLE_MINUTES" -ge "\$IDLE_THRESHOLD_MINUTES" ]; then
+      logger -t ollama-idle "No requests for \$IDLE_MINUTES min. Stopping."
+      aws ec2 stop-instances --instance-ids "\$INSTANCE_ID" --region "\$REGION"
     fi
     IDLE
     chmod +x /usr/local/bin/ollama-idle-check.sh
