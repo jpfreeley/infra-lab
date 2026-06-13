@@ -296,31 +296,27 @@ services:
     restart: unless-stopped
 
   code-server:
-    image: codercom/code-server:latest
+    image: gitpod/openvscode-server:latest
     network_mode: host
     volumes:
-      - .:/home/coder/workspace
-      - code-server-config:/home/coder/.local
-      - /data/home/dcvuser/.hermes:/home/coder/.hermes
+      - .:/home/openvscode-server/workspace
+      - code-server-config:/home/openvscode-server/.openvscode-server
+      - /data/home/dcvuser/.hermes:/home/openvscode-server/.hermes
     environment:
-      - PASSWORD=magnet123
       - OLLAMA_HOST=http://OLLAMA_IP_PLACEHOLDER:11434
     entrypoint: /bin/bash
     command:
       - -c
       - |
-        sudo chown -R coder:coder /home/coder/.local 2>/dev/null
-        sudo apt-get update -qq && sudo apt-get install -y -qq pipx python3-venv >/dev/null 2>&1
+        sudo apt-get update -qq && sudo apt-get install -y -qq pipx python3-venv curl >/dev/null 2>&1
         pipx install 'hermes-agent[acp]' 2>/dev/null
         pipx ensurepath 2>/dev/null
-        export PATH=$$PATH:/home/coder/.local/bin
-        mkdir -p /home/coder/.local/share/code-server/extensions
-        [ ! -f /home/coder/.local/share/code-server/extensions/extensions.json ] && echo '[]' > /home/coder/.local/share/code-server/extensions/extensions.json
-        code-server --install-extension vampozo.hermes-ai-agent-vampozo 2>/dev/null
-        code-server --install-extension Continue.continue 2>/dev/null
-        mkdir -p /home/coder/.continue
-        printf '{"models":[{"title":"Qwen 2.5 Coder 14B","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}],"tabAutocompleteModel":{"title":"Qwen Autocomplete","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}}' "$$OLLAMA_HOST" "$$OLLAMA_HOST" > /home/coder/.continue/config.json
-        exec code-server --auth password --bind-addr 0.0.0.0:8080 /home/coder/workspace
+        export PATH=$$PATH:/home/openvscode-server/.local/bin
+        /home/openvscode-server/.openvscode-server/bin/openvscode-server --install-extension vampozo.hermes-ai-agent-vampozo 2>/dev/null || true
+        /home/openvscode-server/.openvscode-server/bin/openvscode-server --install-extension Continue.continue 2>/dev/null || true
+        mkdir -p /home/openvscode-server/.continue
+        printf '{"models":[{"title":"Qwen 2.5 Coder 14B","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}],"tabAutocompleteModel":{"title":"Qwen Autocomplete","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}}' "$$OLLAMA_HOST" "$$OLLAMA_HOST" > /home/openvscode-server/.continue/config.json
+        exec /home/openvscode-server/.openvscode-server/bin/openvscode-server --host 0.0.0.0 --port 8080 --without-connection-token /home/openvscode-server/workspace
     restart: unless-stopped
 
 volumes:
