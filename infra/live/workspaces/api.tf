@@ -54,7 +54,7 @@ resource "aws_lambda_function" "desktop_provisioner" {
       INSTANCE_PROFILE_ARN = aws_iam_instance_profile.dcv.arn
       API_SECRET           = var.api_secret
       TABLE_NAME           = aws_dynamodb_table.desktops.name
-      RATE_LIMIT_SECONDS   = "180"
+      RATE_LIMIT_SECONDS   = "60"
       OLLAMA_INSTANCE_ID   = aws_instance.ollama.id
     }
   }
