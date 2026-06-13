@@ -100,6 +100,7 @@ const SERVICES = [
   { id: 'code_server', name: '📝 VS Code', port: 8080, protocol: 'http', checkable: true },
   { id: 'supabase_studio', name: '🗄️ Supabase Studio', port: 54323, protocol: 'http', checkable: true },
   { id: 'supabase_api', name: '🔌 Supabase API', port: 54321, protocol: 'http', checkable: true },
+  { id: 'ollama', name: '🧠 Ollama AI', port: 0, protocol: '', checkable: false },
 ];
 
 let publicIp = null;
@@ -119,7 +120,7 @@ function buildChecklist(ip) {
   const container = document.getElementById('checklist');
   container.innerHTML = '';
   SERVICES.forEach(svc => {
-    const url = `${svc.protocol}://${ip}:${svc.port}`;
+    const url = svc.port ? `${svc.protocol}://${ip}:${svc.port}` : '';
     serviceStatus[svc.id] = false;
     const div = document.createElement('div');
     div.className = 'check-item';
@@ -127,7 +128,7 @@ function buildChecklist(ip) {
     div.innerHTML = `
       <div class="check-icon"><div class="spinner-sm"></div></div>
       <span class="check-name">${svc.name}</span>
-      <a class="check-url" href="${url}" target="_blank" style="opacity:0.4">${ip}:${svc.port}</a>
+      ${url ? `<a class="check-url" href="${url}" target="_blank" style="opacity:0.4">${ip}:${svc.port}</a>` : '<span class="check-url" style="opacity:0.4">internal</span>'}
     `;
     container.appendChild(div);
   });
@@ -239,6 +240,16 @@ async function launchDesktop() {
     buildChecklist(publicIp);
     startCountdown();
     startPolling();
+
+    // Handle Ollama status from API response
+    if (data.ollama) {
+      if (data.ollama.status === 'running') {
+        markReady('ollama');
+      } else if (data.ollama.status === 'starting') {
+        // Will be marked ready after a delay
+        setTimeout(() => markReady('ollama'), 120000);
+      }
+    }
 
     // If instance was already running AND status says so, shorter countdown
     if (data.status === 'running' && data.note === undefined) {

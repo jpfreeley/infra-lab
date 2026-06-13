@@ -55,7 +55,7 @@ resource "aws_lambda_function" "desktop_provisioner" {
       API_SECRET           = var.api_secret
       TABLE_NAME           = aws_dynamodb_table.desktops.name
       RATE_LIMIT_SECONDS   = "180"
-      OLLAMA_PRIVATE_IP    = aws_instance.ollama.private_ip
+      OLLAMA_INSTANCE_ID   = aws_instance.ollama.id
     }
   }
 
@@ -139,6 +139,14 @@ resource "aws_iam_role_policy" "lambda_permissions" {
           "logs:PutLogEvents",
         ]
         Resource = "arn:aws:logs:*:*:*"
+      },
+      {
+        Sid    = "SSMRead"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+        ]
+        Resource = "arn:aws:ssm:*:*:parameter/infra-lab/desktop/*"
       },
     ]
   })

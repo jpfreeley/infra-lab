@@ -70,6 +70,7 @@ resource "aws_instance" "ollama" {
   ami                    = data.aws_ami.gpu.id
   instance_type          = "g4dn.xlarge"
   subnet_id              = module.workspaces_vpc.public_subnet_ids[0]
+  private_ip             = "10.0.96.100"
   vpc_security_group_ids = [module.ollama_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.dcv.name
 
@@ -157,4 +158,27 @@ resource "aws_instance" "ollama" {
   lifecycle {
     ignore_changes = [ami]
   }
+}
+
+
+###############################################################################
+# SSM Parameter for Ollama IP (read at runtime by Lambda + desktops)
+###############################################################################
+
+resource "aws_ssm_parameter" "ollama_ip" {
+  name        = "/infra-lab/desktop/ollama-ip"
+  description = "Private IP of the shared Ollama GPU instance"
+  type        = "String"
+  value       = aws_instance.ollama.private_ip
+
+  tags = local.common_tags
+}
+
+resource "aws_ssm_parameter" "ollama_instance_id" {
+  name        = "/infra-lab/desktop/ollama-instance-id"
+  description = "Instance ID of the shared Ollama GPU instance"
+  type        = "String"
+  value       = aws_instance.ollama.id
+
+  tags = local.common_tags
 }

@@ -25,8 +25,10 @@ INSTANCE_PROFILE_ARN = os.environ["INSTANCE_PROFILE_ARN"]
 API_SECRET = os.environ["API_SECRET"]
 TABLE_NAME = os.environ["TABLE_NAME"]
 RATE_LIMIT_SECONDS = int(os.environ.get("RATE_LIMIT_SECONDS", "180"))
+OLLAMA_INSTANCE_ID = os.environ.get("OLLAMA_INSTANCE_ID", "")
 
 ec2 = boto3.client("ec2")
+ssm = boto3.client("ssm")
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 
@@ -47,6 +49,31 @@ def build_endpoints(public_ip):
         name: f"{info['protocol']}://{public_ip}:{info['port']}"
         for name, info in ENDPOINTS.items()
     }
+
+
+def get_ollama_status():
+    """Check Ollama instance state and ensure it's running."""
+    if not OLLAMA_INSTANCE_ID:
+        return {"status": "not_configured"}
+    try:
+        result = ec2.describe_instances(InstanceIds=[OLLAMA_INSTANCE_ID])
+        state = result["Reservations"][0]["Instances"][0]["State"]["Name"]
+        if state == "stopped":
+            # Auto-start Ollama
+            ec2.start_instances(InstanceIds=[OLLAMA_INSTANCE_ID])
+            return {"status": "starting"}
+        return {"status": state}
+    except Exception:
+        return {"status": "unknown"}
+
+
+def get_ollama_ip():
+    """Get Ollama private IP from SSM."""
+    try:
+        result = ssm.get_parameter(Name="/infra-lab/desktop/ollama-ip")
+        return result["Parameter"]["Value"]
+    except Exception:
+        return "10.0.96.100"  # fallback to fixed IP
 
 
 def response(status_code, body):
@@ -159,7 +186,7 @@ def wait_for_ip(instance_id, max_wait=60):
 
 def launch_new_instance(username):
     """Launch a new desktop instance from AMI."""
-    OLLAMA_IP = os.environ.get("OLLAMA_PRIVATE_IP", "10.0.96.100")
+    OLLAMA_IP = get_ollama_ip()
     user_data = f"""#!/bin/bash
 set -x
 exec > /var/log/user-data.log 2>&1
@@ -475,6 +502,9 @@ def handler(event, context):
     username = body.get("username", "").strip().lower()
 
     if http_method == "POST":
+        # Auto-start Ollama if stopped
+        ollama_info = get_ollama_status()
+
         # Validate input
         if not username or not username.isalnum():
             return response(400, {"error": "username required (alphanumeric only)"})
@@ -517,6 +547,7 @@ def handler(event, context):
                         "instance_id": instance_id,
                         "public_ip": public_ip,
                         "endpoints": build_endpoints(public_ip),
+                        "ollama": ollama_info,
                         "credentials": {
                             "dcv_user": "dcvuser",
                             "dcv_password": "(set by user)",

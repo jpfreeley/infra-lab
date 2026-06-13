@@ -92,6 +92,14 @@ resource "aws_iam_role_policy" "dcv_license" {
         ]
         Resource = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:infra-lab/desktop/*"
       },
+      {
+        Sid    = "SSMRead"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+        ]
+        Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/infra-lab/desktop/*"
+      },
     ]
   })
 }
