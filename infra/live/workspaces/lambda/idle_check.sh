@@ -1,6 +1,6 @@
 #!/bin/bash
 # Idle auto-stop script — runs every 15 minutes via cron
-# Stops the instance if no DCV connections for IDLE_THRESHOLD minutes
+# Stops the instance if no DCV or code-server connections for IDLE_THRESHOLD minutes
 #
 # Installed by user_data at: /usr/local/bin/idle-check.sh
 # Cron: */15 * * * * /usr/local/bin/idle-check.sh
@@ -14,8 +14,11 @@ REGION=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.2
 # Check if any DCV session has active connections
 CONNECTIONS=$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{sum += $2} END {print sum+0}')
 
-if [ "$CONNECTIONS" -gt 0 ]; then
-    # Someone is connected — update activity timestamp
+# Check if any code-server connections (port 8080)
+CODE_SERVER_CONNECTIONS=$(ss -tn state established '( dport = :8080 or sport = :8080 )' 2>/dev/null | grep -c ESTAB || echo 0)
+
+if [ "$CONNECTIONS" -gt 0 ] || [ "$CODE_SERVER_CONNECTIONS" -gt 0 ]; then
+    # Someone is connected via DCV or code-server — update activity timestamp
     date +%s > "$STATE_FILE"
     exit 0
 fi

@@ -445,7 +445,8 @@ IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-
 INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 REGION=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
 CONNECTIONS=$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{sum += $2} END {print sum+0}')
-if [ "$CONNECTIONS" -gt 0 ]; then
+CODE_SERVER=$(ss -tn state established '( dport = :8080 or sport = :8080 )' 2>/dev/null | grep -c ESTAB || echo 0)
+if [ "$CONNECTIONS" -gt 0 ] || [ "$CODE_SERVER" -gt 0 ]; then
   date +%s > "$STATE_FILE"
   exit 0
 fi
@@ -457,7 +458,7 @@ LAST_ACTIVITY=$(cat "$STATE_FILE")
 NOW=$(date +%s)
 IDLE_MINUTES=$(( (NOW - LAST_ACTIVITY) / 60 ))
 if [ "$IDLE_MINUTES" -ge "$IDLE_THRESHOLD_MINUTES" ]; then
-  logger -t idle-check "No DCV connections for ${IDLE_MINUTES}min. Stopping."
+  logger -t idle-check "No DCV or code-server connections for ${IDLE_MINUTES}min. Stopping."
   aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
 fi
 IDLE
