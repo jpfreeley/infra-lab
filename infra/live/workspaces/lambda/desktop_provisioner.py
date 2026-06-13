@@ -298,25 +298,27 @@ services:
   code-server:
     image: gitpod/openvscode-server:latest
     network_mode: host
+    user: "1000:1000"
     volumes:
-      - .:/home/openvscode-server/workspace
-      - code-server-config:/home/openvscode-server/.openvscode-server
-      - /data/home/dcvuser/.hermes:/home/openvscode-server/.hermes
+      - .:/home/workspace/workspace
+      - code-server-config:/home/workspace/.openvscode-server
+      - /data/home/dcvuser/.hermes:/home/workspace/.hermes
     environment:
       - OLLAMA_HOST=http://OLLAMA_IP_PLACEHOLDER:11434
+      - HOME=/home/workspace
     entrypoint: /bin/bash
     command:
       - -c
       - |
-        sudo apt-get update -qq && sudo apt-get install -y -qq pipx python3-venv curl >/dev/null 2>&1
-        pipx install 'hermes-agent[acp]' 2>/dev/null
-        pipx ensurepath 2>/dev/null
-        export PATH=$$PATH:/home/openvscode-server/.local/bin
-        /home/openvscode-server/.openvscode-server/bin/openvscode-server --install-extension vampozo.hermes-ai-agent-vampozo 2>/dev/null || true
-        /home/openvscode-server/.openvscode-server/bin/openvscode-server --install-extension Continue.continue 2>/dev/null || true
-        mkdir -p /home/openvscode-server/.continue
-        printf '{"models":[{"title":"Qwen 2.5 Coder 14B","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}],"tabAutocompleteModel":{"title":"Qwen Autocomplete","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}}' "$$OLLAMA_HOST" "$$OLLAMA_HOST" > /home/openvscode-server/.continue/config.json
-        exec /home/openvscode-server/.openvscode-server/bin/openvscode-server --host 0.0.0.0 --port 8080 --without-connection-token /home/openvscode-server/workspace
+        export OPENVSCODE_SERVER_ROOT=/home/.openvscode-server
+        apt-get update -qq && apt-get install -y -qq pipx python3-venv curl >/dev/null 2>&1 || true
+        pipx install 'hermes-agent[acp]' 2>/dev/null || true
+        pipx ensurepath 2>/dev/null || true
+        export PATH=$$PATH:$$HOME/.local/bin
+        $$OPENVSCODE_SERVER_ROOT/bin/openvscode-server --install-extension Continue.continue 2>/dev/null || true
+        mkdir -p $$HOME/.continue
+        printf '{"models":[{"title":"Qwen 2.5 Coder 14B","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}],"tabAutocompleteModel":{"title":"Qwen Autocomplete","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}}' "$$OLLAMA_HOST" "$$OLLAMA_HOST" > $$HOME/.continue/config.json
+        exec $$OPENVSCODE_SERVER_ROOT/bin/openvscode-server --host 0.0.0.0 --port 8080 --without-connection-token $$HOME/workspace
     restart: unless-stopped
 
 volumes:
