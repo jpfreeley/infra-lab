@@ -88,6 +88,8 @@ resource "aws_iam_role" "lambda_exec" {
 }
 
 resource "aws_iam_role_policy" "lambda_permissions" {
+  # checkov:skip=CKV_AWS_290: "Lambda needs write access to create EC2 instances dynamically"
+  # checkov:skip=CKV_AWS_355: "Lambda needs wildcard resource for EC2 RunInstances (instance IDs unknown at policy time)"
   name = "${local.name_prefix}-lambda-permissions"
   role = aws_iam_role.lambda_exec.id
 

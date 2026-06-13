@@ -79,6 +79,9 @@ data "aws_iam_policy_document" "scp_workspaces_service_boundary" {
       # Secrets Manager for storing PATs and API keys
       "secretsmanager:*",
 
+      # Service Quotas (required to view/adjust account limits)
+      "servicequotas:*",
+
       # Support
       "support:*",
       "trustedadvisor:*",
