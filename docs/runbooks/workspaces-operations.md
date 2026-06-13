@@ -43,11 +43,11 @@ tooling and a persistent data volume that survives spot interruptions.
 | Supabase Studio | `http://<PUBLIC_IP>:54323` | (no auth) |
 | Supabase API | `http://<PUBLIC_IP>:54321` | — |
 
-Current IP: check with `terraform output dcv_public_ip` or:
+Current IP: check with `the API response or AWS console` or:
 
 ```bash
 aws ec2 describe-instances \
-  --instance-ids $(terraform output -raw dcv_instance_id) \
+  --instance-ids <YOUR_INSTANCE_ID> \
   --query 'Reservations[0].Instances[0].PublicIpAddress' \
   --output text \
   --profile infra-lab
@@ -143,7 +143,7 @@ aws ec2 start-instances \
 ```
 
 **Note**: Public IP changes after stop/start. Run `terraform refresh` and
-check `terraform output dcv_public_ip`.
+check `the API response or AWS console`.
 
 ### Reboot
 
@@ -161,7 +161,7 @@ If the spot instance gets reclaimed and a new one starts:
 1. Repos, Docker images, and compose files persist
 1. You need to:
    - Wait for boot (~2 minutes)
-   - Get the new public IP (`terraform output dcv_public_ip`)
+   - Get the new public IP (`the API response or AWS console`)
    - Reconnect to DCV
    - Run `newgrp docker` in your terminal
    - Run `supabase start` and `docker compose up -d`
@@ -275,6 +275,6 @@ variable "developers" {
 | Supabase services stopped | Run `supabase stop && supabase start` |
 | Python not found | Use Docker: `docker run --rm -it --network host -v ...:/app python:3.11 bash` |
 | Node not found | Use code-server terminal (port 8080) or Docker |
-| Public IP changed | `terraform output dcv_public_ip` or check EC2 console |
+| Public IP changed | `the API response or AWS console` or check EC2 console |
 | Instance replaced (spot) | Data persists on /data — get new IP and reconnect |
 | DCV license "unlicensed" | Instance role needs S3 read to `dcv-license.us-east-1` bucket |
