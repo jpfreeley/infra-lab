@@ -63,7 +63,7 @@ module "ollama_sg" {
 }
 
 ###############################################################################
-# Ollama Instance (On-Demand GPU — switch to spot when quota approved)
+# Ollama Instance (Spot with persistent stop behavior)
 ###############################################################################
 
 resource "aws_instance" "ollama" {
@@ -75,6 +75,14 @@ resource "aws_instance" "ollama" {
   iam_instance_profile   = aws_iam_instance_profile.dcv.name
 
   associate_public_ip_address = true
+
+  instance_market_options {
+    market_type = "spot"
+    spot_options {
+      instance_interruption_behavior = "stop"
+      spot_instance_type             = "persistent"
+    }
+  }
 
   root_block_device {
     volume_size = 100
