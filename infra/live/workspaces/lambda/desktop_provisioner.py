@@ -425,6 +425,7 @@ terminal:
 HERMESCONFIG
 ln -sfn $MOUNT_POINT/home/dcvuser/.hermes /home/dcvuser/.hermes 2>/dev/null
 chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser/.hermes
+chmod -R 777 $MOUNT_POINT/home/dcvuser/.hermes
 chown -h dcvuser:dcvuser /home/dcvuser/.hermes
 
 # Set OLLAMA_HOST for dcvuser (all shells)
