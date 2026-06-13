@@ -305,17 +305,18 @@ services:
     environment:
       - PASSWORD=magnet123
       - OLLAMA_HOST=http://OLLAMA_IP_PLACEHOLDER:11434
-    command: >
-      bash -c "
-        sudo apt-get update -qq && sudo apt-get install -y -qq pipx python3-venv >/dev/null 2>&1;
-        pipx install 'hermes-agent[acp]' 2>/dev/null;
-        pipx ensurepath 2>/dev/null;
-        export PATH=\\$$PATH:/home/coder/.local/bin;
-        mkdir -p /home/coder/.local/share/code-server/extensions;
-        echo '[]' > /home/coder/.local/share/code-server/extensions/extensions.json 2>/dev/null;
-        code-server --install-extension vampozo.hermes-ai-agent-vampozo 2>/dev/null;
-        code-server --auth password --bind-addr 0.0.0.0:8080 /home/coder/workspace
-      "
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        sudo apt-get update -qq && sudo apt-get install -y -qq pipx python3-venv >/dev/null 2>&1
+        pipx install 'hermes-agent[acp]' 2>/dev/null
+        pipx ensurepath 2>/dev/null
+        export PATH=$$PATH:/home/coder/.local/bin
+        mkdir -p /home/coder/.local/share/code-server/extensions
+        [ ! -f /home/coder/.local/share/code-server/extensions/extensions.json ] && echo '[]' > /home/coder/.local/share/code-server/extensions/extensions.json
+        code-server --install-extension vampozo.hermes-ai-agent-vampozo 2>/dev/null
+        exec code-server --auth password --bind-addr 0.0.0.0:8080 /home/coder/workspace
     restart: unless-stopped
 
 volumes:
