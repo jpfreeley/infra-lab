@@ -91,7 +91,9 @@ resource "aws_instance" "ollama" {
     nvidia-smi
 
     # Install dependencies
-    dnf install -y zstd
+    dnf install -y zstd cronie
+    systemctl enable crond
+    systemctl start crond
 
     # Install Ollama
     curl -fsSL https://ollama.com/install.sh | sh
@@ -113,8 +115,8 @@ resource "aws_instance" "ollama" {
       sleep 5
     done
 
-    # Pull models
-    ollama pull qwen2.5-coder:14b
+    # Pull models via API (CLI can crash on some AMIs)
+    curl -s http://localhost:11434/api/pull -d '{"name":"qwen2.5-coder:14b"}' > /dev/null 2>&1 &
 
     # Idle auto-stop: no API requests for 30 min → stop
     # Grace period: don't stop within first 60 min of boot
@@ -152,7 +154,9 @@ resource "aws_instance" "ollama" {
     IDLE
     chmod +x /usr/local/bin/ollama-idle-check.sh
     date +%s > /var/run/last-ollama-activity
+    mkdir -p /etc/cron.d
     echo "*/5 * * * * root /usr/local/bin/ollama-idle-check.sh" > /etc/cron.d/ollama-idle
+    chmod 644 /etc/cron.d/ollama-idle
 
     echo "=== Ollama setup complete ==="
   EOF

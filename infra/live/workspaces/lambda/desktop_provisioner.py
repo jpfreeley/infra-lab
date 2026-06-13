@@ -309,6 +309,7 @@ services:
     command:
       - -c
       - |
+        sudo chown -R coder:coder /home/coder/.local 2>/dev/null
         sudo apt-get update -qq && sudo apt-get install -y -qq pipx python3-venv >/dev/null 2>&1
         pipx install 'hermes-agent[acp]' 2>/dev/null
         pipx ensurepath 2>/dev/null
