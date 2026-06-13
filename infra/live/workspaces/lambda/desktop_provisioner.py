@@ -364,17 +364,19 @@ fi
 # Install Hermes Agent (via pipx in a container, exposed as host script)
 if [ ! -f /usr/local/bin/hermes ]; then
   # Create a wrapper that runs hermes inside a Python 3.11 container
-  cat > /usr/local/bin/hermes << HERMES
+  cat > /usr/local/bin/hermes << 'HERMES'
 #!/bin/bash
-exec docker run --rm -it \\
-  --network host \\
-  -v "\$HOME:/root" \\
-  -v "\$(pwd):/workspace" \\
-  -w /workspace \\
-  -e OLLAMA_HOST=http://{OLLAMA_IP}:11434 \\
-  -e OLLAMA_BASE_URL=http://{OLLAMA_IP}:11434 \\
-  -e MEMPALACE_DIR=/root/.mempalace \\
-  python:3.11 bash -c "pip install -q hermes-agent mempalace 2>/dev/null && hermes \\"\\\$@\\""
+OLLAMA_IP=$(cat /home/dcvuser/.hermes/.env 2>/dev/null | grep OLLAMA_HOST | cut -d/ -f3 | cut -d: -f1)
+[ -z "$OLLAMA_IP" ] && OLLAMA_IP="10.0.96.100"
+exec docker run --rm -it \
+  --network host \
+  -v "$HOME:/root" \
+  -v "$(pwd):/workspace" \
+  -w /workspace \
+  -e OLLAMA_HOST=http://$OLLAMA_IP:11434 \
+  -e OLLAMA_BASE_URL=http://$OLLAMA_IP:11434 \
+  -e MEMPALACE_DIR=/root/.mempalace \
+  python:3.11 bash -c "pip install -q hermes-agent mempalace 2>/dev/null && hermes \"\$@\""
 HERMES
   chmod +x /usr/local/bin/hermes
 fi
@@ -386,10 +388,23 @@ fi
 ln -sfn $MOUNT_POINT/home/dcvuser/.mempalace /home/dcvuser/.mempalace 2>/dev/null
 chown -h dcvuser:dcvuser /home/dcvuser/.mempalace
 
+# Write Hermes config with Ollama IP from SSM
+OLLAMA_IP_SSM=$(aws ssm get-parameter --name "/infra-lab/desktop/ollama-ip" --query "Parameter.Value" --output text --region $REGION 2>/dev/null | tr -d "\\n")
+if [ -z "$OLLAMA_IP_SSM" ]; then OLLAMA_IP_SSM="10.0.96.100"; fi
+mkdir -p $MOUNT_POINT/home/dcvuser/.hermes
+cat > $MOUNT_POINT/home/dcvuser/.hermes/.env << HERMESENV
+OLLAMA_HOST=http://$OLLAMA_IP_SSM:11434
+HERMES_PROVIDER=ollama
+HERMES_MODEL=qwen2.5-coder:14b
+HERMESENV
+ln -sfn $MOUNT_POINT/home/dcvuser/.hermes /home/dcvuser/.hermes 2>/dev/null
+chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser/.hermes
+chown -h dcvuser:dcvuser /home/dcvuser/.hermes
+
 # Set OLLAMA_HOST for dcvuser (all shells)
 grep -q OLLAMA_HOST /home/dcvuser/.bashrc 2>/dev/null || cat >> /home/dcvuser/.bashrc << BASHRC
-export OLLAMA_HOST="http://{OLLAMA_IP}:11434"
-export OLLAMA_BASE_URL="http://{OLLAMA_IP}:11434"
+export OLLAMA_HOST="http://$OLLAMA_IP_SSM:11434"
+export OLLAMA_BASE_URL="http://$OLLAMA_IP_SSM:11434"
 BASHRC
 
 # Idle auto-stop: stop instance after 30 min of no DCV connections
