@@ -221,15 +221,15 @@ chown -h dcvuser:dcvuser /home/dcvuser/development
 # First-boot: clone repos and set up dev environment if not already done
 if [ ! -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
   REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
-  GH_PAT=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/github-pat" --query SecretString --output text --region $REGION 2>/dev/null || echo "")
+  GH_PAT=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/github-pat" --query SecretString --output text --region $REGION 2>/dev/null | tr -d "\\n")
 
   if [ -n "$GH_PAT" ]; then
     cd $MOUNT_POINT/home/dcvuser/development
 
     # Fetch API keys from Secrets Manager
-    OPENAI_KEY=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/openai-key" --query SecretString --output text --region $REGION 2>/dev/null || echo "sk-REPLACE_ME")
-    TAVILY_KEY=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/tavily-key" --query SecretString --output text --region $REGION 2>/dev/null || echo "tvly-REPLACE_ME")
-    APIFY_TOKEN=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/apify-token" --query SecretString --output text --region $REGION 2>/dev/null || echo "apify_api_REPLACE_ME")
+    OPENAI_KEY=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/openai-key" --query SecretString --output text --region $REGION 2>/dev/null | tr -d "\\n")
+    TAVILY_KEY=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/tavily-key" --query SecretString --output text --region $REGION 2>/dev/null | tr -d "\\n")
+    APIFY_TOKEN=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/apify-token" --query SecretString --output text --region $REGION 2>/dev/null | tr -d "\\n")
 
     # Clone repos via HTTPS + PAT
     if [ ! -d "MagNet-Agents-Backend" ]; then
@@ -309,7 +309,7 @@ if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
   cd $MOUNT_POINT/home/dcvuser/development
 
   # Start Supabase
-  sg docker -c "supabase start" || true
+  sg docker -c "/usr/local/bin/supabase start" || true
 
   # Pull images + start backend/frontend
   sg docker -c "docker compose pull" || true

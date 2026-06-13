@@ -76,6 +76,9 @@ data "aws_iam_policy_document" "scp_workspaces_service_boundary" {
       "lambda:*",
       "apigateway:*",
 
+      # Secrets Manager for storing PATs and API keys
+      "secretsmanager:*",
+
       # Support
       "support:*",
       "trustedadvisor:*",
