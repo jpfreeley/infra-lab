@@ -7,41 +7,51 @@ desktop from scratch. No prior AWS or Docker experience required.
 
 A remote Linux desktop in the cloud with:
 
-- A full graphical desktop you access through your browser
-- VS Code (browser-based) with Node.js 20 and Claude AI assistant
+- A full graphical desktop you access through your browser (DCV)
+- VS Code (native, with Continue AI extension connected to Ollama)
+- A browser-based code editor on port 8080 (OpenVSCode Server)
 - Python 3.11 for backend development (via Docker)
 - Local Supabase database (PostgreSQL + auth + storage + dashboard)
+- Shared Ollama GPU server for AI-assisted coding (qwen2.5-coder:14b)
 - All the MagNet Legal code, ready to run
 
 ## Prerequisites
 
 You need:
 
-1. A modern web browser (Chrome, Firefox, or Safari)
-1. Your developer IP address (ask your team lead — needed for security)
+1. A modern web browser (Chrome or Firefox)
+1. Your developer username (alphanumeric, e.g. `alice`)
+1. The API key (ask your team lead)
 1. GitHub account with access to the MagNet Legal repos
 
-## Step 1: Get Your Desktop URL
+## Step 1: Launch Your Desktop
 
-Your team lead will provide you with:
+1. Go to the self-service page (ask your team lead for the URL)
+1. Enter your username and API key
+1. Click "Launch Desktop"
+1. Wait for the services to come online (~10 minutes on first boot)
 
-- **Desktop URL**: `https://<IP>:8443`
-- **Username**: `dcvuser`
-- **Password**: (will be set for you or you'll set it on first login)
+The page shows a countdown and green checkmarks as services become ready.
 
-## Step 2: Connect to Your Desktop
+## Step 2: Connect to Your Desktop (DCV)
 
-1. Open your browser and go to `https://<YOUR-IP>:8443`
+1. Click the DCV Desktop link shown on the page: `https://<IP>:8443`
 1. You'll see a security warning about the certificate — this is expected.
    Click "Advanced" → "Proceed" (Chrome) or "Accept the Risk" (Firefox)
-1. Enter your username and password
+1. Enter credentials:
+   - **Username**: `dcvuser`
+   - **Password**: `ChangeMeOnFirstLogin!` (first time — change it immediately)
 1. You'll see a Linux desktop (MATE) with a taskbar at the top
 
-## Step 3: Open a Terminal
+## Step 3: Open VS Code
 
-1. Right-click anywhere on the desktop
-1. Click "Open Terminal Here"
-1. You now have a command-line terminal
+VS Code 1.85 is pre-installed on the desktop with the **Continue** AI extension.
+
+1. Right-click the desktop → "Open Terminal Here"
+1. Run: `code ~/development`
+1. VS Code opens with your project files
+1. The Continue extension (sidebar icon) provides AI chat and autocomplete
+   powered by the shared Ollama server
 
 ## Step 4: Set Up Docker Access
 
@@ -84,6 +94,7 @@ This starts:
 
 - **Backend** (Python/Flask) on port 5000
 - **Frontend** (React/Vite) on port 5173
+- **OpenVSCode Server** on port 8080
 
 First time takes 2-3 minutes (installing dependencies). After that,
 restarts are fast.
@@ -94,64 +105,80 @@ Check they're running:
 docker compose ps
 ```
 
-You should see `backend` and `frontend` both "Up".
+## Step 7: Access Services
 
-## Step 7: Open the App
+From your local computer's browser:
 
-From your local computer's browser (not the desktop's browser):
+| Service | URL | Notes |
+| --- | --- | --- |
+| DCV Desktop | `https://<IP>:8443` | Full Linux desktop |
+| Frontend | `http://<IP>:5173` | React app |
+| Backend | `http://<IP>:5000/health` | Flask API |
+| OpenVSCode Server | `http://<IP>:8080` | Browser code editor (no password) |
+| Supabase Studio | `http://<IP>:54323` | Database dashboard |
 
-- **Frontend**: `http://<YOUR-DESKTOP-IP>:5173`
-- **Backend health check**: `http://<YOUR-DESKTOP-IP>:5000/health`
-- **Supabase Studio**: `http://<YOUR-DESKTOP-IP>:54323`
+## AI-Assisted Coding (Continue + Ollama)
 
-## Step 8: Open VS Code (Browser)
+Your desktop comes with the **Continue** VS Code extension pre-configured
+to use a shared Ollama GPU server running `qwen2.5-coder:14b`.
 
-For editing code with a full IDE:
+**What works:**
 
-1. Go to `http://<YOUR-DESKTOP-IP>:8080` in your local browser
-1. Password: `magnet123`
-1. You'll see VS Code with your project files
+- **Chat**: Ask questions, get code suggestions, explain code
+- **Tab autocomplete**: Ghost text suggestions while you type
+- **Code edit**: Select code → Cmd+I → describe changes
 
-The VS Code terminal has **Node.js 20** and **Claude CLI** available.
+**What doesn't work (local model limitation):**
+
+- Agent mode (autonomous coding, running terminal commands)
+- MCP tool integration
+
+For agent/MCP features, add a Claude API key to Continue's config
+(ask your team lead).
+
+**If Continue isn't responding:** The Ollama server auto-stops after
+10 minutes of inactivity. It auto-starts when you launch a desktop,
+but takes ~5 minutes to download the model on first boot. Be patient
+on the first query.
 
 ## Day-to-Day Workflow
 
 ### Starting your day
 
-```bash
-# Open terminal on desktop, then:
-newgrp docker
-supabase start
-cd ~/development && docker compose up -d
-```
+Launch your desktop from the self-service page. If your desktop was
+stopped (idle auto-stop after 30 minutes), it restarts in ~2 minutes.
+First-time boot takes ~10 minutes.
 
 ### Editing code
 
-Option A: Use the browser VS Code at `http://<IP>:8080`
-Option B: Use any editor inside the DCV desktop (right-click → Open Terminal)
+- **Option A (recommended)**: VS Code on the DCV desktop (`code ~/development`)
+- **Option B**: OpenVSCode Server at `http://<IP>:8080`
+- **Option C**: Any terminal editor on the desktop
 
 ### Viewing your changes
 
 The frontend has hot-reload — save a file and the browser refreshes
 automatically at `http://<IP>:5173`.
 
-### Stopping at end of day
+### End of day
+
+Your desktop automatically stops after 30 minutes of inactivity (no DCV
+or code-server connections). No action needed — your files are safe on
+a persistent disk.
+
+To manually stop:
 
 ```bash
 cd ~/development && docker compose down
 supabase stop
 ```
 
-Your team lead may also stop the instance to save costs. Your files
-are safe — they're stored on a separate persistent disk.
-
 ### If the desktop won't connect
 
-Your instance may have been stopped (cost savings) or your IP changed.
-Contact your team lead to:
-
-- Start the instance back up
-- Update the security group with your new IP
+- Your instance may have been stopped (auto idle-stop). Relaunch from the
+  self-service page.
+- Your IP may have changed. The self-service page automatically updates
+  the security group with your current IP on each launch.
 
 ## Project Structure
 
@@ -169,7 +196,7 @@ Contact your team lead to:
 │   ├── package.json           ← Node dependencies
 │   └── .env                   ← Frontend config
 │
-└── docker-compose.yml         ← Runs backend + frontend
+└── docker-compose.yml         ← Runs backend + frontend + code editor
 ```
 
 ## Useful Commands
@@ -182,8 +209,8 @@ Contact your team lead to:
 | View frontend logs | `cd ~/development && docker compose logs -f frontend` |
 | Restart backend | `cd ~/development && docker compose restart backend` |
 | Restart frontend | `cd ~/development && docker compose restart frontend` |
-| Run a Python command | `docker run --rm -v ~/development/MagNet-Agents-Backend:/app -w /app python:3.11 python <script.py>` |
-| Open Supabase dashboard | Browser → `http://localhost:54323` (on desktop) |
+| Open VS Code | `code ~/development` |
+| Test Ollama | `curl http://10.0.96.100:11434/api/tags` |
 | Check Docker containers | `docker ps` |
 | Check disk space | `df -h` |
 
@@ -208,17 +235,30 @@ Ask your team lead for the actual key values.
 | Problem | Solution |
 | --- | --- |
 | "Permission denied" on docker | Run `newgrp docker` first |
-| Can't connect to desktop | Ask team lead to check instance status + your IP |
+| Can't connect to desktop | Relaunch from self-service page |
+| Continue not responding | Ollama may be starting up — wait 2-3 min, try again |
 | Backend not starting | Check logs: `docker compose logs backend` |
 | Frontend npm error | Usually dependency issues — ask team lead |
 | "Port in use" error | `docker compose down` then `docker compose up -d` |
 | Supabase won't start | `supabase stop` then `supabase start` again |
-| Desktop feels slow | Normal for first few minutes. DCV adapts to bandwidth. |
-| Lost my changes | They're safe on `/data`. Files survive restarts. |
-| Certificate warning | Normal — click through it. It's a self-signed cert. |
+| Desktop feels slow | Normal for first few minutes. DCV adapts to bandwidth |
+| Lost my changes | They're safe on `/data`. Files survive restarts |
+| Certificate warning | Normal — click through it. Self-signed cert |
+| VS Code says "can't find code" | Run `export PATH=$PATH:/usr/bin` then `code` |
+
+## Architecture (for team leads)
+
+- **Desktop instance**: t3.large, Amazon Linux 2, DCV AMI
+- **Ollama GPU**: g4dn.xlarge (on-demand), Amazon Linux 2023, 10-min idle auto-stop
+- **Provisioning**: Lambda + API Gateway, self-service via web page
+- **State**: DynamoDB tracks active desktops
+- **Networking**: VPC 10.0.96.0/20, desktops in public subnet, SG restricts by IP
+- **Ollama IP**: Fixed at 10.0.96.100 (private, within VPC)
+- **Idle auto-stop**: Desktop (30 min, DCV + code-server connections), Ollama (10 min, API requests)
+- **Persistent storage**: 50GB EBS volume at /data, survives stop/start
 
 ## Getting Help
 
 1. Check this doc first
 1. Ask in the team chat
-1. Reach out to your team lead for infrastructure issues (instance, IP, keys)
+1. Reach out to your team lead for infrastructure issues
