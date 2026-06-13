@@ -174,6 +174,7 @@ resource "aws_ssm_parameter" "ollama_ip" {
   description = "Private IP of the shared Ollama GPU instance"
   type        = "String"
   value       = aws_instance.ollama.private_ip
+  overwrite   = true
 
   tags = local.common_tags
 }
@@ -183,6 +184,7 @@ resource "aws_ssm_parameter" "ollama_instance_id" {
   description = "Instance ID of the shared Ollama GPU instance"
   type        = "String"
   value       = aws_instance.ollama.id
+  overwrite   = true
 
   tags = local.common_tags
 }
