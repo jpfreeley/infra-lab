@@ -459,7 +459,7 @@ NOW=$(date +%s)
 IDLE_MINUTES=$(( (NOW - LAST_ACTIVITY) / 60 ))
 if [ "$IDLE_MINUTES" -ge "$IDLE_THRESHOLD_MINUTES" ]; then
   logger -t idle-check "No DCV or code-server connections for ${IDLE_MINUTES}min. Stopping."
-  aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
+  /usr/local/bin/aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
 fi
 IDLE
 chmod +x /usr/local/bin/idle-check.sh
