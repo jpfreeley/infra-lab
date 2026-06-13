@@ -9,7 +9,7 @@
 :root{--bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3250;--accent:#6c63ff;--accent2:#00d4aa;--danger:#ff4f6d;--text:#e2e8f0;--muted:#8892a4;--code:#12151f}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-.container{max-width:560px;width:100%}
+.container{max-width:600px;width:100%}
 .logo{text-align:center;margin-bottom:32px}
 .logo h1{font-size:24px;font-weight:700;color:#fff;letter-spacing:-.5px}
 .logo p{color:var(--muted);font-size:13px;margin-top:4px}
@@ -22,30 +22,29 @@ body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-ser
 .btn{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .2s}
 .btn:hover{opacity:.9}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.btn.stop{background:var(--danger)}
 .status{display:none;margin-top:20px}
 .status.show{display:block}
-.status-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-.status-badge.provisioning{background:#6c63ff33;color:var(--accent)}
-.status-badge.starting{background:#f7d15433;color:#f7d154}
-.status-badge.running{background:#00d4aa33;color:var(--accent2)}
-.status-badge.stopped{background:#ff4f6d33;color:var(--danger)}
-.endpoints{margin-top:16px}
-.endpoint{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--code);border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
-.endpoint-name{font-size:12px;color:var(--muted);font-weight:500}
-.endpoint-url{font-size:13px;color:var(--accent2);text-decoration:none;font-family:ui-monospace,monospace}
-.endpoint-url:hover{text-decoration:underline}
+.countdown{text-align:center;margin-bottom:20px}
+.countdown-time{font-size:36px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.countdown-label{font-size:12px;color:var(--muted);margin-top:4px}
+.checklist{margin:16px 0}
+.check-item{display:flex;align-items:center;padding:10px 14px;background:var(--code);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:border-color .3s}
+.check-item.ready{border-color:var(--accent2)}
+.check-icon{width:24px;height:24px;margin-right:12px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.check-item .spinner-sm{width:16px;height:16px;border:2px solid #fff2;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+.check-name{flex:1;font-size:13px;font-weight:500}
+.check-url{font-size:12px;color:var(--accent2);text-decoration:none;font-family:ui-monospace,monospace}
+.check-url:hover{text-decoration:underline}
 .creds{margin-top:16px;padding:14px;background:var(--code);border:1px solid var(--border);border-radius:8px}
 .creds h4{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
 .creds p{font-size:13px;margin-bottom:4px}
 .creds code{color:var(--accent2);font-family:ui-monospace,monospace}
-.note{margin-top:12px;padding:10px 14px;background:#6c63ff11;border:1px solid #6c63ff44;border-radius:8px;font-size:12px;color:var(--muted)}
 .error{margin-top:12px;padding:10px 14px;background:#ff4f6d11;border:1px solid #ff4f6d44;border-radius:8px;font-size:12px;color:var(--danger);display:none}
 .error.show{display:block}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid #fff3;border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin-right:8px;vertical-align:middle}
+.all-ready{text-align:center;padding:12px;background:#00d4aa22;border:1px solid #00d4aa55;border-radius:8px;color:var(--accent2);font-weight:600;font-size:14px;margin-top:12px;display:none}
+.all-ready.show{display:block}
 @keyframes spin{to{transform:rotate(360deg)}}
-.actions{display:flex;gap:8px;margin-top:12px}
-.actions .btn{flex:1}
 </style>
 </head>
 <body>
@@ -67,35 +66,25 @@ body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-ser
     <button class="btn" id="launch-btn" onclick="launchDesktop()">
       Launch Desktop
     </button>
-    <button class="btn" id="check-btn" onclick="checkStatus()" style="margin-top:8px;background:var(--surface2);border:1px solid var(--border)">
-      Check Status
-    </button>
     <div class="error" id="error"></div>
   </div>
 
   <div class="status" id="status-card">
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div>
-          <h3 style="font-size:16px;color:#fff" id="status-username">—</h3>
-          <p style="font-size:12px;color:var(--muted)" id="status-instance">—</p>
-        </div>
-        <span class="status-badge" id="status-badge">—</span>
+      <div class="countdown">
+        <div class="countdown-time" id="countdown">5:00</div>
+        <div class="countdown-label">Estimated time to ready</div>
       </div>
 
-      <div class="endpoints" id="endpoints"></div>
+      <div class="checklist" id="checklist"></div>
 
-      <div class="creds" id="creds" style="display:none">
+      <div class="all-ready" id="all-ready">🎉 All services are up! Connect now.</div>
+
+      <div class="creds" id="creds">
         <h4>Credentials</h4>
-        <p>DCV User: <code id="cred-user">—</code></p>
-        <p>DCV Password: <code id="cred-pass">—</code></p>
-        <p>code-server: <code id="cred-code">—</code></p>
-      </div>
-
-      <div class="note" id="note" style="display:none"></div>
-
-      <div class="actions">
-        <button class="btn" onclick="checkStatus()">Refresh</button>
+        <p>DCV User: <code>dcvuser</code></p>
+        <p>DCV Password: <code>ChangeMeOnFirstLogin!</code></p>
+        <p>code-server: <code>magnet123</code></p>
       </div>
     </div>
   </div>
@@ -104,6 +93,21 @@ body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-ser
 <script>
 const API_URL = 'https://i50blnf638.execute-api.us-east-1.amazonaws.com/v1/desktops';
 
+const SERVICES = [
+  { id: 'dcv', name: '🖥️ Desktop (DCV)', port: 8443, protocol: 'https', checkable: false },
+  { id: 'backend', name: '⚙️ Backend API', port: 5000, protocol: 'http', checkable: true, path: '/health' },
+  { id: 'frontend', name: '🌐 Frontend', port: 5173, protocol: 'http', checkable: true },
+  { id: 'code_server', name: '📝 VS Code', port: 8080, protocol: 'http', checkable: true },
+  { id: 'supabase_studio', name: '🗄️ Supabase Studio', port: 54323, protocol: 'http', checkable: true },
+  { id: 'supabase_api', name: '🔌 Supabase API', port: 54321, protocol: 'http', checkable: true },
+];
+
+let publicIp = null;
+let countdownInterval = null;
+let pollInterval = null;
+let countdownSeconds = 300;
+let serviceStatus = {};
+
 function showError(msg) {
   const el = document.getElementById('error');
   el.textContent = msg;
@@ -111,79 +115,98 @@ function showError(msg) {
   setTimeout(() => el.classList.remove('show'), 5000);
 }
 
-function setLoading(btn, loading) {
-  btn.disabled = loading;
-  if (loading) {
-    btn.dataset.originalText = btn.textContent;
-    btn.innerHTML = '<span class="spinner"></span>Working...';
-  } else {
-    btn.textContent = btn.dataset.originalText || 'Launch Desktop';
+function buildChecklist(ip) {
+  const container = document.getElementById('checklist');
+  container.innerHTML = '';
+  SERVICES.forEach(svc => {
+    const url = `${svc.protocol}://${ip}:${svc.port}`;
+    serviceStatus[svc.id] = false;
+    const div = document.createElement('div');
+    div.className = 'check-item';
+    div.id = `check-${svc.id}`;
+    div.innerHTML = `
+      <div class="check-icon"><div class="spinner-sm"></div></div>
+      <span class="check-name">${svc.name}</span>
+      <a class="check-url" href="${url}" target="_blank" style="opacity:0.4">${ip}:${svc.port}</a>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function markReady(svcId) {
+  if (serviceStatus[svcId]) return;
+  serviceStatus[svcId] = true;
+  const el = document.getElementById(`check-${svcId}`);
+  if (el) {
+    el.classList.add('ready');
+    el.querySelector('.check-icon').innerHTML = '✅';
+    el.querySelector('.check-url').style.opacity = '1';
+  }
+  // Check if all done
+  if (Object.values(serviceStatus).every(v => v)) {
+    document.getElementById('all-ready').classList.add('show');
+    document.getElementById('countdown').textContent = '0:00';
+    clearInterval(countdownInterval);
+    clearInterval(pollInterval);
   }
 }
 
-function renderStatus(data) {
-  document.getElementById('status-card').classList.add('show');
-  document.getElementById('status-username').textContent = data.username || '—';
-  document.getElementById('status-instance').textContent = data.instance_id || '—';
-
-  const badge = document.getElementById('status-badge');
-  const status = data.status || 'unknown';
-  badge.textContent = status;
-  badge.className = 'status-badge ' + status;
-
-  // Endpoints
-  const container = document.getElementById('endpoints');
-  container.innerHTML = '';
-  if (data.endpoints) {
-    const names = {
-      dcv_desktop: '🖥️ Desktop (DCV)',
-      code_server: '📝 VS Code',
-      frontend: '🌐 Frontend',
-      backend: '⚙️ Backend',
-      supabase_studio: '🗄️ Supabase Studio',
-      supabase_api: '🔌 Supabase API'
-    };
-    for (const [key, url] of Object.entries(data.endpoints)) {
-      const div = document.createElement('div');
-      div.className = 'endpoint';
-      div.innerHTML = `
-        <span class="endpoint-name">${names[key] || key}</span>
-        <a class="endpoint-url" href="${url}" target="_blank">${url.replace(/https?:\/\//, '')}</a>
-      `;
-      container.appendChild(div);
+function startCountdown() {
+  countdownSeconds = 300;
+  updateCountdownDisplay();
+  countdownInterval = setInterval(() => {
+    countdownSeconds--;
+    if (countdownSeconds <= 0) {
+      countdownSeconds = 0;
+      clearInterval(countdownInterval);
     }
-  }
+    updateCountdownDisplay();
+  }, 1000);
+}
 
-  // Credentials
-  const credsEl = document.getElementById('creds');
-  if (data.credentials) {
-    credsEl.style.display = 'block';
-    document.getElementById('cred-user').textContent = data.credentials.dcv_user || '—';
-    document.getElementById('cred-pass').textContent = data.credentials.dcv_password || '(set by user)';
-    document.getElementById('cred-code').textContent = data.credentials.code_server_password || '—';
-  } else {
-    credsEl.style.display = 'none';
-  }
+function updateCountdownDisplay() {
+  const min = Math.floor(countdownSeconds / 60);
+  const sec = countdownSeconds % 60;
+  document.getElementById('countdown').textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+}
 
-  // Note
-  const noteEl = document.getElementById('note');
-  if (data.note) {
-    noteEl.style.display = 'block';
-    noteEl.textContent = data.note;
-  } else {
-    noteEl.style.display = 'none';
+async function checkService(svc) {
+  if (serviceStatus[svc.id]) return;
+  const url = `${svc.protocol}://${publicIp}:${svc.port}${svc.path || '/'}`;
+  try {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(url, { mode: 'no-cors', signal: controller.signal });
+    // no-cors means we can't read the response, but if fetch doesn't throw, the server responded
+    markReady(svc.id);
+  } catch (e) {
+    // Not ready yet
   }
+}
+
+function startPolling() {
+  // DCV uses HTTPS with self-signed cert — mark it ready after 3 min (can't check from browser)
+  setTimeout(() => markReady('dcv'), 180000);
+
+  pollInterval = setInterval(() => {
+    SERVICES.filter(s => s.checkable).forEach(svc => checkService(svc));
+  }, 10000);
+
+  // Also do an immediate check
+  setTimeout(() => {
+    SERVICES.filter(s => s.checkable).forEach(svc => checkService(svc));
+  }, 30000);
 }
 
 async function launchDesktop() {
   const username = document.getElementById('username').value.trim();
   const apikey = document.getElementById('apikey').value.trim();
-
   if (!username) { showError('Username is required'); return; }
   if (!apikey) { showError('API Key is required'); return; }
 
   const btn = document.getElementById('launch-btn');
-  setLoading(btn, true);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Launching...';
 
   try {
     const res = await fetch(API_URL, {
@@ -195,47 +218,41 @@ async function launchDesktop() {
 
     if (!res.ok) {
       showError(data.error || `Error ${res.status}`);
+      btn.disabled = false;
+      btn.textContent = 'Launch Desktop';
       return;
     }
 
-    renderStatus(data);
-  } catch (e) {
-    showError('Network error: ' + e.message);
-  } finally {
-    setLoading(btn, false);
-  }
-}
-
-async function checkStatus() {
-  const username = document.getElementById('username').value.trim();
-  const apikey = document.getElementById('apikey').value.trim();
-
-  if (!username) { showError('Username is required'); return; }
-  if (!apikey) { showError('API Key is required'); return; }
-
-  const btn = document.getElementById('check-btn');
-  setLoading(btn, true);
-
-  try {
-    const res = await fetch(`${API_URL}?username=${encodeURIComponent(username)}`, {
-      headers: { 'X-API-Key': apikey }
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      showError(data.error || `Error ${res.status}`);
+    publicIp = data.public_ip;
+    if (!publicIp) {
+      showError('No IP returned. Try again in 30 seconds.');
+      btn.disabled = false;
+      btn.textContent = 'Launch Desktop';
       return;
     }
 
-    renderStatus(data);
+    // Show status card
+    document.getElementById('form-card').style.display = 'none';
+    document.getElementById('status-card').classList.add('show');
+
+    // Build checklist and start monitoring
+    buildChecklist(publicIp);
+    startCountdown();
+    startPolling();
+
+    // If instance was already running, check immediately
+    if (data.status === 'running') {
+      countdownSeconds = 30;
+      SERVICES.filter(s => s.checkable).forEach(svc => checkService(svc));
+    }
+
   } catch (e) {
     showError('Network error: ' + e.message);
-  } finally {
-    setLoading(btn, false);
+    btn.disabled = false;
+    btn.textContent = 'Launch Desktop';
   }
 }
 
-// Enter key triggers launch
 document.getElementById('username').addEventListener('keypress', e => { if (e.key === 'Enter') launchDesktop(); });
 document.getElementById('apikey').addEventListener('keypress', e => { if (e.key === 'Enter') launchDesktop(); });
 </script>
