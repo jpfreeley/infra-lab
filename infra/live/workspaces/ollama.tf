@@ -63,7 +63,7 @@ module "ollama_sg" {
 }
 
 ###############################################################################
-# Ollama Instance (Spot with persistent stop behavior)
+# Ollama Instance (On-Demand GPU — 10-min idle auto-stop for cost control)
 ###############################################################################
 
 resource "aws_instance" "ollama" {
@@ -75,14 +75,6 @@ resource "aws_instance" "ollama" {
   iam_instance_profile   = aws_iam_instance_profile.dcv.name
 
   associate_public_ip_address = true
-
-  instance_market_options {
-    market_type = "spot"
-    spot_options {
-      instance_interruption_behavior = "stop"
-      spot_instance_type             = "persistent"
-    }
-  }
 
   root_block_device {
     volume_size = 100
@@ -126,12 +118,12 @@ resource "aws_instance" "ollama" {
     # Pull models via API (CLI can crash on some AMIs)
     curl -s http://localhost:11434/api/pull -d '{"name":"qwen2.5-coder:14b"}' > /dev/null 2>&1 &
 
-    # Idle auto-stop: no API requests for 30 min → stop
+    # Idle auto-stop: no API requests for 10 min → stop
     # Grace period: don't stop within first 60 min of boot
     BOOT_TIME=$(date +%s)
     cat > /usr/local/bin/ollama-idle-check.sh << IDLE
     #!/bin/bash
-    IDLE_THRESHOLD_MINUTES=30
+    IDLE_THRESHOLD_MINUTES=10
     BOOT_TIME=$BOOT_TIME
     GRACE_MINUTES=60
     STATE_FILE="/var/run/last-ollama-activity"
