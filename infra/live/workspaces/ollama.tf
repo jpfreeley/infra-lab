@@ -12,7 +12,7 @@ data "aws_ami" "gpu" {
 
   filter {
     name   = "name"
-    values = ["Deep Learning Base OSS Nvidia Driver AMI (Amazon Linux 2) *"]
+    values = ["Deep Learning Base OSS Nvidia Driver GPU AMI (Amazon Linux 2023) *"]
   }
 
   filter {
@@ -89,6 +89,9 @@ resource "aws_instance" "ollama" {
 
     # NVIDIA drivers are pre-installed in the Deep Learning AMI
     nvidia-smi
+
+    # Install dependencies
+    dnf install -y zstd
 
     # Install Ollama
     curl -fsSL https://ollama.com/install.sh | sh
