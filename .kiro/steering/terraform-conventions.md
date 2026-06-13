@@ -20,6 +20,7 @@
 ## Pre-commit / Linting
 
 - All pre-commit hooks must pass before committing: trailing-whitespace, end-of-file-fixer, check-yaml, terraform_fmt, terraform_tflint, terraform_validate, terraform_checkov, terraform_docs, gitleaks
+- **NEVER use `--no-verify` to bypass pre-commit hooks.** If checks fail, fix the issues or add properly annotated skip rationale. No exceptions.
 - **tflint zero-warning policy**: No unused variables, locals, or data sources. Remove them immediately or use them.
 - `terraform validate` requires `terraform init -backend=false` in each root first
 - Use `TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache` when initializing multiple roots to save disk and time

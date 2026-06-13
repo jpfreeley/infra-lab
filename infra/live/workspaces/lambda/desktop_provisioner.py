@@ -186,8 +186,7 @@ def wait_for_ip(instance_id, max_wait=60):
 
 def launch_new_instance(username):
     """Launch a new desktop instance from AMI."""
-    OLLAMA_IP = get_ollama_ip()
-    user_data = f"""#!/bin/bash
+    user_data = """#!/bin/bash
 set -x
 exec > /var/log/user-data.log 2>&1
 
@@ -216,7 +215,7 @@ fi
 
 mkdir -p $MOUNT_POINT/docker/data /etc/docker
 cat > /etc/docker/daemon.json << 'EOF'
-{{"data-root": "/data/docker/data"}}
+{"data-root": "/data/docker/data"}
 EOF
 systemctl start docker
 
@@ -391,7 +390,7 @@ exec docker run --rm -it \
   -e OLLAMA_HOST=http://$OLLAMA_IP:11434 \
   -e OLLAMA_BASE_URL=http://$OLLAMA_IP:11434 \
   -e MEMPALACE_DIR=/root/.mempalace \
-  python:3.11 bash -c "pip install -q hermes-agent mempalace 2>/dev/null && hermes \"\$@\""
+  python:3.11 bash -c "pip install -q hermes-agent mempalace 2>/dev/null && hermes \"\\$@\""
 HERMES
   chmod +x /usr/local/bin/hermes
 fi
@@ -430,7 +429,7 @@ STATE_FILE="/var/run/last-dcv-activity"
 IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
 INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 REGION=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
-CONNECTIONS=$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{{sum += $2}} END {{print sum+0}}')
+CONNECTIONS=$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{sum += $2} END {print sum+0}')
 if [ "$CONNECTIONS" -gt 0 ]; then
   date +%s > "$STATE_FILE"
   exit 0
@@ -443,7 +442,7 @@ LAST_ACTIVITY=$(cat "$STATE_FILE")
 NOW=$(date +%s)
 IDLE_MINUTES=$(( (NOW - LAST_ACTIVITY) / 60 ))
 if [ "$IDLE_MINUTES" -ge "$IDLE_THRESHOLD_MINUTES" ]; then
-  logger -t idle-check "No DCV connections for ${{IDLE_MINUTES}}min. Stopping."
+  logger -t idle-check "No DCV connections for ${IDLE_MINUTES}min. Stopping."
   aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
 fi
 IDLE
@@ -451,8 +450,6 @@ chmod +x /usr/local/bin/idle-check.sh
 date +%s > /var/run/last-dcv-activity
 echo "*/5 * * * * root /usr/local/bin/idle-check.sh" > /etc/cron.d/idle-check
 """
-
-    import base64
 
     result = ec2.run_instances(
         ImageId=AMI_ID,

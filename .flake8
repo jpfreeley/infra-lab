@@ -1,2 +1,7 @@
 [flake8]
 max-line-length = 88
+per-file-ignores =
+    # Lambda provisioner contains embedded bash heredocs — line length and
+    # escape sequences are unavoidable in user_data templates
+    infra/live/workspaces/lambda/desktop_provisioner.py:E501,W605,D205,D400,D401
+extend-ignore = D100,D101,D102,D103,D104
