@@ -84,7 +84,6 @@ body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-ser
         <h4>Credentials</h4>
         <p>DCV User: <code>dcvuser</code></p>
         <p>DCV Password: <code>ChangeMeOnFirstLogin!</code></p>
-        <p>code-server: <code>no password (IP-restricted)</code></p>
       </div>
     </div>
   </div>
@@ -97,7 +96,6 @@ const SERVICES = [
   { id: 'dcv', name: '🖥️ Desktop (DCV)', port: 8443, protocol: 'https', checkable: false },
   { id: 'backend', name: '⚙️ Backend API', port: 5000, protocol: 'http', checkable: true, path: '/health' },
   { id: 'frontend', name: '🌐 Frontend', port: 5173, protocol: 'http', checkable: true },
-  { id: 'code_server', name: '📝 VS Code', port: 8080, protocol: 'http', checkable: true },
   { id: 'supabase_studio', name: '🗄️ Supabase Studio', port: 54323, protocol: 'http', checkable: true },
   { id: 'supabase_api', name: '🔌 Supabase API', port: 54321, protocol: 'http', checkable: true, path: '/rest/v1/' },
 ];

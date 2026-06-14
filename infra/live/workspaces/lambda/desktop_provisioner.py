@@ -34,7 +34,6 @@ table = dynamodb.Table(TABLE_NAME)
 # Port map for response
 ENDPOINTS = {
     "dcv_desktop": {"port": 8443, "protocol": "https"},
-    "code_server": {"port": 8080, "protocol": "http"},
     "frontend": {"port": 5173, "protocol": "http"},
     "backend": {"port": 5000, "protocol": "http"},
     "supabase_studio": {"port": 54323, "protocol": "http"},
