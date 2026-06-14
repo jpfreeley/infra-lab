@@ -238,6 +238,7 @@ if [ ! -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
     fi
     if [ ! -d "magnet-app-front" ]; then
       git clone https://x-access-token:$GH_PAT@github.com/avinair108/magnet-app-front.git
+      cd magnet-app-front && git checkout feature/seed-dataset && cd ..
     fi
 
     # Create docker-compose.yml
@@ -335,6 +336,11 @@ if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
 
   # Start Supabase
   sg docker -c "/usr/local/bin/supabase start" || true
+
+  # Seed the database with test data (idempotent)
+  if [ -f magnet-app-front/seeds/seed.sql ]; then
+    psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f magnet-app-front/seeds/seed.sql || true
+  fi
 
   # Pull images + start backend/frontend
   sg docker -c "docker compose pull" || true
