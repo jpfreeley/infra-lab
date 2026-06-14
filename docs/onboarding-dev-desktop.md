@@ -80,8 +80,20 @@ From your local computer's browser:
 | DCV Desktop | `https://<IP>:8443` | Full Linux desktop |
 | Frontend | `http://<IP>:5173` | React app |
 | Backend | `http://<IP>:5000/health` | Flask API |
-| OpenVSCode Server | `http://<IP>:8080` | Browser code editor (no password) |
 | Supabase Studio | `http://<IP>:54323` | Database dashboard |
+
+## Pre-Seeded Test Accounts
+
+Your Supabase database comes pre-loaded with test data. Log in with:
+
+| Email | Password | Role |
+| --- | --- | --- |
+| `alice@test.magnetlegal.dev` | `TestPass123!` | Active subscription |
+| `bob@test.magnetlegal.dev` | `TestPass123!` | Free tier / trialing |
+| `carol@test.magnetlegal.dev` | `TestPass123!` | Canceled subscription |
+
+Each account has leads, intel reports, outreach plans, and Stripe data
+pre-populated. See `magnet-app-front/docs/LOCAL_SEED_DATA.md` for full details.
 
 ## AI-Assisted Coding (Continue + Bring Your Own Key)
 

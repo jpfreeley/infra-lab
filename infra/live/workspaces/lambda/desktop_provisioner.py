@@ -339,7 +339,13 @@ if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
 
   # Seed the database with test data (idempotent)
   if [ -f magnet-app-front/seeds/seed.sql ]; then
-    psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f magnet-app-front/seeds/seed.sql || true
+    SUPABASE_DB=$(sg docker -c "docker ps -q --filter 'name=supabase_db'" | head -1)
+    if [ -z "$SUPABASE_DB" ]; then
+      SUPABASE_DB=$(sg docker -c "docker ps -q --filter 'ancestor=public.ecr.aws/supabase/postgres'" | head -1)
+    fi
+    if [ -n "$SUPABASE_DB" ]; then
+      sg docker -c "docker cp magnet-app-front/seeds/ $SUPABASE_DB:/tmp/ && docker exec -w /tmp $SUPABASE_DB psql -U postgres -d postgres -f /tmp/seeds/seed.sql" || true
+    fi
   fi
 
   # Pull images + start backend/frontend
