@@ -415,6 +415,14 @@ models:
       - chat
       - edit
       - apply
+  - name: Claude 3.5 Sonnet
+    provider: anthropic
+    model: claude-3-5-sonnet-20241022
+    apiKey: $CLAUDE_KEY
+    roles:
+      - chat
+      - edit
+      - apply
 CONTINUECONF
 
 # If no Claude key was provided, remove the apiKey line so Continue prompts for it
