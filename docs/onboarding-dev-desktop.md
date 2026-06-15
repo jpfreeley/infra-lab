@@ -9,7 +9,7 @@ A remote Linux desktop in the cloud with:
 
 - A full graphical desktop you access through your browser (DCV)
 - VS Code (native, with Continue AI extension — bring your own Claude key)
-- A browser-based code editor on port 8080 (OpenVSCode Server)
+
 - Python 3.11 for backend development (via Docker)
 - Local Supabase database (PostgreSQL + auth + storage + dashboard)
 - All the MagNet Legal code, ready to run
@@ -56,7 +56,7 @@ VS Code 1.85 is pre-installed on the desktop with the **Continue** AI extension.
 
 The boot script automatically starts all services:
 
-- Docker + `docker compose up -d` (backend, frontend, OpenVSCode Server)
+- Docker + `docker compose up -d` (backend, frontend)
 - Supabase (PostgreSQL, auth, storage, dashboard)
 - DCV session
 
@@ -80,8 +80,20 @@ From your local computer's browser:
 | DCV Desktop | `https://<IP>:8443` | Full Linux desktop |
 | Frontend | `http://<IP>:5173` | React app |
 | Backend | `http://<IP>:5000/health` | Flask API |
-| OpenVSCode Server | `http://<IP>:8080` | Browser code editor (no password) |
 | Supabase Studio | `http://<IP>:54323` | Database dashboard |
+
+## Pre-Seeded Test Accounts
+
+Your Supabase database comes pre-loaded with test data. Log in with:
+
+| Email | Password | Role |
+| --- | --- | --- |
+| `alice@test.magnetlegal.dev` | `TestPass123!` | Active subscription |
+| `bob@test.magnetlegal.dev` | `TestPass123!` | Free tier / trialing |
+| `carol@test.magnetlegal.dev` | `TestPass123!` | Canceled subscription |
+
+Each account has leads, intel reports, outreach plans, and Stripe data
+pre-populated. See `magnet-app-front/docs/LOCAL_SEED_DATA.md` for details.
 
 ## AI-Assisted Coding (Continue + Bring Your Own Key)
 
@@ -120,7 +132,7 @@ automatically — just wait for the checkmarks to go green.
 ### Editing code
 
 - **Option A (recommended)**: VS Code on the DCV desktop (`code ~/development`)
-- **Option B**: OpenVSCode Server at `http://<IP>:8080`
+- **
 - **Option C**: Any terminal editor on the desktop
 
 ### Viewing your changes
