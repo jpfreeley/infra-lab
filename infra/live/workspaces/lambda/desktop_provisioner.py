@@ -396,7 +396,12 @@ fi
 sudo -u dcvuser code --install-extension Continue.continue@1.2.0 2>/dev/null || true
 
 # Install MemPalace (persistent AI memory — MCP server for Continue)
-pip3 install mempalace 2>/dev/null || true
+if ! command -v uv &>/dev/null; then
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  cp /root/.local/bin/uv /usr/local/bin/uv
+  cp /root/.local/bin/uvx /usr/local/bin/uvx
+fi
+sudo -u dcvuser uv tool install mempalace 2>/dev/null || true
 mkdir -p $MOUNT_POINT/home/dcvuser/.mempalace
 ln -sfn $MOUNT_POINT/home/dcvuser/.mempalace /home/dcvuser/.mempalace
 chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser/.mempalace /home/dcvuser/.mempalace
@@ -424,10 +429,7 @@ models:
 mcpServers:
   - name: MemPalace
     type: stdio
-    command: python3
-    args:
-      - -m
-      - mempalace.mcp_server
+    command: /home/dcvuser/.local/bin/mempalace-mcp
 CONTINUECONF
 
 # If no Claude key was provided, remove the apiKey line so Continue prompts for it
