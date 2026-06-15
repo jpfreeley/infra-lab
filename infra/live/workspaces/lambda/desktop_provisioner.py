@@ -344,6 +344,8 @@ if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
     fi
     if [ -n "$SUPABASE_DB" ]; then
       sg docker -c "docker cp magnet-app-front/seeds/ $SUPABASE_DB:/tmp/ && docker exec -w /tmp $SUPABASE_DB psql -U postgres -d postgres -f /tmp/seeds/seed.sql" || true
+      # Restart PostgREST to reload schema cache after seed creates tables
+      sg docker -c "docker restart \$(docker ps -q --filter 'ancestor=public.ecr.aws/supabase/postgrest')" || true
     fi
   fi
 
