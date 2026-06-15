@@ -45,3 +45,6 @@ Each ADR follows a lightweight format:
 | [028](028-pre-commit-ci-parity.md) | Pre-commit local/CI parity | Accepted | E01 |
 | [029](029-rds-auto-stop-mechanism.md) | RDS auto-stop via EventBridge + Lambda | Accepted | E07 |
 | [030](030-compute-off-by-default.md) | Compute layer off by default in dev | Accepted | E06 |
+| [031](031-dedicated-workspaces-account.md) | Dedicated WorkSpaces account | Accepted | E13 |
+| [032](032-dcv-desktop-al2-with-browser-ide.md) | DCV desktop on AL2 with browser IDE | Accepted | E13 |
+| [033](033-ollama-gpu-dormant-byo-key.md) | Ollama GPU dormant — BYO Claude key | Accepted | E13 |
