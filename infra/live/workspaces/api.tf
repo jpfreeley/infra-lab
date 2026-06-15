@@ -147,6 +147,15 @@ resource "aws_iam_role_policy" "lambda_permissions" {
         ]
         Resource = "arn:aws:ssm:*:*:parameter/infra-lab/desktop/*"
       },
+      {
+        Sid    = "SSMWrite"
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:AddTagsToResource",
+        ]
+        Resource = "arn:aws:ssm:*:*:parameter/infra-lab/desktop/*"
+      },
     ]
   })
 }
