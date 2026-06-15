@@ -68,26 +68,30 @@ def store_claude_api_key(username, claude_api_key):
     if not claude_api_key:
         return
     param_name = f"/infra-lab/desktop/{username}/claude-api-key"
-    ssm.put_parameter(
-        Name=param_name,
-        Value=claude_api_key,
-        Type="SecureString",
-        Overwrite=True,
-        Description=f"Claude API key for {username} (BYO key for Continue extension)",
-        Tags=[] if _parameter_exists(param_name) else [
-            {"Key": "Project", "Value": "infra-lab"},
-            {"Key": "Owner", "Value": username},
-        ],
-    )
-
-
-def _parameter_exists(param_name):
-    """Check if an SSM parameter already exists (tags can't be set on update)."""
     try:
-        ssm.get_parameter(Name=param_name)
-        return True
-    except ClientError:
-        return False
+        # Try to create new parameter with tags
+        ssm.put_parameter(
+            Name=param_name,
+            Value=claude_api_key,
+            Type="SecureString",
+            Description=f"Claude API key for {username} (BYO key for Continue extension)",
+            Tags=[
+                {"Key": "Project", "Value": "infra-lab"},
+                {"Key": "Owner", "Value": username},
+            ],
+        )
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ParameterAlreadyExists":
+            # Parameter exists — update without tags
+            ssm.put_parameter(
+                Name=param_name,
+                Value=claude_api_key,
+                Type="SecureString",
+                Overwrite=True,
+                Description=f"Claude API key for {username} (BYO key for Continue extension)",
+            )
+        else:
+            raise
 
 
 def check_rate_limit(source_ip):
