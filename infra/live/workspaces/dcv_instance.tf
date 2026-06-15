@@ -84,6 +84,14 @@ resource "aws_iam_role_policy" "dcv_license" {
         }
       },
       {
+        Sid    = "DescribeOwnTags"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeTags",
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "SecretsAccess"
         Effect = "Allow"
         Action = [

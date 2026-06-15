@@ -63,6 +63,33 @@ def response(status_code, body):
     }
 
 
+def store_claude_api_key(username, claude_api_key):
+    """Store user's Claude API key in SSM Parameter Store (SecureString)."""
+    if not claude_api_key:
+        return
+    param_name = f"/infra-lab/desktop/{username}/claude-api-key"
+    ssm.put_parameter(
+        Name=param_name,
+        Value=claude_api_key,
+        Type="SecureString",
+        Overwrite=True,
+        Description=f"Claude API key for {username} (BYO key for Continue extension)",
+        Tags=[] if _parameter_exists(param_name) else [
+            {"Key": "Project", "Value": "infra-lab"},
+            {"Key": "Owner", "Value": username},
+        ],
+    )
+
+
+def _parameter_exists(param_name):
+    """Check if an SSM parameter already exists (tags can't be set on update)."""
+    try:
+        ssm.get_parameter(Name=param_name)
+        return True
+    except ClientError:
+        return False
+
+
 def check_rate_limit(source_ip):
     """Check if source IP has made a request in the last RATE_LIMIT_SECONDS."""
     try:
@@ -366,6 +393,11 @@ sudo -u dcvuser code --install-extension Continue.continue 2>/dev/null || true
 
 # Write default Continue config (user brings their own Claude API key)
 mkdir -p /home/dcvuser/.continue
+IMDS_TOKEN2=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+REGION2=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN2" http://169.254.169.254/latest/meta-data/placement/region)
+INSTANCE_TAGS=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN2" http://169.254.169.254/latest/meta-data/instance-id)" "Name=key,Values=Owner" --query 'Tags[0].Value' --output text --region $REGION2 2>/dev/null)
+CLAUDE_KEY=$(aws ssm get-parameter --name "/infra-lab/desktop/$INSTANCE_TAGS/claude-api-key" --with-decryption --query 'Parameter.Value' --output text --region $REGION2 2>/dev/null || echo "")
+
 cat > /home/dcvuser/.continue/config.yaml << CONTINUECONF
 name: Local Config
 version: 1.0.0
@@ -374,11 +406,18 @@ models:
   - name: Claude Sonnet
     provider: anthropic
     model: claude-sonnet-4-20250514
+    apiKey: $CLAUDE_KEY
     roles:
       - chat
       - edit
       - apply
 CONTINUECONF
+
+# If no Claude key was provided, remove the apiKey line so Continue prompts for it
+if [ -z "$CLAUDE_KEY" ]; then
+  sed -i '/apiKey:/d' /home/dcvuser/.continue/config.yaml
+fi
+
 chown -R dcvuser:dcvuser /home/dcvuser/.continue
 
 # Idle auto-stop: stop instance after 30 min of no DCV connections
@@ -498,6 +537,11 @@ def handler(event, context):
         # Validate input
         if not username or not username.isalnum():
             return response(400, {"error": "username required (alphanumeric only)"})
+
+        # Store Claude API key in SSM if provided
+        claude_api_key = body.get("claude_api_key", "").strip()
+        if claude_api_key:
+            store_claude_api_key(username, claude_api_key)
 
         # Rate limit check
         if not check_rate_limit(source_ip):

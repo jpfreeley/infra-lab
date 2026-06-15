@@ -63,6 +63,10 @@ body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-ser
       <label>API Key</label>
       <input type="password" id="apikey" placeholder="Enter your API key"/>
     </div>
+    <div class="field">
+      <label>Claude API Key <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional — for VS Code AI assistant)</span></label>
+      <input type="password" id="claude-key" placeholder="sk-ant-api03-..." autocomplete="off"/>
+    </div>
     <button class="btn" id="launch-btn" onclick="launchDesktop()">
       Launch Desktop
     </button>
@@ -199,6 +203,7 @@ function startPolling() {
 async function launchDesktop() {
   const username = document.getElementById('username').value.trim();
   const apikey = document.getElementById('apikey').value.trim();
+  const claudeKey = document.getElementById('claude-key').value.trim();
   if (!username) { showError('Username is required'); return; }
   if (!apikey) { showError('API Key is required'); return; }
 
@@ -207,10 +212,13 @@ async function launchDesktop() {
   btn.innerHTML = '<span class="spinner"></span>Launching...';
 
   try {
+    const payload = { username };
+    if (claudeKey) payload.claude_api_key = claudeKey;
+
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-API-Key': apikey },
-      body: JSON.stringify({ username })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
 
@@ -254,6 +262,7 @@ async function launchDesktop() {
 
 document.getElementById('username').addEventListener('keypress', e => { if (e.key === 'Enter') launchDesktop(); });
 document.getElementById('apikey').addEventListener('keypress', e => { if (e.key === 'Enter') launchDesktop(); });
+document.getElementById('claude-key').addEventListener('keypress', e => { if (e.key === 'Enter') launchDesktop(); });
 </script>
 </body>
 </html>
