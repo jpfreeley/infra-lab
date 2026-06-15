@@ -407,17 +407,17 @@ name: Local Config
 version: 1.0.0
 schema: v1
 models:
-  - name: Claude Sonnet
+  - name: Claude Sonnet 4.6
     provider: anthropic
-    model: claude-sonnet-4-20250514
+    model: claude-sonnet-4-6
     apiKey: $CLAUDE_KEY
     roles:
       - chat
       - edit
       - apply
-  - name: Claude 3.5 Sonnet
+  - name: Claude Sonnet 4.5
     provider: anthropic
-    model: claude-3-5-sonnet-20241022
+    model: claude-sonnet-4-5
     apiKey: $CLAUDE_KEY
     roles:
       - chat
