@@ -310,7 +310,7 @@ ENVFILE
     # Create frontend .env
     INSTANCE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
     cat > magnet-app-front/.env << ENVFILE
-VITE_SUPABASE_URL=http://127.0.0.1:54321
+VITE_SUPABASE_URL=http://$INSTANCE_IP:54321
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
 VITE_MICROSOFT_CLIENT_ID=REPLACE_ME
 VITE_MICROSOFT_TENANT_ID=common
