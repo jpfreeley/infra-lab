@@ -392,8 +392,8 @@ if ! command -v code &> /dev/null; then
   rm -f /tmp/code-1.85.2.rpm
 fi
 
-# Install Continue extension in VS Code for dcvuser
-sudo -u dcvuser code --install-extension Continue.continue 2>/dev/null || true
+# Install Continue extension in VS Code for dcvuser (pinned — 1.2.24+ breaks on VS Code 1.85)
+sudo -u dcvuser code --install-extension Continue.continue@1.2.0 2>/dev/null || true
 
 # Write default Continue config (user brings their own Claude API key)
 mkdir -p /home/dcvuser/.continue
