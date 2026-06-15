@@ -395,6 +395,12 @@ fi
 # Install Continue extension in VS Code for dcvuser (pinned — 1.2.24+ breaks on VS Code 1.85)
 sudo -u dcvuser code --install-extension Continue.continue@1.2.0 2>/dev/null || true
 
+# Install MemPalace (persistent AI memory — MCP server for Continue)
+pip3 install mempalace 2>/dev/null || true
+mkdir -p $MOUNT_POINT/home/dcvuser/.mempalace
+ln -sfn $MOUNT_POINT/home/dcvuser/.mempalace /home/dcvuser/.mempalace
+chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser/.mempalace /home/dcvuser/.mempalace
+
 # Write default Continue config (user brings their own Claude API key)
 mkdir -p /home/dcvuser/.continue
 IMDS_TOKEN2=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
@@ -415,6 +421,13 @@ models:
       - chat
       - edit
       - apply
+mcpServers:
+  - name: MemPalace
+    type: stdio
+    command: python3
+    args:
+      - -m
+      - mempalace.mcp_server
 CONTINUECONF
 
 # If no Claude key was provided, remove the apiKey line so Continue prompts for it
