@@ -458,6 +458,13 @@ echo "*/5 * * * * root /usr/local/bin/idle-check.sh" > /etc/cron.d/idle-check
         MaxCount=1,
         UserData=user_data,
         IamInstanceProfile={"Arn": INSTANCE_PROFILE_ARN},
+        InstanceMarketOptions={
+            "MarketType": "spot",
+            "SpotOptions": {
+                "SpotInstanceType": "persistent",
+                "InstanceInterruptionBehavior": "stop",
+            },
+        },
         NetworkInterfaces=[
             {
                 "DeviceIndex": 0,
