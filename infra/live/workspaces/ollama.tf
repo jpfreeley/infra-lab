@@ -4,22 +4,23 @@
 
 ###############################################################################
 # GPU AMI (Amazon Linux 2 with NVIDIA drivers)
+# DORMANT: Commented out — no active GPU instance
 ###############################################################################
 
-data "aws_ami" "gpu" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["Deep Learning Base OSS Nvidia Driver GPU AMI (Amazon Linux 2023) *"]
-  }
-
-  filter {
-    name   = "state"
-    values = ["available"]
-  }
-}
+# data "aws_ami" "gpu" {
+#   most_recent = true
+#   owners      = ["amazon"]
+#
+#   filter {
+#     name   = "name"
+#     values = ["Deep Learning Base OSS Nvidia Driver GPU AMI (Amazon Linux 2023) *"]
+#   }
+#
+#   filter {
+#     name   = "state"
+#     values = ["available"]
+#   }
+# }
 
 ###############################################################################
 # Ollama Security Group
@@ -64,135 +65,137 @@ module "ollama_sg" {
 
 ###############################################################################
 # Ollama Instance (On-Demand GPU — 10-min idle auto-stop for cost control)
+# DORMANT: Commented out to avoid accidental launch. Uncomment when needed.
 ###############################################################################
 
-resource "aws_instance" "ollama" {
-  ami                    = data.aws_ami.gpu.id
-  instance_type          = "g4dn.xlarge"
-  subnet_id              = module.workspaces_vpc.public_subnet_ids[0]
-  private_ip             = "10.0.96.100"
-  vpc_security_group_ids = [module.ollama_sg.id]
-  iam_instance_profile   = aws_iam_instance_profile.dcv.name
-
-  associate_public_ip_address = true
-
-  root_block_device {
-    volume_size = 100
-    volume_type = "gp3"
-    encrypted   = true
-  }
-
-  user_data = base64encode(<<-EOF
-    #!/bin/bash
-    set -x
-    exec > /var/log/user-data.log 2>&1
-
-    # NVIDIA drivers are pre-installed in the Deep Learning AMI
-    nvidia-smi
-
-    # Install dependencies
-    dnf install -y zstd cronie
-    systemctl enable crond
-    systemctl start crond
-
-    # Install Ollama
-    curl -fsSL https://ollama.com/install.sh | sh
-
-    # Configure Ollama to listen on all interfaces
-    mkdir -p /etc/systemd/system/ollama.service.d
-    cat > /etc/systemd/system/ollama.service.d/override.conf << 'OVERRIDE'
-    [Service]
-    Environment="OLLAMA_HOST=0.0.0.0:11434"
-    OVERRIDE
-
-    systemctl daemon-reload
-    systemctl enable ollama
-    systemctl start ollama
-
-    # Wait for Ollama to be ready
-    for i in $(seq 1 60); do
-      curl -s http://localhost:11434/api/tags && break
-      sleep 5
-    done
-
-    # Pull models via API (CLI can crash on some AMIs)
-    curl -s http://localhost:11434/api/pull -d '{"name":"qwen2.5-coder:14b"}' > /dev/null 2>&1 &
-
-    # Idle auto-stop: no API requests for 10 min → stop
-    # Grace period: don't stop within first 60 min of boot
-    BOOT_TIME=$(date +%s)
-    cat > /usr/local/bin/ollama-idle-check.sh << IDLE
-    #!/bin/bash
-    IDLE_THRESHOLD_MINUTES=10
-    BOOT_TIME=$BOOT_TIME
-    GRACE_MINUTES=60
-    STATE_FILE="/var/run/last-ollama-activity"
-    IMDS_TOKEN=\$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
-    INSTANCE_ID=\$(curl -s -H "X-aws-ec2-metadata-token: \$IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
-    REGION=\$(curl -s -H "X-aws-ec2-metadata-token: \$IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
-
-    # Grace period — don't stop within first hour
-    NOW=\$(date +%s)
-    UPTIME_MIN=\$(( (NOW - BOOT_TIME) / 60 ))
-    if [ "\$UPTIME_MIN" -lt "\$GRACE_MINUTES" ]; then exit 0; fi
-
-    # Check if any requests in the last interval
-    RECENT=\$(journalctl -u ollama --since "5 min ago" --no-pager 2>/dev/null | grep -c "POST\|completion")
-    if [ "\$RECENT" -gt 0 ]; then
-      date +%s > "\$STATE_FILE"
-      exit 0
-    fi
-    if [ ! -f "\$STATE_FILE" ]; then
-      date +%s > "\$STATE_FILE"
-      exit 0
-    fi
-    LAST_ACTIVITY=\$(cat "\$STATE_FILE")
-    IDLE_MINUTES=\$(( (NOW - LAST_ACTIVITY) / 60 ))
-    if [ "\$IDLE_MINUTES" -ge "\$IDLE_THRESHOLD_MINUTES" ]; then
-      logger -t ollama-idle "No requests for \$IDLE_MINUTES min. Stopping."
-      /usr/local/bin/aws ec2 stop-instances --instance-ids "\$INSTANCE_ID" --region "\$REGION"
-    fi
-    IDLE
-    chmod +x /usr/local/bin/ollama-idle-check.sh
-    date +%s > /var/run/last-ollama-activity
-    mkdir -p /etc/cron.d
-    echo "*/5 * * * * root /usr/local/bin/ollama-idle-check.sh" > /etc/cron.d/ollama-idle
-    chmod 644 /etc/cron.d/ollama-idle
-
-    echo "=== Ollama setup complete ==="
-  EOF
-  )
-
-  tags = merge(local.common_tags, {
-    Name = "${local.name_prefix}-ollama"
-  })
-
-  lifecycle {
-    ignore_changes = [ami]
-  }
-}
+# resource "aws_instance" "ollama" {
+#   ami                    = data.aws_ami.gpu.id
+#   instance_type          = "g4dn.xlarge"
+#   subnet_id              = module.workspaces_vpc.public_subnet_ids[0]
+#   private_ip             = "10.0.96.100"
+#   vpc_security_group_ids = [module.ollama_sg.id]
+#   iam_instance_profile   = aws_iam_instance_profile.dcv.name
+#
+#   associate_public_ip_address = true
+#
+#   root_block_device {
+#     volume_size = 100
+#     volume_type = "gp3"
+#     encrypted   = true
+#   }
+#
+#   user_data = base64encode(<<-EOF
+#     #!/bin/bash
+#     set -x
+#     exec > /var/log/user-data.log 2>&1
+#
+#     # NVIDIA drivers are pre-installed in the Deep Learning AMI
+#     nvidia-smi
+#
+#     # Install dependencies
+#     dnf install -y zstd cronie
+#     systemctl enable crond
+#     systemctl start crond
+#
+#     # Install Ollama
+#     curl -fsSL https://ollama.com/install.sh | sh
+#
+#     # Configure Ollama to listen on all interfaces
+#     mkdir -p /etc/systemd/system/ollama.service.d
+#     cat > /etc/systemd/system/ollama.service.d/override.conf << 'OVERRIDE'
+#     [Service]
+#     Environment="OLLAMA_HOST=0.0.0.0:11434"
+#     OVERRIDE
+#
+#     systemctl daemon-reload
+#     systemctl enable ollama
+#     systemctl start ollama
+#
+#     # Wait for Ollama to be ready
+#     for i in $(seq 1 60); do
+#       curl -s http://localhost:11434/api/tags && break
+#       sleep 5
+#     done
+#
+#     # Pull models via API (CLI can crash on some AMIs)
+#     curl -s http://localhost:11434/api/pull -d '{"name":"qwen2.5-coder:14b"}' > /dev/null 2>&1 &
+#
+#     # Idle auto-stop: no API requests for 10 min → stop
+#     # Grace period: don't stop within first 60 min of boot
+#     BOOT_TIME=$(date +%s)
+#     cat > /usr/local/bin/ollama-idle-check.sh << IDLE
+#     #!/bin/bash
+#     IDLE_THRESHOLD_MINUTES=10
+#     BOOT_TIME=$BOOT_TIME
+#     GRACE_MINUTES=60
+#     STATE_FILE="/var/run/last-ollama-activity"
+#     IMDS_TOKEN=\$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+#     INSTANCE_ID=\$(curl -s -H "X-aws-ec2-metadata-token: \$IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+#     REGION=\$(curl -s -H "X-aws-ec2-metadata-token: \$IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+#
+#     # Grace period — don't stop within first hour
+#     NOW=\$(date +%s)
+#     UPTIME_MIN=\$(( (NOW - BOOT_TIME) / 60 ))
+#     if [ "\$UPTIME_MIN" -lt "\$GRACE_MINUTES" ]; then exit 0; fi
+#
+#     # Check if any requests in the last interval
+#     RECENT=\$(journalctl -u ollama --since "5 min ago" --no-pager 2>/dev/null | grep -c "POST\|completion")
+#     if [ "\$RECENT" -gt 0 ]; then
+#       date +%s > "\$STATE_FILE"
+#       exit 0
+#     fi
+#     if [ ! -f "\$STATE_FILE" ]; then
+#       date +%s > "\$STATE_FILE"
+#       exit 0
+#     fi
+#     LAST_ACTIVITY=\$(cat "\$STATE_FILE")
+#     IDLE_MINUTES=\$(( (NOW - LAST_ACTIVITY) / 60 ))
+#     if [ "\$IDLE_MINUTES" -ge "\$IDLE_THRESHOLD_MINUTES" ]; then
+#       logger -t ollama-idle "No requests for \$IDLE_MINUTES min. Stopping."
+#       /usr/local/bin/aws ec2 stop-instances --instance-ids "\$INSTANCE_ID" --region "\$REGION"
+#     fi
+#     IDLE
+#     chmod +x /usr/local/bin/ollama-idle-check.sh
+#     date +%s > /var/run/last-ollama-activity
+#     mkdir -p /etc/cron.d
+#     echo "*/5 * * * * root /usr/local/bin/ollama-idle-check.sh" > /etc/cron.d/ollama-idle
+#     chmod 644 /etc/cron.d/ollama-idle
+#
+#     echo "=== Ollama setup complete ==="
+#   EOF
+#   )
+#
+#   tags = merge(local.common_tags, {
+#     Name = "${local.name_prefix}-ollama"
+#   })
+#
+#   lifecycle {
+#     ignore_changes = [ami]
+#   }
+# }
 
 
 ###############################################################################
 # SSM Parameter for Ollama IP (read at runtime by Lambda + desktops)
+# DORMANT: Commented out — depends on ollama instance
 ###############################################################################
 
-resource "aws_ssm_parameter" "ollama_ip" {
-  name        = "/infra-lab/desktop/ollama-ip"
-  description = "Private IP of the shared Ollama GPU instance"
-  type        = "String"
-  value       = aws_instance.ollama.private_ip
-  overwrite   = true
+# resource "aws_ssm_parameter" "ollama_ip" {
+#   name        = "/infra-lab/desktop/ollama-ip"
+#   description = "Private IP of the shared Ollama GPU instance"
+#   type        = "String"
+#   value       = aws_instance.ollama.private_ip
+#   overwrite   = true
+#
+#   tags = local.common_tags
+# }
 
-  tags = local.common_tags
-}
-
-resource "aws_ssm_parameter" "ollama_instance_id" {
-  name        = "/infra-lab/desktop/ollama-instance-id"
-  description = "Instance ID of the shared Ollama GPU instance"
-  type        = "String"
-  value       = aws_instance.ollama.id
-  overwrite   = true
-
-  tags = local.common_tags
-}
+# resource "aws_ssm_parameter" "ollama_instance_id" {
+#   name        = "/infra-lab/desktop/ollama-instance-id"
+#   description = "Instance ID of the shared Ollama GPU instance"
+#   type        = "String"
+#   value       = aws_instance.ollama.id
+#   overwrite   = true
+#
+#   tags = local.common_tags
+# }

@@ -25,12 +25,13 @@ output "api_url" {
   value       = "${aws_api_gateway_stage.prod.invoke_url}/desktops"
 }
 
-output "ollama_instance_id" {
-  description = "Ollama GPU instance ID"
-  value       = aws_instance.ollama.id
-}
+# DORMANT: Ollama outputs commented out — instance not active
+# output "ollama_instance_id" {
+#   description = "Ollama GPU instance ID"
+#   value       = aws_instance.ollama.id
+# }
 
-output "ollama_private_ip" {
-  description = "Ollama instance private IP (accessible from VPC)"
-  value       = aws_instance.ollama.private_ip
-}
+# output "ollama_private_ip" {
+#   description = "Ollama instance private IP (accessible from VPC)"
+#   value       = aws_instance.ollama.private_ip
+# }
