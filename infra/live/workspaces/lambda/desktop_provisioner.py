@@ -34,7 +34,6 @@ table = dynamodb.Table(TABLE_NAME)
 # Port map for response
 ENDPOINTS = {
     "dcv_desktop": {"port": 8443, "protocol": "https"},
-    "code_server": {"port": 8080, "protocol": "http"},
     "frontend": {"port": 5173, "protocol": "http"},
     "backend": {"port": 5000, "protocol": "http"},
     "supabase_studio": {"port": 54323, "protocol": "http"},
@@ -239,6 +238,7 @@ if [ ! -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
     fi
     if [ ! -d "magnet-app-front" ]; then
       git clone https://x-access-token:$GH_PAT@github.com/avinair108/magnet-app-front.git
+      cd magnet-app-front && git checkout feature/seed-dataset && cd ..
     fi
 
     # Create docker-compose.yml
@@ -336,6 +336,17 @@ if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
 
   # Start Supabase
   sg docker -c "/usr/local/bin/supabase start" || true
+
+  # Seed the database with test data (idempotent)
+  if [ -f magnet-app-front/seeds/seed.sql ]; then
+    SUPABASE_DB=$(sg docker -c "docker ps -q --filter 'name=supabase_db'" | head -1)
+    if [ -z "$SUPABASE_DB" ]; then
+      SUPABASE_DB=$(sg docker -c "docker ps -q --filter 'ancestor=public.ecr.aws/supabase/postgres'" | head -1)
+    fi
+    if [ -n "$SUPABASE_DB" ]; then
+      sg docker -c "docker cp magnet-app-front/seeds/ $SUPABASE_DB:/tmp/ && docker exec -w /tmp $SUPABASE_DB psql -U postgres -d postgres -f /tmp/seeds/seed.sql" || true
+    fi
+  fi
 
   # Pull images + start backend/frontend
   sg docker -c "docker compose pull" || true
