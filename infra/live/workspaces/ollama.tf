@@ -150,7 +150,7 @@ resource "aws_instance" "ollama" {
     IDLE_MINUTES=\$(( (NOW - LAST_ACTIVITY) / 60 ))
     if [ "\$IDLE_MINUTES" -ge "\$IDLE_THRESHOLD_MINUTES" ]; then
       logger -t ollama-idle "No requests for \$IDLE_MINUTES min. Stopping."
-      aws ec2 stop-instances --instance-ids "\$INSTANCE_ID" --region "\$REGION"
+      /usr/local/bin/aws ec2 stop-instances --instance-ids "\$INSTANCE_ID" --region "\$REGION"
     fi
     IDLE
     chmod +x /usr/local/bin/ollama-idle-check.sh

@@ -37,5 +37,5 @@ IDLE_MINUTES=$((IDLE_SECONDS / 60))
 
 if [ "$IDLE_MINUTES" -ge "$IDLE_THRESHOLD_MINUTES" ]; then
     logger -t idle-check "No DCV connections for ${IDLE_MINUTES} minutes. Stopping instance."
-    aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
+    /usr/local/bin/aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
 fi

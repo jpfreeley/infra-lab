@@ -25,7 +25,6 @@ INSTANCE_PROFILE_ARN = os.environ["INSTANCE_PROFILE_ARN"]
 API_SECRET = os.environ["API_SECRET"]
 TABLE_NAME = os.environ["TABLE_NAME"]
 RATE_LIMIT_SECONDS = int(os.environ.get("RATE_LIMIT_SECONDS", "180"))
-OLLAMA_INSTANCE_ID = os.environ.get("OLLAMA_INSTANCE_ID", "")
 
 ec2 = boto3.client("ec2")
 ssm = boto3.client("ssm")
@@ -49,31 +48,6 @@ def build_endpoints(public_ip):
         name: f"{info['protocol']}://{public_ip}:{info['port']}"
         for name, info in ENDPOINTS.items()
     }
-
-
-def get_ollama_status():
-    """Check Ollama instance state and ensure it's running."""
-    if not OLLAMA_INSTANCE_ID:
-        return {"status": "not_configured"}
-    try:
-        result = ec2.describe_instances(InstanceIds=[OLLAMA_INSTANCE_ID])
-        state = result["Reservations"][0]["Instances"][0]["State"]["Name"]
-        if state == "stopped":
-            # Auto-start Ollama
-            ec2.start_instances(InstanceIds=[OLLAMA_INSTANCE_ID])
-            return {"status": "starting"}
-        return {"status": state}
-    except Exception:
-        return {"status": "unknown"}
-
-
-def get_ollama_ip():
-    """Get Ollama private IP from SSM."""
-    try:
-        result = ssm.get_parameter(Name="/infra-lab/desktop/ollama-ip")
-        return result["Parameter"]["Value"]
-    except Exception:
-        return "10.0.96.100"  # fallback to fixed IP
 
 
 def response(status_code, body):
@@ -250,8 +224,6 @@ if [ ! -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
   IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
   REGION=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
   GH_PAT=$(aws secretsmanager get-secret-value --secret-id "infra-lab/desktop/github-pat" --query SecretString --output text --region $REGION 2>/dev/null | tr -d "\\n")
-  OLLAMA_IP_SSM=$(aws ssm get-parameter --name "/infra-lab/desktop/ollama-ip" --query "Parameter.Value" --output text --region $REGION 2>/dev/null | tr -d "\\n")
-  if [ -z "$OLLAMA_IP_SSM" ]; then OLLAMA_IP_SSM="10.0.96.100"; fi
 
   if [ -n "$GH_PAT" ]; then
     cd $MOUNT_POINT/home/dcvuser/development
@@ -302,22 +274,16 @@ services:
     volumes:
       - .:/home/workspace/workspace
       - code-server-config:/home/workspace/.openvscode-server
-      - /data/home/dcvuser/.hermes:/home/workspace/.hermes
     environment:
-      - OLLAMA_HOST=http://OLLAMA_IP_PLACEHOLDER:11434
       - HOME=/home/workspace
     entrypoint: /bin/bash
     command:
       - -c
       - |
         export OPENVSCODE_SERVER_ROOT=/home/.openvscode-server
-        apt-get update -qq && apt-get install -y -qq pipx python3-venv curl >/dev/null 2>&1 || true
-        pipx install 'hermes-agent[acp]' 2>/dev/null || true
-        pipx ensurepath 2>/dev/null || true
-        export PATH=$$PATH:$$HOME/.local/bin
+        mkdir -p $$HOME/.openvscode-server/extensions
+        chown -R 1000:1000 $$HOME/.openvscode-server 2>/dev/null || true
         $$OPENVSCODE_SERVER_ROOT/bin/openvscode-server --install-extension Continue.continue 2>/dev/null || true
-        mkdir -p $$HOME/.continue
-        printf '{"models":[{"title":"Qwen 2.5 Coder 14B","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}],"tabAutocompleteModel":{"title":"Qwen Autocomplete","provider":"ollama","model":"qwen2.5-coder:14b","apiBase":"%s"}}' "$$OLLAMA_HOST" "$$OLLAMA_HOST" > $$HOME/.continue/config.json
         exec $$OPENVSCODE_SERVER_ROOT/bin/openvscode-server --host 0.0.0.0 --port 8080 --without-connection-token $$HOME/workspace
     restart: unless-stopped
 
@@ -327,7 +293,7 @@ volumes:
 COMPOSE
 
     # Replace Ollama IP placeholder in docker-compose
-    sed -i "s|OLLAMA_IP_PLACEHOLDER|$OLLAMA_IP_SSM|g" docker-compose.yml
+    # (Ollama integration disabled — bring your own API key for LLM features)
 
     # Create backend .env
     cat > MagNet-Agents-Backend/.env << ENVFILE
@@ -376,63 +342,32 @@ if [ -f $MOUNT_POINT/home/dcvuser/development/docker-compose.yml ]; then
   sg docker -c "docker compose up -d" || true
 fi
 
-# Install Hermes Agent (via pipx in a container, exposed as host script)
-if [ ! -f /usr/local/bin/hermes ]; then
-  # Create a wrapper that runs hermes inside a Python 3.11 container
-  cat > /usr/local/bin/hermes << 'HERMES'
-#!/bin/bash
-OLLAMA_IP=$(cat /home/dcvuser/.hermes/.env 2>/dev/null | grep OLLAMA_HOST | cut -d/ -f3 | cut -d: -f1)
-[ -z "$OLLAMA_IP" ] && OLLAMA_IP="10.0.96.100"
-exec docker run --rm -it \
-  --network host \
-  -v "$HOME:/root" \
-  -v "$(pwd):/workspace" \
-  -w /workspace \
-  -e OLLAMA_HOST=http://$OLLAMA_IP:11434 \
-  -e OLLAMA_BASE_URL=http://$OLLAMA_IP:11434 \
-  -e MEMPALACE_DIR=/root/.mempalace \
-  python:3.11 bash -c "pip install -q hermes-agent mempalace 2>/dev/null && hermes \"\\$@\""
-HERMES
-  chmod +x /usr/local/bin/hermes
+# Install VS Code 1.85 (last version compatible with AL2 glibc 2.26)
+if ! command -v code &> /dev/null; then
+  cd /tmp && curl -L -o code-1.85.2.rpm 'https://update.code.visualstudio.com/1.85.2/linux-rpm-x64/stable' 2>/dev/null
+  yum install -y /tmp/code-1.85.2.rpm 2>/dev/null
+  rm -f /tmp/code-1.85.2.rpm
 fi
 
-# Install MemPalace on persistent volume
-if [ ! -d $MOUNT_POINT/home/dcvuser/.mempalace ]; then
-  mkdir -p $MOUNT_POINT/home/dcvuser/.mempalace
-fi
-ln -sfn $MOUNT_POINT/home/dcvuser/.mempalace /home/dcvuser/.mempalace 2>/dev/null
-chown -h dcvuser:dcvuser /home/dcvuser/.mempalace
+# Install Continue extension in VS Code for dcvuser
+sudo -u dcvuser code --install-extension Continue.continue 2>/dev/null || true
 
-# Write Hermes config with Ollama IP from SSM
-OLLAMA_IP_SSM=$(aws ssm get-parameter --name "/infra-lab/desktop/ollama-ip" --query "Parameter.Value" --output text --region $REGION 2>/dev/null | tr -d "\\n")
-if [ -z "$OLLAMA_IP_SSM" ]; then OLLAMA_IP_SSM="10.0.96.100"; fi
-mkdir -p $MOUNT_POINT/home/dcvuser/.hermes
-cat > $MOUNT_POINT/home/dcvuser/.hermes/.env << HERMESENV
-OLLAMA_HOST=http://$OLLAMA_IP_SSM:11434
-HERMES_PROVIDER=ollama
-HERMES_MODEL=qwen2.5-coder:14b
-HERMESENV
-cat > $MOUNT_POINT/home/dcvuser/.hermes/config.yaml << HERMESCONFIG
-model:
-  provider: ollama
-  default: qwen2.5-coder:14b
-  base_url: http://$OLLAMA_IP_SSM:11434/v1
-  context_length: 65536
-  ollama_num_ctx: 65536
-
-terminal:
-  backend: local
-HERMESCONFIG
-ln -sfn $MOUNT_POINT/home/dcvuser/.hermes /home/dcvuser/.hermes 2>/dev/null
-chown -R dcvuser:dcvuser $MOUNT_POINT/home/dcvuser/.hermes
-chmod -R 777 $MOUNT_POINT/home/dcvuser/.hermes
-chown -h dcvuser:dcvuser /home/dcvuser/.hermes
-
-# Set OLLAMA_HOST for dcvuser (all shells)
-grep -q OLLAMA_HOST /home/dcvuser/.bashrc 2>/dev/null || cat >> /home/dcvuser/.bashrc << BASHRC
-export OLLAMA_HOST="http://$OLLAMA_IP_SSM:11434"
-export OLLAMA_BASE_URL="http://$OLLAMA_IP_SSM:11434"
-BASHRC
+# Write default Continue config (user brings their own Claude API key)
+mkdir -p /home/dcvuser/.continue
+cat > /home/dcvuser/.continue/config.yaml << CONTINUECONF
+name: Local Config
+version: 1.0.0
+schema: v1
+models:
+  - name: Claude Sonnet
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    roles:
+      - chat
+      - edit
+      - apply
+CONTINUECONF
+chown -R dcvuser:dcvuser /home/dcvuser/.continue
 
 # Idle auto-stop: stop instance after 30 min of no DCV connections
 cat > /usr/local/bin/idle-check.sh << 'IDLE'
@@ -457,7 +392,7 @@ NOW=$(date +%s)
 IDLE_MINUTES=$(( (NOW - LAST_ACTIVITY) / 60 ))
 if [ "$IDLE_MINUTES" -ge "$IDLE_THRESHOLD_MINUTES" ]; then
   logger -t idle-check "No DCV or code-server connections for ${IDLE_MINUTES}min. Stopping."
-  aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
+  /usr/local/bin/aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
 fi
 IDLE
 chmod +x /usr/local/bin/idle-check.sh
@@ -548,9 +483,6 @@ def handler(event, context):
     username = body.get("username", "").strip().lower()
 
     if http_method == "POST":
-        # Auto-start Ollama if stopped
-        ollama_info = get_ollama_status()
-
         # Validate input
         if not username or not username.isalnum():
             return response(400, {"error": "username required (alphanumeric only)"})
@@ -593,7 +525,6 @@ def handler(event, context):
                         "instance_id": instance_id,
                         "public_ip": public_ip,
                         "endpoints": build_endpoints(public_ip),
-                        "ollama": ollama_info,
                         "credentials": {
                             "dcv_user": "dcvuser",
                             "dcv_password": "(set by user)",
@@ -624,7 +555,6 @@ def handler(event, context):
                             "instance_id": instance_id,
                             "public_ip": public_ip,
                             "endpoints": build_endpoints(public_ip),
-                            "ollama": ollama_info,
                             "credentials": {
                                 "dcv_user": "dcvuser",
                                 "dcv_password": "(set by user)",
@@ -679,7 +609,6 @@ def handler(event, context):
                     "instance_id": instance_id,
                     "public_ip": public_ip,
                     "endpoints": build_endpoints(public_ip),
-                    "ollama": ollama_info,
                     "credentials": {
                         "dcv_user": "dcvuser",
                         "dcv_password": "ChangeMeOnFirstLogin!",

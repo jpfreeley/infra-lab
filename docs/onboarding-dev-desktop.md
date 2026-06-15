@@ -7,8 +7,9 @@ desktop from scratch. No prior AWS or Docker experience required.
 
 A remote Linux desktop in the cloud with:
 
-- A full graphical desktop you access through your browser
-- VS Code (browser-based) with Node.js 20 and Claude AI assistant
+- A full graphical desktop you access through your browser (DCV)
+- VS Code (native, with Continue AI extension — bring your own Claude key)
+- A browser-based code editor on port 8080 (OpenVSCode Server)
 - Python 3.11 for backend development (via Docker)
 - Local Supabase database (PostgreSQL + auth + storage + dashboard)
 - All the MagNet Legal code, ready to run
@@ -17,141 +18,128 @@ A remote Linux desktop in the cloud with:
 
 You need:
 
-1. A modern web browser (Chrome, Firefox, or Safari)
-1. Your developer IP address (ask your team lead — needed for security)
+1. A modern web browser (Chrome or Firefox)
+1. Your developer username (alphanumeric, e.g. `alice`)
+1. The API key (ask your team lead)
 1. GitHub account with access to the MagNet Legal repos
 
-## Step 1: Get Your Desktop URL
+## Step 1: Launch Your Desktop
 
-Your team lead will provide you with:
+1. Go to the self-service page (ask your team lead for the URL)
+1. Enter your username and API key
+1. Click "Launch Desktop"
+1. Wait for the services to come online (~10 minutes on first boot)
 
-- **Desktop URL**: `https://<IP>:8443`
-- **Username**: `dcvuser`
-- **Password**: (will be set for you or you'll set it on first login)
+The page shows a countdown and green checkmarks as services become ready.
 
-## Step 2: Connect to Your Desktop
+## Step 2: Connect to Your Desktop (DCV)
 
-1. Open your browser and go to `https://<YOUR-IP>:8443`
+1. Click the DCV Desktop link shown on the page: `https://<IP>:8443`
 1. You'll see a security warning about the certificate — this is expected.
    Click "Advanced" → "Proceed" (Chrome) or "Accept the Risk" (Firefox)
-1. Enter your username and password
+1. Enter credentials:
+   - **Username**: `dcvuser`
+   - **Password**: `ChangeMeOnFirstLogin!` (first time — change it immediately)
 1. You'll see a Linux desktop (MATE) with a taskbar at the top
 
-## Step 3: Open a Terminal
+## Step 3: Open VS Code
 
-1. Right-click anywhere on the desktop
-1. Click "Open Terminal Here"
-1. You now have a command-line terminal
+VS Code 1.85 is pre-installed on the desktop with the **Continue** AI extension.
 
-## Step 4: Set Up Docker Access
+1. Right-click the desktop → "Open Terminal Here"
+1. Run: `code ~/development`
+1. VS Code opens with your project files
+1. The Continue extension (sidebar icon) provides AI chat, autocomplete,
+   and agent features (bring your own Anthropic API key — see below)
 
-Run this once (needed every time you open a new terminal session):
+## Step 4: Everything is Already Running
 
-```bash
-newgrp docker
-```
+The boot script automatically starts all services:
 
-Verify it works:
+- Docker + `docker compose up -d` (backend, frontend, OpenVSCode Server)
+- Supabase (PostgreSQL, auth, storage, dashboard)
+- DCV session
 
-```bash
-docker --version
-# Should show: Docker version 25.x.x
-```
+No manual commands needed. Just wait for the self-service page checkmarks
+to turn green (~10 minutes on first boot, ~2 minutes on restart).
 
-## Step 5: Start Supabase (Local Database)
-
-```bash
-supabase start
-```
-
-First time takes 3-5 minutes (downloading database images). After that,
-it's instant.
-
-When it finishes, you'll see credentials. The important ones:
-
-- **Dashboard**: `http://localhost:54323` (open in Firefox on the desktop)
-- **API URL**: `http://localhost:54321`
-- **Database**: `postgresql://postgres:postgres@localhost:54322/postgres`
-
-## Step 6: Start the Application
-
-```bash
-cd ~/development
-docker compose up -d
-```
-
-This starts:
-
-- **Backend** (Python/Flask) on port 5000
-- **Frontend** (React/Vite) on port 5173
-
-First time takes 2-3 minutes (installing dependencies). After that,
-restarts are fast.
-
-Check they're running:
+Verify from a terminal on the desktop:
 
 ```bash
 docker compose ps
 ```
 
-You should see `backend` and `frontend` both "Up".
+You should see all containers running.
 
-## Step 7: Open the App
+## Step 5: Access Services
 
-From your local computer's browser (not the desktop's browser):
+From your local computer's browser:
 
-- **Frontend**: `http://<YOUR-DESKTOP-IP>:5173`
-- **Backend health check**: `http://<YOUR-DESKTOP-IP>:5000/health`
-- **Supabase Studio**: `http://<YOUR-DESKTOP-IP>:54323`
+| Service | URL | Notes |
+| --- | --- | --- |
+| DCV Desktop | `https://<IP>:8443` | Full Linux desktop |
+| Frontend | `http://<IP>:5173` | React app |
+| Backend | `http://<IP>:5000/health` | Flask API |
+| OpenVSCode Server | `http://<IP>:8080` | Browser code editor (no password) |
+| Supabase Studio | `http://<IP>:54323` | Database dashboard |
 
-## Step 8: Open VS Code (Browser)
+## AI-Assisted Coding (Continue + Bring Your Own Key)
 
-For editing code with a full IDE:
+Your desktop comes with the **Continue** VS Code extension pre-installed.
+To use AI features, bring your own Anthropic (Claude) API key.
 
-1. Go to `http://<YOUR-DESKTOP-IP>:8080` in your local browser
-1. Password: `magnet123`
-1. You'll see VS Code with your project files
+**Setup (one time):**
 
-The VS Code terminal has **Node.js 20** and **Claude CLI** available.
+1. Open VS Code on the DCV desktop
+1. Open Continue settings: click the gear icon in the Continue sidebar
+1. Add your Anthropic API key when prompted
+1. Select Claude Sonnet as your model
+
+**What you get with Claude:**
+
+- **Chat**: Ask questions, get code suggestions, explain code
+- **Tab autocomplete**: Ghost text suggestions while you type
+- **Code edit**: Select code → Cmd+I → describe changes
+- **Agent mode**: Autonomous coding, terminal commands, file edits
+- **MCP**: Tool server integration
+
+**Note about Ollama (GPU server):**
+
+The infrastructure includes a shared Ollama GPU server (g4dn.xlarge) defined
+in Terraform, but it is currently **disabled** (not auto-started). It exists
+for future use if you want local/free LLM inference. Contact your team lead
+if you want to explore this option.
 
 ## Day-to-Day Workflow
 
 ### Starting your day
 
-```bash
-# Open terminal on desktop, then:
-newgrp docker
-supabase start
-cd ~/development && docker compose up -d
-```
+Launch your desktop from the self-service page. Everything starts
+automatically — just wait for the checkmarks to go green.
 
 ### Editing code
 
-Option A: Use the browser VS Code at `http://<IP>:8080`
-Option B: Use any editor inside the DCV desktop (right-click → Open Terminal)
+- **Option A (recommended)**: VS Code on the DCV desktop (`code ~/development`)
+- **Option B**: OpenVSCode Server at `http://<IP>:8080`
+- **Option C**: Any terminal editor on the desktop
 
 ### Viewing your changes
 
 The frontend has hot-reload — save a file and the browser refreshes
 automatically at `http://<IP>:5173`.
 
-### Stopping at end of day
+### End of day
 
-```bash
-cd ~/development && docker compose down
-supabase stop
-```
-
-Your team lead may also stop the instance to save costs. Your files
-are safe — they're stored on a separate persistent disk.
+Your desktop automatically stops after 30 minutes of inactivity (no DCV
+or code-server connections). No action needed — your files are safe on
+a persistent disk.
 
 ### If the desktop won't connect
 
-Your instance may have been stopped (cost savings) or your IP changed.
-Contact your team lead to:
-
-- Start the instance back up
-- Update the security group with your new IP
+- Your instance may have been stopped (auto idle-stop). Relaunch from the
+  self-service page.
+- Your IP may have changed. The self-service page automatically updates
+  the security group with your current IP on each launch.
 
 ## Project Structure
 
@@ -169,21 +157,19 @@ Contact your team lead to:
 │   ├── package.json           ← Node dependencies
 │   └── .env                   ← Frontend config
 │
-└── docker-compose.yml         ← Runs backend + frontend
+└── docker-compose.yml         ← Runs backend + frontend + code editor
 ```
 
 ## Useful Commands
 
 | What | Command |
 | --- | --- |
-| Start everything | `newgrp docker && supabase start && cd ~/development && docker compose up -d` |
-| Stop everything | `cd ~/development && docker compose down && supabase stop` |
+| Check running services | `docker compose ps` |
 | View backend logs | `cd ~/development && docker compose logs -f backend` |
 | View frontend logs | `cd ~/development && docker compose logs -f frontend` |
 | Restart backend | `cd ~/development && docker compose restart backend` |
 | Restart frontend | `cd ~/development && docker compose restart frontend` |
-| Run a Python command | `docker run --rm -v ~/development/MagNet-Agents-Backend:/app -w /app python:3.11 python <script.py>` |
-| Open Supabase dashboard | Browser → `http://localhost:54323` (on desktop) |
+| Open VS Code | `code ~/development` |
 | Check Docker containers | `docker ps` |
 | Check disk space | `df -h` |
 
@@ -208,17 +194,30 @@ Ask your team lead for the actual key values.
 | Problem | Solution |
 | --- | --- |
 | "Permission denied" on docker | Run `newgrp docker` first |
-| Can't connect to desktop | Ask team lead to check instance status + your IP |
+| Can't connect to desktop | Relaunch from self-service page |
 | Backend not starting | Check logs: `docker compose logs backend` |
 | Frontend npm error | Usually dependency issues — ask team lead |
 | "Port in use" error | `docker compose down` then `docker compose up -d` |
 | Supabase won't start | `supabase stop` then `supabase start` again |
-| Desktop feels slow | Normal for first few minutes. DCV adapts to bandwidth. |
-| Lost my changes | They're safe on `/data`. Files survive restarts. |
-| Certificate warning | Normal — click through it. It's a self-signed cert. |
+| Desktop feels slow | Normal for first few minutes. DCV adapts to bandwidth |
+| Lost my changes | They're safe on `/data`. Files survive restarts |
+| Certificate warning | Normal — click through it. Self-signed cert |
+| VS Code says "can't find code" | Run `export PATH=$PATH:/usr/bin` then `code` |
+
+## Architecture (for team leads)
+
+- **Desktop instance**: t3.large, Amazon Linux 2, DCV AMI
+- **Ollama GPU** (dormant): g4dn.xlarge defined in Terraform but not auto-started.
+  Available for future local LLM use if needed.
+- **Provisioning**: Lambda + API Gateway, self-service via web page
+- **State**: DynamoDB tracks active desktops
+- **Networking**: VPC 10.0.96.0/20, desktops in public subnet, SG restricts by IP
+- **LLM**: Bring-your-own Anthropic API key (Continue extension)
+- **Idle auto-stop**: Desktop (30 min, DCV + code-server connections)
+- **Persistent storage**: 50GB EBS volume at /data, survives stop/start
 
 ## Getting Help
 
 1. Check this doc first
 1. Ask in the team chat
-1. Reach out to your team lead for infrastructure issues (instance, IP, keys)
+1. Reach out to your team lead for infrastructure issues
