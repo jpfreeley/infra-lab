@@ -109,6 +109,8 @@ resource "aws_iam_role_policy" "lambda_permissions" {
           "ec2:AttachVolume",
           "ec2:DescribeVolumes",
           "ec2:CreateTags",
+          "ec2:CancelSpotInstanceRequests",
+          "ec2:DescribeSpotInstanceRequests",
         ]
         Resource = "*"
       },
