@@ -10,6 +10,14 @@
 # - Verified that 'infra-lab-org-trail' is a Multi-Region Organization Trail.
 # - Editted Landing Zone Settings to DISABLE baseline trail (35m to update settings)
 #   -- Upon successful edit to the settings, the CT cloudtrail will be deleted
+#
+# On 2026-07-01: Control Tower baseline trail was still active (never actually deleted
+# by LZ settings change). Manually deleted via:
+#   aws cloudtrail delete-trail --name aws-controltower-BaselineCloudTrail
+# Also restored bucket policy on aws-controltower-logs-172134854767-us-east-1
+# (was missing — S3 delivery had been AccessDenied since 2026-03-10).
+# Access to log-archive account requires AWSControlTowerExecution role, not
+# OrganizationAccountAccessRole.
 
 # --- KMS Keys ---
 
@@ -110,6 +118,53 @@ resource "aws_cloudtrail" "org_trail" {
   depends_on = [
     aws_organizations_organization.org
   ]
+}
+
+# --- S3 Bucket Policy for CloudTrail Log Delivery (Log Archive Account) ---
+
+data "aws_s3_bucket" "cloudtrail_logs" {
+  provider = aws.delegated_admin
+  bucket   = "aws-controltower-logs-172134854767-us-east-1"
+}
+
+resource "aws_s3_bucket_policy" "cloudtrail_logs" {
+  provider = aws.delegated_admin
+  bucket   = data.aws_s3_bucket.cloudtrail_logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AWSCloudTrailAclCheck"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:GetBucketAcl"
+        Resource = data.aws_s3_bucket.cloudtrail_logs.arn
+        Condition = {
+          StringEquals = {
+            "aws:SourceArn" = aws_cloudtrail.org_trail.arn
+          }
+        }
+      },
+      {
+        Sid    = "AWSCloudTrailWrite"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:PutObject"
+        Resource = "${data.aws_s3_bucket.cloudtrail_logs.arn}/o-hrzezrr7b1/AWSLogs/*"
+        Condition = {
+          StringEquals = {
+            "s3:x-amz-acl"  = "bucket-owner-full-control"
+            "aws:SourceArn" = aws_cloudtrail.org_trail.arn
+          }
+        }
+      }
+    ]
+  })
 }
 
 # --- IAM Policy Documents (KMS) ---
