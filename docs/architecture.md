@@ -23,5 +23,6 @@ graphical development. Key characteristics:
 - Golden AMI (`ami-0f618edd4b848eb44`) with Docker, Supabase CLI, Git
 - Persistent 50GB EBS data volume for repos, Docker images, and user state
 - Docker-based dev stack: Python 3.11, Node 20, code-server, Supabase local
-- Spot instance (t3.large) for cost optimization (~$28/mo vs $140/mo for WorkSpaces)
+- Spot instance (t3.large, one-time request) for cost optimization (~$28/mo vs $140/mo for WorkSpaces)
+- Idle auto-stop after 30 min of inactivity; terminate to fully decommission
 - Service boundary SCP restricts allowed AWS services

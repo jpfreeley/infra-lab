@@ -439,30 +439,35 @@ fi
 
 chown -R dcvuser:dcvuser /home/dcvuser/.continue
 
-# Idle auto-stop: stop instance after 30 min of no DCV connections
-cat > /usr/local/bin/idle-check.sh << 'IDLE'
+# Idle auto-stop: stop instance after 30 min of no DCV/code-server connections
+# Find aws CLI (v1 at /usr/bin/aws on DCV AMI, v2 at /usr/local/bin/aws if installed)
+AWS_BIN=$(command -v aws || echo /usr/bin/aws)
+cat > /usr/local/bin/idle-check.sh << IDLE
 #!/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
 IDLE_THRESHOLD_MINUTES=30
 STATE_FILE="/var/run/last-dcv-activity"
-IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
-INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
-REGION=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
-CONNECTIONS=$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{sum += $2} END {print sum+0}')
-CODE_SERVER=$(ss -tn state established '( dport = :8080 or sport = :8080 )' 2>/dev/null | grep -c ESTAB || echo 0)
-if [ "$CONNECTIONS" -gt 0 ] || [ "$CODE_SERVER" -gt 0 ]; then
-  date +%s > "$STATE_FILE"
+IMDS_TOKEN=\$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+INSTANCE_ID=\$(curl -s -H "X-aws-ec2-metadata-token: \$IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+REGION=\$(curl -s -H "X-aws-ec2-metadata-token: \$IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+# Count DCV connections (any session)
+CONNECTIONS=\$(dcv list-sessions -j 2>/dev/null | grep -o '"num-of-connections" : [0-9]*' | awk -F: '{sum += \$2} END {print sum+0}')
+# Count established TCP connections on code-server port 8080 (exclude header line)
+CODE_SERVER=\$(ss -tn state established '( dport = :8080 or sport = :8080 )' 2>/dev/null | tail -n +2 | wc -l)
+if [ "\$CONNECTIONS" -gt 0 ] || [ "\$CODE_SERVER" -gt 0 ]; then
+  date +%s > "\$STATE_FILE"
   exit 0
 fi
-if [ ! -f "$STATE_FILE" ]; then
-  date +%s > "$STATE_FILE"
+if [ ! -f "\$STATE_FILE" ]; then
+  date +%s > "\$STATE_FILE"
   exit 0
 fi
-LAST_ACTIVITY=$(cat "$STATE_FILE")
-NOW=$(date +%s)
-IDLE_MINUTES=$(( (NOW - LAST_ACTIVITY) / 60 ))
-if [ "$IDLE_MINUTES" -ge "$IDLE_THRESHOLD_MINUTES" ]; then
-  logger -t idle-check "No DCV or code-server connections for ${IDLE_MINUTES}min. Stopping."
-  /usr/local/bin/aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION"
+LAST_ACTIVITY=\$(cat "\$STATE_FILE")
+NOW=\$(date +%s)
+IDLE_MINUTES=\$(( (NOW - LAST_ACTIVITY) / 60 ))
+if [ "\$IDLE_MINUTES" -ge "\$IDLE_THRESHOLD_MINUTES" ]; then
+  logger -t idle-check "No DCV or code-server connections for \${IDLE_MINUTES}min. Stopping."
+  aws ec2 stop-instances --instance-ids "\$INSTANCE_ID" --region "\$REGION"
 fi
 IDLE
 chmod +x /usr/local/bin/idle-check.sh
@@ -480,8 +485,7 @@ echo "*/5 * * * * root /usr/local/bin/idle-check.sh" > /etc/cron.d/idle-check
         InstanceMarketOptions={
             "MarketType": "spot",
             "SpotOptions": {
-                "SpotInstanceType": "persistent",
-                "InstanceInterruptionBehavior": "stop",
+                "SpotInstanceType": "one-time",
             },
         },
         NetworkInterfaces=[

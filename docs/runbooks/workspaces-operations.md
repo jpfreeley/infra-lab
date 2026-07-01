@@ -155,16 +155,21 @@ aws ec2 reboot-instances \
 
 ## After Instance Replacement (Spot Interruption)
 
-If the spot instance gets reclaimed and a new one starts:
+Instances use **one-time** spot requests. If AWS reclaims the spot capacity,
+the instance is terminated and the spot request closes — no automatic
+respawn. To get a new desktop, re-launch from the self-service page.
 
-1. The data volume (`/data`) reattaches automatically
-1. Repos, Docker images, and compose files persist
-1. You need to:
-   - Wait for boot (~2 minutes)
-   - Get the new public IP (`the API response or AWS console`)
-   - Reconnect to DCV
-   - Run `newgrp docker` in your terminal
-   - Run `supabase start` and `docker compose up -d`
+The persistent data volume (`/data`) is not deleted on termination and can
+be reattached to a new instance. The Lambda provisioner handles this
+automatically on the next launch for the same username.
+
+After a new instance starts:
+
+1. Wait for boot (~2 minutes)
+1. Get the new public IP from the API response or AWS console
+1. Reconnect to DCV
+1. Run `newgrp docker` in your terminal
+1. Run `supabase start` and `docker compose up -d`
 
 Tools pre-installed on the AMI (survive replacement):
 
@@ -258,6 +263,12 @@ variable "developers" {
 | Component | Running | Stopped |
 | --- | --- | --- |
 | EC2 t3.large spot | ~$18/mo | $0 |
+
+**Spot instance behavior**: Instances use one-time spot requests. Terminating
+an instance (manually or by AWS reclaiming capacity) closes the spot request
+permanently — no respawn. The idle-check script stops (not terminates) idle
+instances after 30 minutes, preserving the instance for quick restart later.
+To fully decommission, terminate the instance.
 | EBS 50GB data vol | ~$4/mo | ~$4/mo |
 | EBS 30GB root vol | ~$2.40/mo | ~$2.40/mo |
 | Public IPv4 | ~$3.60/mo | ~$3.60/mo |
