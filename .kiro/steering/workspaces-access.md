@@ -15,6 +15,32 @@ export $(aws sts assume-role \
 
 Terraform handles this via the `assume_role` block in `infra/live/workspaces/providers.tf`.
 
+## Log Archive Account Access (172134854767)
+
+Control Tower-managed accounts (log-archive, audit) do **not** have `OrganizationAccountAccessRole`. Use `AWSControlTowerExecution` instead:
+
+```bash
+export $(aws sts assume-role \
+  --role-arn arn:aws:iam::172134854767:role/AWSControlTowerExecution \
+  --role-session-name log-archive \
+  --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+  --output text \
+  --profile infra-lab | awk '{print "AWS_ACCESS_KEY_ID="$1" AWS_SECRET_ACCESS_KEY="$2" AWS_SESSION_TOKEN="$3}')
+```
+
+## Audit Account Access (881413600100)
+
+Same pattern — use `AWSControlTowerExecution`:
+
+```bash
+export $(aws sts assume-role \
+  --role-arn arn:aws:iam::881413600100:role/AWSControlTowerExecution \
+  --role-session-name audit \
+  --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+  --output text \
+  --profile infra-lab | awk '{print "AWS_ACCESS_KEY_ID="$1" AWS_SECRET_ACCESS_KEY="$2" AWS_SESSION_TOKEN="$3}')
+```
+
 ## SSH into Desktop or Ollama Instances
 
 Uses EC2 Instance Connect (ephemeral keys, no permanent SSH key needed):
