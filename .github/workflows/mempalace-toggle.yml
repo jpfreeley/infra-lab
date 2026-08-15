@@ -52,10 +52,10 @@ jobs:
         working-directory: infra/live/mempalace
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::551452024305:role/infra-lab-github-actions-deploy
           aws-region: us-east-1
