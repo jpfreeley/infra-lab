@@ -1,11 +1,11 @@
 # MemPalace ALB + WAF
 # ADR-034: fully public + WAF, bearer token as the primary access control.
 #
-# HTTPS is variable-gated (enable_https, default false) — see variables.tf
-# for why: ACM can't issue a cert for the ALB's own *.elb.amazonaws.com
-# name, and no domain has been decided yet. Until enable_https=true, this
-# serves plain HTTP. That's a deliberate, temporary starting point per
-# direct instruction — not something to leave as the end state.
+# HTTPS is variable-gated (enable_https, default true as of the
+# mempalace.lintwiselabs.com ACM cert being issued and validated — see
+# variables.tf and acm.tf). Kept as a variable rather than hardcoded so a
+# domain-less deployment (e.g. before Magnet Legal has one) can still set
+# it false and get plain HTTP behind WAF + bearer token as a bootstrap.
 
 ###############################################################################
 # ALB
@@ -15,6 +15,7 @@ resource "aws_lb" "mempalace" {
   # checkov:skip=CKV_AWS_150: "Deletion protection off — matches infra-lab's other lab/dev ALBs, single-owner account"
   # checkov:skip=CKV_AWS_91: "Access logs off for cost; revisit if this account ever holds more than one person's data"
   # checkov:skip=CKV2_AWS_28: "WAF is associated below (aws_wafv2_web_acl_association) — checkov doesn't always resolve the cross-resource association statically"
+  # checkov:skip=CKV2_AWS_76: "The Log4j-covering rule group (AWSManagedRulesKnownBadInputsRuleSet) IS attached, in aws_wafv2_web_acl.mempalace below (see its 'aws-managed-known-bad-inputs' rule) — checkov can't resolve that across the ALB/WebACL/rule resource graph"
   name               = "${local.name_prefix}-alb"
   internal           = false
   load_balancer_type = "application"
@@ -34,6 +35,7 @@ resource "aws_lb" "mempalace" {
 ###############################################################################
 
 resource "aws_lb_target_group" "mempalace" {
+  # checkov:skip=CKV_AWS_378: "Deliberate: TLS terminates at the ALB (the HTTPS listener above), this is the ALB-to-task hop inside the VPC, not the client-facing one — standard pattern, not a gap"
   name        = "${local.name_prefix}-tg"
   port        = 8765
   protocol    = "HTTP"
