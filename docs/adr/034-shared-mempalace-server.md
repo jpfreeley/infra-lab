@@ -590,6 +590,38 @@ passed would look identical to real silence and could tear back down
 almost immediately. Fixed with a minimum-age gate (window length plus a
 5-minute buffer) before the idle check ever runs.
 
+**A third, more serious bug: the checker never actually worked at
+all, for any of its first 9 runs.** Caught only because the stack had
+genuinely sat idle for ~110 minutes, past the 90-minute threshold, and
+was confirmed still up by hand. Every prior run had logged "ALB not
+found — already down, nothing to do" regardless of real state. Root
+cause: the job's `Configure AWS credentials` step only assumed the
+management-account role (`551452024305`) and called the AWS CLI
+directly with those credentials — it never got the second hop into the
+mempalace account (`310697203282`) that Terraform's own provider
+config does internally whenever `mempalace-toggle.yml` runs
+`apply`/`destroy`. `mempalace-toggle.yml` never surfaced this because
+Terraform handles that hop transparently; a job calling the AWS CLI
+directly needed it spelled out explicitly, and didn't have it. This
+had been silently broken since the workflow was first built earlier
+the same day — the exact failure mode a check like this is supposed to
+prevent, just at one level up.
+
+Fixed by chaining a second `configure-aws-credentials` step assuming
+the same `OrganizationAccountAccessRole` Terraform's provider uses.
+The first live test of that fix hit a second, smaller issue:
+`role-chaining: true` tags the assumed session by default (for
+auditability), which needs `sts:TagSession` on the target role, and
+`OrganizationAccountAccessRole`'s fixed AWS-managed trust policy
+doesn't grant that to arbitrary principals — fixed with
+`role-skip-session-tagging: true`, again matching Terraform's own
+`assume_role` block, which doesn't tag sessions by default. Verified
+live end to end afterward: manually triggered the corrected workflow
+with the stack genuinely idle, watched it correctly detect the idle
+state and run the teardown job, then confirmed via direct AWS CLI
+(not just the workflow's own green checkmark) that the ALB, ECS
+service, and WAF Web ACL were all actually gone.
+
 **Final right-sizing, from real post-migration usage, not the
 migration tuning.** See Open Question #2 above for the full three-step
 sizing history. The short version: `256`/`512` (the original floor)
