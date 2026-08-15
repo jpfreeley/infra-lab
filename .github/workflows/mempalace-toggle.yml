@@ -19,6 +19,18 @@ on:
         options:
           - up
           - down
+  # Lets mempalace-idle-teardown.yml call this workflow directly instead of
+  # duplicating the destroy target list — one place the resource list lives,
+  # whether triggered by a human or by the idle checker. workflow_call
+  # inputs can't use type: choice (only boolean/number/string), so this is
+  # a separate input block from workflow_dispatch's above; `inputs.action`
+  # resolves correctly either way depending on which trigger fired.
+  workflow_call:
+    inputs:
+      action:
+        description: "Spin the mempalace server up or tear it down"
+        required: true
+        type: string
 
 permissions:
   id-token: write # required for OIDC
