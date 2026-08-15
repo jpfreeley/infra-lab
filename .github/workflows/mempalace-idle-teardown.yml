@@ -69,6 +69,15 @@ jobs:
           role-to-assume: arn:aws:iam::310697203282:role/OrganizationAccountAccessRole
           aws-region: us-east-1
           role-chaining: true
+          # role-chaining tags the assumed session by default (for
+          # auditability), which needs sts:TagSession on the target
+          # role — OrganizationAccountAccessRole's fixed AWS-managed
+          # trust policy doesn't grant that to arbitrary principals, so
+          # the first real attempt at this failed with "not authorized
+          # to perform: sts:TagSession." Terraform's own assume_role
+          # block never hits this because it doesn't tag sessions by
+          # default. Skip tagging here to match that behavior.
+          role-skip-session-tagging: true
 
       - name: Check whether the ALB exists and is idle
         id: check
