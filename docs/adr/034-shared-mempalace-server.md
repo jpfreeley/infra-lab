@@ -193,6 +193,7 @@ reachable dev desktop widens blast radius and dilutes ADR-031's
 narrowly-scoped SCP, and while Workspaces is unused *right now*, "not
 soon" isn't "never." Isolation won on a close call, not a lopsided one —
 worth revisiting if Workspaces stays unused indefinitely.
+
 - Full public exposure means the bearer token + WAF are the only things
   between the internet and JP's memory data. Token rotation process isn't
   designed yet (see open questions).
