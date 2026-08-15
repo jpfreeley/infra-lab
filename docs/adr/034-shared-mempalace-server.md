@@ -4,9 +4,14 @@
 
 Accepted. Design verified live 2026-08-14. The full ~41k-drawer local
 palace was migrated into the shared server 2026-08-15 (see "Security
-Incident, WAF Tuning, and Full Migration" below) and the stack is
-currently torn down again to stop metered spend between sessions — see
-"Currently Torn Down" note below.
+Incident, WAF Tuning, and Full Migration" below), the task was
+right-sized off real usage data the same day (see "Automatic Idle
+Teardown and Final Right-Sizing" below), and up/down control is now
+automatic — the stack tears itself down after an hour of no real
+traffic rather than needing a manual trigger every time. See
+"Currently Torn Down" for the last manually-observed state; the
+idle-teardown workflow is now the thing that actually keeps it down
+between sessions, not a person remembering to run it.
 
 ## Context
 
@@ -209,27 +214,40 @@ worth revisiting if Workspaces stays unused indefinitely.
 1. **Domain/DNS** — SUPERSEDED: was "bare ALB DNS name for now," now decided
    as `mempalace.lintwiselabs.com` (see "Decided, Not Yet Built" above).
    Not yet implemented — no Route53 record or ACM cert created yet.
-2. **Task sizing** — RESOLVED, with real CloudWatch data, not a guess.
-   `cpu=256`/`memory=512` (Fargate's floor) is enough for the service to
-   start, pass health checks, and serve light single-user traffic — that
-   part of the original guess held up. But it is genuinely undersized for
-   write-heavy bulk load: during the 2026-08-15 migration, CloudWatch
-   showed the task pegged at 99-100% CPU utilization for sustained
-   multi-minute stretches while memory stayed under 60% and EFS
-   `PercentIOLimit` stayed under 1% — CPU, not storage, was the real
-   ceiling. Bumping to `cpu=2048`/`memory=4096` roughly quadrupled
-   sustained throughput (2.3 rec/s -> 9.5 rec/s active writes/sec).
-   **Decision: keep the floor (`256`/`512`) as the steady-state default**
-   — this is a single-user, mostly-read/light-write service day to day,
-   and the floor is what's actually deployed now — but treat the bump as
-   a known, tested lever for any future bulk-load operation (another big
-   migration, a mass re-embed), not something to rediscover from scratch.
+2. **Task sizing** — RESOLVED and right-sized, with real CloudWatch data
+   at every step, not guesses. Went through three sizes before landing on
+   the final steady-state default:
+   - `cpu=256`/`memory=512` (Fargate's floor, the original starting
+     guess) — enough to start, pass health checks, and survive idle. But
+     genuinely undersized for write-heavy bulk load: during the
+     2026-08-15 migration, CloudWatch showed the task pegged at 99-100%
+     CPU for sustained multi-minute stretches (memory under 60%, EFS
+     `PercentIOLimit` under 1% — CPU, not storage, was the ceiling).
+   - `cpu=2048`/`memory=4096` — a temporary bump for that migration only,
+     roughly quadrupling sustained write throughput (2.3 rec/s -> 9.5
+     rec/s). Reverted back to `256`/`512` the same day once the
+     ~41k-record migration finished (PR #119) — this size was never meant
+     to be the steady-state default, only a lever for bulk operations.
+   - **`cpu=512`/`memory=1024` — the actual steady-state default, landed
+     on after real post-migration usage, not the migration tuning.** A
+     genuine light-usage burst (a handful of near-simultaneous
+     `mempalace_search` calls in one session) spiked ALB
+     `TargetResponseTime` to a 15s worst case at the `256` floor,
+     CPU-bound on embedding computation (CPU jumped 10%->66% in the same
+     minute). `256` is fine at idle but not for interactive query bursts,
+     which matters far more for this service's real usage pattern than
+     bulk-write throughput does. Verified live at `512`: the same class
+     of query burst dropped to a 0.50s worst case (30x improvement) with
+     CPU only peaking at 15% — real headroom, not just barely enough.
    Both values are plain Terraform variables (`mempalace_cpu`/
    `mempalace_memory` in `infra/live/mempalace/variables.tf`), so scaling
-   for a one-off bulk job is a one-line `-var` change plus a redeploy, not
-   a module edit. Remote-embedding-server offload (noted below as an
-   alternative) was never tried — the brute-force CPU bump was simpler
-   and got measured, verified results.
+   further for a one-off bulk job (another big migration, a mass
+   re-embed) is still just a one-line change plus a redeploy, not a
+   module edit — the `2048`/`4096` data point above stays available as a
+   known, tested lever even though it's no longer the default. Remote-
+   embedding-server offload (noted below as an alternative) was never
+   tried — the brute-force CPU bump was simpler and got measured,
+   verified results at every size tested.
 3. **Token rotation** — RESOLVED as designed and actually exercised for
    real, not just planned. The guest-key/permission-level model described
    in public docs does **not** exist in the installed CLI (see "Multi-
@@ -536,6 +554,55 @@ running tasks, no WAF Web ACLs, endpoint unreachable), not just the
 workflow's green checkmark. EFS was never in the teardown's scope, so
 all migrated data persists untouched through the down/up cycle — that
 was always the point of splitting EFS out of the toggle's target list.
+
+## Automatic Idle Teardown and Final Right-Sizing (2026-08-15)
+
+Two more real changes, both from the session immediately following the
+migration, both verified live rather than just designed:
+
+**Automatic idle teardown.** The manual `mempalace-toggle.yml` toggle
+(up/down via `workflow_dispatch`) still exists and still works, but the
+stack no longer depends on a person remembering to run it. A new
+scheduled workflow, `.github/workflows/mempalace-idle-teardown.yml`,
+checks every 15 minutes whether the ALB has served any real client 2xx
+traffic in the trailing 60 minutes and tears the stack down the same
+way the manual toggle does (via `workflow_call`, reusing the exact same
+destroy target list rather than duplicating it) if it's been idle that
+whole hour.
+
+The one design risk here — the ALB's own target-group health check
+hits `/healthz` every 30 seconds forever, so a naive "any traffic"
+check would never see zero and would keep the stack up permanently —
+was tested empirically, not just reasoned from AWS docs, with the
+stack live: a 5-minute window with only health checks running (zero
+real requests) returned **zero datapoints** for
+`HTTPCode_Target_2XX_Count`, and a single real client request sent in
+the same session registered correctly (`Sum: 1.0`). Health checks are
+genuinely invisible to that metric; real traffic isn't. A second real
+bug was caught and fixed before this ever ran unattended: a
+freshly-created ALB has no CloudWatch history, so "no datapoints in the
+trailing 60 minutes" is ambiguous between "confirmed idle for an hour"
+and "hasn't existed for an hour yet" — without an explicit age check, a
+stack brought up and checked before a real hour had passed would look
+identical to an hour of silence and could tear back down almost
+immediately. Fixed with a 65-minute minimum-age gate before the idle
+check ever runs.
+
+**Final right-sizing, from real post-migration usage, not the
+migration tuning.** See Open Question #2 above for the full three-step
+sizing history. The short version: `256`/`512` (the original floor)
+turned out fine at idle but genuinely bad for real interactive query
+bursts — a handful of near-simultaneous `mempalace_search` calls spiked
+worst-case ALB response time to 15 seconds, CPU-bound on embedding
+computation. `512`/`1024` is now the steady-state default, verified
+live with a before/after comparison on the same class of query burst:
+15s worst case dropped to 0.50s (30x), and CPU peaked at only 15%
+instead of 66% — real headroom, not just barely enough. This is a
+permanent default change, not a temporary bump like the migration-era
+`2048`/`4096` (which was reverted the same day it was no longer
+needed, PR #119) — `512`/`1024` is what the stack actually deploys at
+now, combined with the idle teardown above so the larger steady-state
+size only costs money while genuinely in use.
 
 ## Currently Torn Down (end of 2026-08-14 session)
 
