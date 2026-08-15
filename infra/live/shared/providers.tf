@@ -12,19 +12,17 @@ terraform {
     }
   }
 
-  # Had no backend block (defaulted to local state), same gap found and
-  # fixed in infra/mgmt/org on 2026-08-14. This module holds no resources
-  # today (providers.tf + variables.tf only) so there was nothing at risk,
-  # but fixing it now for consistency rather than leaving a second copy of
-  # the same gap for whenever this module actually grows resources.
-  backend "s3" {
-    bucket         = "infra-lab-tf-state-551452024305"
-    key            = "live/shared/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "infra-lab-tf-state-locks"
-    encrypt        = true
-    kms_key_id     = "alias/aws/s3"
-  }
+  # Deliberately no backend block. Same gap exists here as the one found
+  # and fixed in infra/mgmt/org on 2026-08-14 (local state only, no
+  # remote backup); tried adding one here too, but it broke
+  # infra-compliance.yml's CI check, which relies on `terraform init
+  # -backend=false` for an offline plan and errors once an explicit
+  # backend block exists (confirmed by reproducing the CI failure
+  # locally, not guessed). Reverted rather than touching that CI job:
+  # this module holds zero real resources today (providers.tf +
+  # variables.tf only), so there's nothing actually at risk from staying
+  # on local state, worth fixing properly (alongside the CI job) only
+  # once this module has real resources to protect.
 }
 
 # The default provider for the management/shared account
