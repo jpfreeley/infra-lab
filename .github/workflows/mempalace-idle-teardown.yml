@@ -1,0 +1,125 @@
+name: MemPalace Idle Auto-Teardown
+
+# Automatic follow-on to the manual mempalace-toggle.yml: checks every 15
+# minutes whether the ALB has served any real client 2xx traffic in the
+# trailing 60 minutes, and tears the stack down (same target list as the
+# manual "down" toggle, via workflow_call so that list only lives in one
+# place) if it's been idle that whole hour. If the ALB doesn't exist, the
+# stack is already down and this is a no-op — cheap enough to just run on
+# a schedule indefinitely rather than trying to only run while the stack
+# is up.
+#
+# Deliberately checks HTTPCode_Target_2XX_Count, not raw RequestCount:
+# the target group's own health check hits /healthz every 30s regardless
+# of real usage, and a WAF-blocked scan/bot hit isn't real usage either —
+# both would keep "activity" artificially non-zero forever if counted.
+# ALB health-check traffic is excluded from this metric by AWS's own
+# design (same reason it's excluded from ALB access logs), so a real
+# zero here means genuinely no client requests, not "no health checks."
+# Verified empirically 2026-08-15, not just reasoned from docs: with the
+# target group healthy and pinging /healthz every 30s (so ~10 health
+# checks in a 5-minute window) and zero real client requests sent,
+# HTTPCode_Target_2XX_Count returned no datapoints at all for that
+# window — confirmed health checks genuinely don't register.
+#
+# Uses GitHub Actions cron, not EventBridge Scheduler (ADR-034 decision,
+# same tradeoff as the manual toggle: simpler, no new IAM surface, at the
+# cost of GitHub's schedule being best-effort/delayable under load —
+# acceptable here since a late teardown just means a few extra idle
+# minutes of a ~$0.05/hr stack, not a correctness problem).
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {} # manual trigger, for testing the check itself
+
+permissions:
+  id-token: write # required for OIDC
+  contents: read
+
+jobs:
+  check-idle:
+    name: Check idle status
+    runs-on: ubuntu-latest
+    outputs:
+      should-teardown: ${{ steps.check.outputs.should_teardown }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::551452024305:role/infra-lab-github-actions-deploy
+          aws-region: us-east-1
+
+      - name: Check whether the ALB exists and is idle
+        id: check
+        run: |
+          ALB_INFO=$(aws elbv2 describe-load-balancers \
+            --names infra-lab-mempalace-alb \
+            --region us-east-1 \
+            --query 'LoadBalancers[0].{arn:LoadBalancerArn,created:CreatedTime}' \
+            --output json 2>/dev/null || echo "null")
+
+          ALB_ARN=$(echo "$ALB_INFO" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['arn'] if d else 'None')")
+
+          if [ "$ALB_ARN" = "None" ] || [ -z "$ALB_ARN" ]; then
+            echo "ALB not found — already down, nothing to do."
+            echo "should_teardown=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Grace period: a freshly-created ALB has no CloudWatch history
+          # yet, and "no datapoints" is indistinguishable from "confirmed
+          # idle" in the query below. Without this, a stack brought up and
+          # checked before an hour has actually passed would look exactly
+          # like an hour of real silence and could tear down almost
+          # immediately — the opposite of the 1-hour grace period this is
+          # supposed to give. Skip entirely until the ALB itself is old
+          # enough to have actually earned a real "no traffic for an hour"
+          # verdict.
+          CREATED=$(echo "$ALB_INFO" | python3 -c "import json,sys; print(json.load(sys.stdin)['created'])")
+          AGE_SECONDS=$(( $(date -u +%s) - $(date -u -d "$CREATED" +%s) ))
+          if [ "$AGE_SECONDS" -lt 3900 ]; then
+            echo "ALB is only ${AGE_SECONDS}s old — too young to judge idle yet, staying up."
+            echo "should_teardown=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # CloudWatch's LoadBalancer dimension value is the ARN suffix,
+          # e.g. "app/infra-lab-mempalace-alb/1234567890abcdef".
+          DIMENSION=$(echo "$ALB_ARN" | sed -E 's#.*loadbalancer/##')
+
+          END=$(date -u +%Y-%m-%dT%H:%M:%S)
+          START=$(date -u -d '-60 minutes' +%Y-%m-%dT%H:%M:%S)
+
+          SUM=$(aws cloudwatch get-metric-statistics \
+            --namespace AWS/ApplicationELB \
+            --metric-name HTTPCode_Target_2XX_Count \
+            --dimensions Name=LoadBalancer,Value="$DIMENSION" \
+            --start-time "$START" --end-time "$END" \
+            --period 3600 --statistics Sum \
+            --region us-east-1 \
+            --query 'Datapoints[0].Sum' --output text)
+
+          echo "Real 2xx responses in the trailing 60 minutes: ${SUM}"
+
+          if [ "$SUM" = "None" ] || [ -z "$SUM" ]; then
+            echo "No datapoints at all — treating as idle."
+            echo "should_teardown=true" >> "$GITHUB_OUTPUT"
+          elif awk -v n="$SUM" 'BEGIN { exit !(n == 0) }'; then
+            echo "Zero real traffic for an hour — idle, tearing down."
+            echo "should_teardown=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Real traffic seen — staying up."
+            echo "should_teardown=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  teardown:
+    name: Tear down (idle)
+    needs: check-idle
+    if: needs.check-idle.outputs.should-teardown == 'true'
+    uses: ./.github/workflows/mempalace-toggle.yml
+    with:
+      action: down
+    permissions:
+      id-token: write
+      contents: read
