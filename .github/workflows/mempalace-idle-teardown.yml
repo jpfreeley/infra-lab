@@ -2,12 +2,12 @@ name: MemPalace Idle Auto-Teardown
 
 # Automatic follow-on to the manual mempalace-toggle.yml: checks every 15
 # minutes whether the ALB has served any real client 2xx traffic in the
-# trailing 60 minutes, and tears the stack down (same target list as the
+# trailing 90 minutes, and tears the stack down (same target list as the
 # manual "down" toggle, via workflow_call so that list only lives in one
-# place) if it's been idle that whole hour. If the ALB doesn't exist, the
-# stack is already down and this is a no-op — cheap enough to just run on
-# a schedule indefinitely rather than trying to only run while the stack
-# is up.
+# place) if it's been idle that whole window. If the ALB doesn't exist,
+# the stack is already down and this is a no-op — cheap enough to just
+# run on a schedule indefinitely rather than trying to only run while the
+# stack is up.
 #
 # Deliberately checks HTTPCode_Target_2XX_Count, not raw RequestCount:
 # the target group's own health check hits /healthz every 30s regardless
@@ -70,15 +70,15 @@ jobs:
           # Grace period: a freshly-created ALB has no CloudWatch history
           # yet, and "no datapoints" is indistinguishable from "confirmed
           # idle" in the query below. Without this, a stack brought up and
-          # checked before an hour has actually passed would look exactly
-          # like an hour of real silence and could tear down almost
-          # immediately — the opposite of the 1-hour grace period this is
-          # supposed to give. Skip entirely until the ALB itself is old
-          # enough to have actually earned a real "no traffic for an hour"
-          # verdict.
+          # checked before the full idle window has actually passed would
+          # look exactly like a real window of silence and could tear
+          # down almost immediately — the opposite of the grace period
+          # this is supposed to give. Skip entirely until the ALB itself
+          # is old enough to have actually earned a real "no traffic for
+          # 90 minutes" verdict (90 min + a 5 min buffer).
           CREATED=$(echo "$ALB_INFO" | python3 -c "import json,sys; print(json.load(sys.stdin)['created'])")
           AGE_SECONDS=$(( $(date -u +%s) - $(date -u -d "$CREATED" +%s) ))
-          if [ "$AGE_SECONDS" -lt 3900 ]; then
+          if [ "$AGE_SECONDS" -lt 5700 ]; then
             echo "ALB is only ${AGE_SECONDS}s old — too young to judge idle yet, staying up."
             echo "should_teardown=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -89,24 +89,24 @@ jobs:
           DIMENSION=$(echo "$ALB_ARN" | sed -E 's#.*loadbalancer/##')
 
           END=$(date -u +%Y-%m-%dT%H:%M:%S)
-          START=$(date -u -d '-60 minutes' +%Y-%m-%dT%H:%M:%S)
+          START=$(date -u -d '-90 minutes' +%Y-%m-%dT%H:%M:%S)
 
           SUM=$(aws cloudwatch get-metric-statistics \
             --namespace AWS/ApplicationELB \
             --metric-name HTTPCode_Target_2XX_Count \
             --dimensions Name=LoadBalancer,Value="$DIMENSION" \
             --start-time "$START" --end-time "$END" \
-            --period 3600 --statistics Sum \
+            --period 5400 --statistics Sum \
             --region us-east-1 \
             --query 'Datapoints[0].Sum' --output text)
 
-          echo "Real 2xx responses in the trailing 60 minutes: ${SUM}"
+          echo "Real 2xx responses in the trailing 90 minutes: ${SUM}"
 
           if [ "$SUM" = "None" ] || [ -z "$SUM" ]; then
             echo "No datapoints at all — treating as idle."
             echo "should_teardown=true" >> "$GITHUB_OUTPUT"
           elif awk -v n="$SUM" 'BEGIN { exit !(n == 0) }'; then
-            echo "Zero real traffic for an hour — idle, tearing down."
+            echo "Zero real traffic for 90 minutes — idle, tearing down."
             echo "should_teardown=true" >> "$GITHUB_OUTPUT"
           else
             echo "Real traffic seen — staying up."
