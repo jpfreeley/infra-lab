@@ -38,15 +38,15 @@ variable "acm_certificate_arn" {
 }
 
 variable "mempalace_cpu" {
-  description = "Fargate task CPU units for the mempalace_server module (passed through). Was temporarily bumped 256->2048 on 2026-08-15 for the bulk EFS migration (CloudWatch confirmed CPU, not EFS or client concurrency, was the bottleneck — task sat at 99-100%, ~4x'd throughput). Reverted back to 256 the same day once the ~41k-record migration finished; steady-state single-user traffic doesn't need more."
+  description = "Fargate task CPU units for the mempalace_server module (passed through). Was temporarily bumped 256->2048 on 2026-08-15 for the bulk EFS migration (CloudWatch confirmed CPU, not EFS or client concurrency, was the bottleneck), then reverted to 256 once that finished. Raised again the same day to 512, this time as the new steady-state floor, not a temporary bump: a real post-migration usage burst (several near-simultaneous mempalace_search calls in one agent session) spiked ALB TargetResponseTime to a 15s worst case at cpu=256, CPU-bound on embedding computation (confirmed via CloudWatch — CPU jumped 10%->66% in the same minute the latency spiked, EFS PercentIOLimit stayed under 1% the whole time, ruling out storage). 256 is fine at idle but not for interactive query bursts, which matters more for this service's actual use pattern than bulk-write throughput does."
   type        = number
-  default     = 256
+  default     = 512
 }
 
 variable "mempalace_memory" {
-  description = "Fargate task memory in MiB for the mempalace_server module (passed through). Reverted alongside mempalace_cpu (see above) back to the original 512 once the migration that needed 4096 finished."
+  description = "Fargate task memory in MiB for the mempalace_server module (passed through). Raised alongside mempalace_cpu (see above) to 1024 as the new steady-state floor — 1024 is Fargate's minimum allowed memory at cpu=512."
   type        = number
-  default     = 512
+  default     = 1024
 }
 
 variable "embedding_device" {
