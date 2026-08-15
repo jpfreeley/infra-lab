@@ -207,7 +207,15 @@ resource "aws_wafv2_web_acl" "mempalace" {
 
     statement {
       rate_based_statement {
-        limit              = 2000 # requests per 5-minute window per IP
+        # Bumped 2000 -> 20000 (temporary, 2026-08-15) for the bulk EFS
+        # migration: at cpu=2048 the task can sustain ~9-14 req/s from a
+        # single client, but 2000/5min (~6.67 req/s) started 403'ing the
+        # migration script's own traffic well below that ceiling. This is
+        # a single known trusted IP running an authenticated one-time
+        # bulk load, not the threat this rule exists for. Revert to 2000
+        # (alongside the cpu/memory revert in variables.tf) once the
+        # migration is done.
+        limit              = 20000 # requests per 5-minute window per IP
         aggregate_key_type = "IP"
       }
     }

@@ -38,15 +38,15 @@ variable "acm_certificate_arn" {
 }
 
 variable "mempalace_cpu" {
-  description = "Fargate task CPU units for the mempalace_server module (passed through)."
+  description = "Fargate task CPU units for the mempalace_server module (passed through). Bumped from 256 to 2048 2026-08-15 after confirming via CloudWatch that CPU (not EFS, not client concurrency) was the bottleneck during migration testing — task sat at 99-100% utilization while memory stayed under 60% and EFS PercentIOLimit stayed under 1%. Scale back down to 256 once the bulk migration is done; steady-state single-user traffic doesn't need this."
   type        = number
-  default     = 256
+  default     = 2048
 }
 
 variable "mempalace_memory" {
-  description = "Fargate task memory in MiB for the mempalace_server module (passed through)."
+  description = "Fargate task memory in MiB for the mempalace_server module (passed through). 4096 is the minimum Fargate allows at cpu=2048 (see mempalace_cpu)."
   type        = number
-  default     = 512
+  default     = 4096
 }
 
 variable "embedding_device" {
