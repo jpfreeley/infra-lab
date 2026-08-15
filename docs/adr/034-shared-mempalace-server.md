@@ -7,7 +7,7 @@ palace was migrated into the shared server 2026-08-15 (see "Security
 Incident, WAF Tuning, and Full Migration" below), the task was
 right-sized off real usage data the same day (see "Automatic Idle
 Teardown and Final Right-Sizing" below), and up/down control is now
-automatic — the stack tears itself down after an hour of no real
+automatic — the stack tears itself down after 90 minutes of no real
 traffic rather than needing a manual trigger every time. See
 "Currently Torn Down" for the last manually-observed state; the
 idle-teardown workflow is now the thing that actually keeps it down
@@ -565,10 +565,12 @@ migration, both verified live rather than just designed:
 stack no longer depends on a person remembering to run it. A new
 scheduled workflow, `.github/workflows/mempalace-idle-teardown.yml`,
 checks every 15 minutes whether the ALB has served any real client 2xx
-traffic in the trailing 60 minutes and tears the stack down the same
+traffic in the trailing 90 minutes and tears the stack down the same
 way the manual toggle does (via `workflow_call`, reusing the exact same
 destroy target list rather than duplicating it) if it's been idle that
-whole hour.
+whole window. (Started at a 60-minute window when first built, raised
+to 90 minutes the same day per JP's preference — a plain constant
+change in the workflow, not a design change.)
 
 The one design risk here — the ALB's own target-group health check
 hits `/healthz` every 30 seconds forever, so a naive "any traffic"
@@ -581,12 +583,12 @@ the same session registered correctly (`Sum: 1.0`). Health checks are
 genuinely invisible to that metric; real traffic isn't. A second real
 bug was caught and fixed before this ever ran unattended: a
 freshly-created ALB has no CloudWatch history, so "no datapoints in the
-trailing 60 minutes" is ambiguous between "confirmed idle for an hour"
-and "hasn't existed for an hour yet" — without an explicit age check, a
-stack brought up and checked before a real hour had passed would look
-identical to an hour of silence and could tear back down almost
-immediately. Fixed with a 65-minute minimum-age gate before the idle
-check ever runs.
+trailing window" is ambiguous between "confirmed idle the whole time"
+and "hasn't existed that long yet" — without an explicit age check, a
+stack brought up and checked before the full window had actually
+passed would look identical to real silence and could tear back down
+almost immediately. Fixed with a minimum-age gate (window length plus a
+5-minute buffer) before the idle check ever runs.
 
 **Final right-sizing, from real post-migration usage, not the
 migration tuning.** See Open Question #2 above for the full three-step
