@@ -45,7 +45,7 @@ jobs:
       should-teardown: ${{ steps.check.outputs.should_teardown }}
     steps:
       - name: Configure AWS credentials (management account)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::551452024305:role/infra-lab-github-actions-deploy
           aws-region: us-east-1
@@ -64,7 +64,7 @@ jobs:
       # assume-role into the same OrganizationAccountAccessRole
       # Terraform's provider uses, mirroring providers.tf exactly.
       - name: Configure AWS credentials (mempalace account)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::310697203282:role/OrganizationAccountAccessRole
           aws-region: us-east-1
