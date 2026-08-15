@@ -7,6 +7,21 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  # Previously had no backend block at all (defaulted to local state) —
+  # unlike every infra/live/* root, which already uses this same bucket.
+  # That gap meant this module's state lived only on whatever machine last
+  # ran it; a machine migration lost it, requiring a manual restore from an
+  # SMB backup on 2026-08-14 before this block was added. Matches the
+  # mgmt/backend module's own backend config (same bucket/lock table).
+  backend "s3" {
+    bucket         = "infra-lab-tf-state-551452024305"
+    key            = "mgmt/org/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "infra-lab-tf-state-locks"
+    encrypt        = true
+    kms_key_id     = "alias/aws/s3"
+  }
 }
 
 # Default provider (Management Account)

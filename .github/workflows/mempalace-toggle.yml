@@ -1,0 +1,92 @@
+name: MemPalace Server Toggle
+
+# Manual up/down control for the mempalace server's billable resources
+# (ALB, WAF, ECS service). Everything else (VPC, EFS, KMS key, Secrets
+# Manager secret, ECS cluster, IAM roles, task definition) costs close to
+# nothing and is never touched here, up or down.
+#
+# Start of the nightly-teardown plan from ADR-034 ("Decided, Not Yet
+# Built"): this is the manual trigger first, a schedule comes later once
+# this is proven out.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Spin the mempalace server up or tear it down"
+        required: true
+        type: choice
+        options:
+          - up
+          - down
+
+permissions:
+  id-token: write # required for OIDC
+  contents: read
+
+concurrency:
+  group: mempalace-toggle
+  cancel-in-progress: false
+
+env:
+  TF_VAR_aws_profile: "" # no named profile in CI, falls back to OIDC creds
+
+jobs:
+  toggle:
+    name: "${{ inputs.action == 'up' && 'Spin Up' || 'Tear Down' }}"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/live/mempalace
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::551452024305:role/infra-lab-github-actions-deploy
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.7.0
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Spin Up
+        if: inputs.action == 'up'
+        run: terraform apply -auto-approve
+
+      - name: Tear Down
+        if: inputs.action == 'down'
+        # Targeted, deliberately: this destroys only the resources that
+        # cost real standing money. VPC/EFS/KMS/Secrets/cluster/IAM stay.
+        # ECS service is included: destroying its target group forces its
+        # replacement anyway (Terraform can't leave a service pointing at
+        # a target group that won't exist), so it's listed explicitly
+        # rather than relying on that cascade to do it implicitly.
+        #
+        # Tested end-to-end 2026-08-14, not just written and assumed:
+        # destroying aws_lb.mempalace also pulls in the Route53 alias
+        # record automatically (Terraform won't leave it referencing a
+        # destroyed ALB's live attributes), confirmed via `terraform plan`
+        # showing all 8 resources (7 targeted + the DNS record) correctly
+        # back to "to add" afterward, and directly via AWS CLI
+        # (ecs list-tasks / elbv2 describe-load-balancers / wafv2
+        # list-web-acls all empty). Nothing is left dangling.
+        run: |
+          terraform destroy -auto-approve \
+            -target=aws_wafv2_web_acl_association.mempalace \
+            -target=aws_wafv2_web_acl.mempalace \
+            -target=aws_lb_listener.https \
+            -target=aws_lb_listener.http \
+            -target=aws_lb_target_group.mempalace \
+            -target=aws_lb.mempalace \
+            -target=module.mempalace.aws_ecs_service.this
+
+      - name: Show current outputs
+        if: always()
+        run: terraform output || true
