@@ -11,6 +11,18 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  # Deliberately no backend block. Same gap exists here as the one found
+  # and fixed in infra/mgmt/org on 2026-08-14 (local state only, no
+  # remote backup); tried adding one here too, but it broke
+  # infra-compliance.yml's CI check, which relies on `terraform init
+  # -backend=false` for an offline plan and errors once an explicit
+  # backend block exists (confirmed by reproducing the CI failure
+  # locally, not guessed). Reverted rather than touching that CI job:
+  # this module holds zero real resources today (providers.tf +
+  # variables.tf only), so there's nothing actually at risk from staying
+  # on local state, worth fixing properly (alongside the CI job) only
+  # once this module has real resources to protect.
 }
 
 # The default provider for the management/shared account

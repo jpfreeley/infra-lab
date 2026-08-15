@@ -57,7 +57,7 @@ resource "aws_organizations_policy" "tag_policy" {
           "@@assign" = "Environment"
         }
         tag_value = {
-          "@@assign" = ["mgmt", "shared", "dev", "staging", "prod", "sandbox"]
+          "@@assign" = ["mgmt", "shared", "dev", "staging", "prod", "sandbox", "workspaces", "mempalace"]
         }
         enforced_for = {
           "@@assign" = [

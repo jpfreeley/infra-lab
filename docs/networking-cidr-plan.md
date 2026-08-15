@@ -17,7 +17,7 @@ tenant workloads with restricted egress.
 | prod | Control | 10.0.64.0/20 | 4,094 |
 | prod | Execution | 10.0.80.0/20 | 4,094 |
 | workspaces | WorkSpaces | 10.0.96.0/20 | 4,094 |
-| reserved | future | 10.0.112.0/20 | 4,094 |
+| mempalace | MemPalace | 10.0.112.0/20 | 4,094 |
 
 ## Subnet Layout (per VPC, 3 AZs)
 
@@ -124,6 +124,17 @@ Each /20 VPC is divided into subnet tiers across 3 AZs:
 | private | us-east-1a | 10.0.100.0/22 |
 | private | us-east-1b | 10.0.104.0/22 |
 
+### MemPalace VPC (10.0.112.0/20)
+
+Public-only — no NAT Gateway, no private/data tiers (ADR-034/ADR-031 cost
+pattern: the ECS task gets a public IP directly, its security group
+restricts ingress to the ALB's SG).
+
+| Tier | AZ | CIDR |
+| --- | --- | --- |
+| public | us-east-1a | 10.0.112.0/24 |
+| public | us-east-1b | 10.0.113.0/24 |
+
 ## VPC Endpoint Strategy
 
 Control VPCs get Interface endpoints for private AWS API access:
@@ -146,6 +157,7 @@ Control VPCs get Interface endpoints for private AWS API access:
 | staging | 1 (single AZ) | Cost optimization |
 | prod | 3 (per AZ) | High availability |
 | workspaces | 1 (single AZ) | Cost optimization |
+| mempalace | 0 | No private subnets to serve — public-only topology |
 
 ## VPC Peering
 

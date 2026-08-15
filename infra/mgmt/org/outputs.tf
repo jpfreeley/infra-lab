@@ -22,3 +22,8 @@ output "workspaces_account_id" {
   description = "The AWS Account ID of the dedicated WorkSpaces account"
   value       = aws_organizations_account.workspaces.id
 }
+
+output "mempalace_account_id" {
+  description = "The AWS Account ID of the dedicated MemPalace account. Needed to fill in infra/live/mempalace/providers.tf's assume_role ARN after this account is created."
+  value       = aws_organizations_account.mempalace.id
+}
