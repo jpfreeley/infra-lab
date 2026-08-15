@@ -140,6 +140,24 @@ resource "aws_wafv2_web_acl" "mempalace" {
       managed_rule_group_statement {
         name        = "AWSManagedRulesCommonRuleSet"
         vendor_name = "AWS"
+
+        # GenericLFI_BODY (path-traversal/local-file-inclusion detection)
+        # false-positives on ordinary code content — confirmed directly
+        # (2026-08-15) blocking a plain bash script during a migration
+        # test, with a 403 and a WAF log entry showing
+        # terminatingRuleId=aws-managed-common, ruleId=GenericLFI_BODY.
+        # This palace's whole purpose is storing arbitrary text/code
+        # verbatim, so this rule is fundamentally the wrong shape for
+        # this endpoint's traffic. Overridden to Count (still visible if
+        # WAF logging ever comes back, just not blocking) rather than
+        # dropping the whole managed rule group, which still has value
+        # for actual attack patterns unrelated to code-shaped content.
+        rule_action_override {
+          name = "GenericLFI_BODY"
+          action_to_use {
+            count {}
+          }
+        }
       }
     }
 
