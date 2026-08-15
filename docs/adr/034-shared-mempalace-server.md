@@ -2,8 +2,11 @@
 
 ## Status
 
-Accepted (design verified live 2026-08-14; currently torn down to stop
-metered spend between sessions — see "Currently Torn Down" note below)
+Accepted. Design verified live 2026-08-14. The full ~41k-drawer local
+palace was migrated into the shared server 2026-08-15 (see "Security
+Incident, WAF Tuning, and Full Migration" below) and the stack is
+currently torn down again to stop metered spend between sessions — see
+"Currently Torn Down" note below.
 
 ## Context
 
@@ -206,25 +209,41 @@ worth revisiting if Workspaces stays unused indefinitely.
 1. **Domain/DNS** — SUPERSEDED: was "bare ALB DNS name for now," now decided
    as `mempalace.lintwiselabs.com` (see "Decided, Not Yet Built" above).
    Not yet implemented — no Route53 record or ACM cert created yet.
-2. **Task sizing** — STILL UNMEASURED, module ships with a starting guess.
-   Confirmed from upstream docs: ChromaDB (the local default) needs ~300MB
-   disk for its embedding model; no RAM figure published. Docker isn't
-   available in this environment to measure directly. `mempalace` also
-   supports an optional remote embedding server (OpenAI-compatible
-   endpoint) — offloading embedding out of the task would meaningfully
-   shrink whatever Fargate size is needed, worth weighing against the added
-   moving part. `mempalace_server`'s defaults are `cpu=256`/`memory=512` —
-   Fargate's smallest possible size, not a measured number. Plan stands:
-   deploy at this floor, right-size from real CloudWatch metrics after the
-   first deploy rather than lab-testing blind.
-3. **Token rotation** — PARTIALLY RESOLVED. Public docs (not yet verified
-   against the actual installed CLI) describe guest keys with permission
-   levels (`read` / `write` / `admin`) that are revocable independently of
-   the root `palace_key`. If confirmed, design is: one `palace_key` (admin)
-   generated out-of-band into Secrets Manager per ADR-023, used to mint a
-   separate revocable guest key per device/client — losing or rotating one
-   device's access never requires rotating every other client's token.
-   Verifying this against `mempalace serve --help` before committing to it.
+2. **Task sizing** — RESOLVED, with real CloudWatch data, not a guess.
+   `cpu=256`/`memory=512` (Fargate's floor) is enough for the service to
+   start, pass health checks, and serve light single-user traffic — that
+   part of the original guess held up. But it is genuinely undersized for
+   write-heavy bulk load: during the 2026-08-15 migration, CloudWatch
+   showed the task pegged at 99-100% CPU utilization for sustained
+   multi-minute stretches while memory stayed under 60% and EFS
+   `PercentIOLimit` stayed under 1% — CPU, not storage, was the real
+   ceiling. Bumping to `cpu=2048`/`memory=4096` roughly quadrupled
+   sustained throughput (2.3 rec/s -> 9.5 rec/s active writes/sec).
+   **Decision: keep the floor (`256`/`512`) as the steady-state default**
+   — this is a single-user, mostly-read/light-write service day to day,
+   and the floor is what's actually deployed now — but treat the bump as
+   a known, tested lever for any future bulk-load operation (another big
+   migration, a mass re-embed), not something to rediscover from scratch.
+   Both values are plain Terraform variables (`mempalace_cpu`/
+   `mempalace_memory` in `infra/live/mempalace/variables.tf`), so scaling
+   for a one-off bulk job is a one-line `-var` change plus a redeploy, not
+   a module edit. Remote-embedding-server offload (noted below as an
+   alternative) was never tried — the brute-force CPU bump was simpler
+   and got measured, verified results.
+3. **Token rotation** — RESOLVED as designed and actually exercised for
+   real, not just planned. The guest-key/permission-level model described
+   in public docs does **not** exist in the installed CLI (see "Multi-
+   User / Team Permissioning" below, verified directly against `mempalace
+   serve --help` v3.6.0) — there is exactly one bearer token per server
+   process, full read/write, no finer grain. Rotation is therefore: mint
+   a new token (`openssl rand -base64 32`), `aws secretsmanager
+   put-secret-value` it, force a new ECS deployment to pick it up. This
+   was actually done for real on 2026-08-15 after the WAF log-leak
+   incident (see below) — the one wrinkle discovered was that ECS's
+   default rolling deployment (200%/100%) doesn't work for this service
+   at all (see the write-lock fix, same section), so token rotation
+   silently never took effect until that was fixed. Documented so a
+   future rotation doesn't rediscover the same trap.
 4. **Backup/DR** — RESOLVED, per direct confirmation from the session
    actively running the current mp_sync setup: the central Qdrant server
    becomes the sole source of truth (no more per-machine Chroma
@@ -385,6 +404,139 @@ same destroy automatically (Terraform won't leave it referencing a
 destroyed resource's live attributes), and it came back correctly
 pointed at the new ALB on the next apply, no manual intervention.
 
+## Security Incident, WAF Tuning, and Full Migration (2026-08-15)
+
+Picking up the same session's next day: brought the stack back up, fixed
+two real bugs found only under live traffic, then ran the actual
+~41,204-record migration of the local palace into the shared server.
+
+**Security incident: bearer token leaking into WAF logs, plaintext.**
+While investigating an unrelated 403, enabled WAF logging
+(`aws_wafv2_web_acl_logging_configuration`) with a `redacted_fields {
+single_header { name = "authorization" } }` block specifically to keep
+the bearer token out of CloudWatch Logs. Confirmed via `aws wafv2
+get-logging-configuration` that the redaction config was live and
+correct — and confirmed, via direct `aws logs tail` inspection, that it
+did **not** work: the token appeared in plaintext in every logged
+request, well past any reasonable propagation delay. Root cause not
+pursued further (this looked like an AWS-side redaction bug, not a
+misconfiguration on our end) — fixed by treating the token as already
+exposed rather than debugging while still leaking:
+`aws wafv2 delete-logging-configuration` immediately, then the
+CloudWatch log group itself was destroyed (removing the already-leaked
+history), then the token was rotated
+(`openssl rand -base64 32` -> `put-secret-value`). WAF logging stays
+**off** until redaction is proven working with a throwaway token first —
+see the commented-out logging resources left in `alb.tf` with this
+explanation attached directly at the resource.
+
+**Deployment bug: rolling deployments silently never take effect.**
+Discovered while completing the token rotation above: the new task
+failed to start with `Writable MCP HTTP startup refused: ... palace is
+held by PID 1`. ECS's default rolling deployment (`200%`/`100%`) starts
+the new task *before* stopping the old one — but mempalace holds a
+single-writer lock on the shared EFS palace, so the new task's attempt
+to acquire that lock while the old task still holds it fails, every
+time, not occasionally. The deployment circuit breaker caught this and
+auto-rolled-back each time (the service stayed up throughout, on the
+stale task), which made this a *quiet* failure mode — a token rotation
+or any task-definition change would silently never actually deploy,
+with no error surfaced anywhere except a task-level log line. Fixed in
+`mempalace_server`'s `aws_ecs_service.this`:
+`deployment_maximum_percent = 100` / `deployment_minimum_healthy_percent
+= 0` — stop-then-start instead of start-then-stop. Consistent with the
+module's own singleton design (`desired_count` capped at 1 elsewhere);
+this is the deployment-strategy half of that same constraint.
+
+**WAF false positives on real content.** The migration corpus is code
+and infra documentation — shell scripts, Terraform, raw HTML/CSS
+snippets — which is exactly the kind of content AWS's
+`AWSManagedRulesCommonRuleSet` generic body-inspection rules are tuned
+to flag. First hit: `GenericLFI_BODY` on a bash script, patched with a
+targeted `rule_action_override` (Count instead of Block) for that one
+sub-rule. Second hit, same test session: `CrossSiteScripting_BODY` on a
+record containing raw HTML/inline CSS. Rather than keep patching
+individual sub-rules as more turned up, stepped back: this endpoint's
+real access control is the bearer token, not content inspection — every
+request either authenticates or gets `401`'d before content is even
+looked at, so the Common Rule Set's LFI/XSS/SQLi heuristics (built for
+anonymous public form traffic) are the wrong shape for a token-gated
+arbitrary-content-storage API. Set the whole
+`AWSManagedRulesCommonRuleSet` group's `override_action` to `count {}`
+(observation only, not removed — still visible in metrics/sampled
+requests). `AWSManagedRulesKnownBadInputsRuleSet` (Log4Shell-class
+exploit signatures — about attacking the server, not about stored
+content looking suspicious) and the rate-limit rule were left actively
+blocking; only the Common Rule Set's blocking was disabled.
+
+**Throughput tuning.** Diagnosed via CloudWatch, not guessed — see
+Open Question #2 above for the full CPU-bottleneck finding and the
+`cpu=2048`/`memory=4096` bump. A second, smaller ceiling turned up right
+after: once CPU was no longer the constraint, the migration script's
+own traffic (a single trusted, authenticated IP) started tripping the
+WAF `rate-limit` rule's `2000` requests/5-minute-window/IP threshold
+(~6.67 req/s sustained) well below the upsized task's real capacity —
+confirmed by the exact shape of the failure (a burst to 13-14 req/s,
+then 403s climbing as the rolling 5-minute window filled, recovering
+only once the early high-rate requests aged back out of that window).
+Raised to `20000` for the migration window, verified with a sustained
+255-second/2,432-record batch at the new limit with zero failures.
+Both bumps were temporary and explicitly tracked as such the moment
+they were applied (git commit messages, PR descriptions, and this ADR
+all noted "revert once migration is done") — reverted back to `2000`/
+`256`/`512` immediately after the migration finished, before the stack
+was torn down again. Final measured throughput ceiling: ~9-10 rec/s,
+which held flat regardless of client worker count (12 vs. 24 workers,
+same rate) — that plateau is the server's real per-request processing
+cost (most likely qdrant's embedding + single-writer indexing on every
+`add_drawer`), not a client- or network-side limit.
+
+**The migration itself.** Source: `mp_sync`'s export format
+(`{"id","document","metadata"}` JSONL, no embeddings — see Open
+Question #4), re-embedded on import as expected, not a raw vector copy.
+A resumable Python script (progress-tracked via a local `completed_ids`
+file, not committed) submitted each record as a real
+`mempalace_add_drawer` MCP `tools/call` over the authenticated `/mcp`
+endpoint. Final result: **41,204/41,204 records submitted successfully**
+(one individual 403 mid-run traced to the WAF false-positive above,
+resolved by the Count-instead-of-Block fix and confirmed by retrying it
+individually afterward). Verified success is `success: true` on every
+submission — but the server's final `mempalace_status` reports **34,646
+unique drawers**, not 41,204. Traced this gap to source, not assumed
+benign: `mempalace_add_drawer`'s server-side idempotency check
+(`mcp_server.py`) derives a deterministic `drawer_id` from
+`(wing, room, content)` and probes for that exact id before writing;
+if it already exists, it returns `{"success": true, "reason":
+"already_exists"}` instead of writing again. This is exact-content
+idempotency, not fuzzy/lossy dedup (that's a separate, unrelated
+CLI-only tool, `mempalace.dedup`, never invoked here) — the gap
+reflects genuine duplicate `(wing, room, content)` tuples already
+present in the source export (plausible for an enterprise codebase with
+shared boilerplate scripts mined into multiple similar rooms), not
+discarded or lost content.
+
+**MCP client wiring.** Added `mempalace-remote` as a second, separate
+MCP server entry (alongside the existing local `mempalace` entry, not
+replacing it) pointed at `https://mempalace.lintwiselabs.com/mcp` with
+the bearer token as an `Authorization` header. Verified healthy two
+ways: `claude mcp list` (a real MCP `initialize` handshake over the
+configured transport) and a direct `tools/call` to `mempalace_status`
+speaking raw JSON-RPC (since a server added mid-session isn't hot-loaded
+into an already-running session's own tool list) — both confirmed
+working end to end, not just a `/healthz` ping. Only this one machine's
+config was updated in this session; other devices still need the same
+`claude mcp add` command run locally.
+
+**Final teardown.** Once the migration and its retry were both
+confirmed, and the CPU/rate-limit bump reverted in git (see below), the
+stack was torn back down via the tested
+`.github/workflows/mempalace-toggle.yml` (`action=down`) — verified
+against real AWS state afterward (no ALB, ECS service `INACTIVE` 0/0, no
+running tasks, no WAF Web ACLs, endpoint unreachable), not just the
+workflow's green checkmark. EFS was never in the teardown's scope, so
+all migrated data persists untouched through the down/up cycle — that
+was always the point of splitting EFS out of the toggle's target list.
+
 ## Currently Torn Down (end of 2026-08-14 session)
 
 Deployed, verified live end-to-end (see below), then deliberately torn
@@ -409,6 +561,13 @@ real state as of the end of this session is torn down again, this time
 via the tested `.github/workflows/mempalace-toggle.yml` destroy target
 list rather than by hand — see that section for the exact, verified
 resource list and how spin-up/teardown actually work now.
+
+Superseded again by "Security Incident, WAF Tuning, and Full Migration"
+above: EFS is no longer empty — the full ~41,204-drawer local palace was
+migrated in on 2026-08-15 — and the stack was torn back down a second
+time afterward, same workflow, same verification method. That section is
+the current source of truth for what's actually deployed/torn-down and
+why.
 
 One correctness fix landed as part of this: `mempalace_server`'s
 `aws_ecs_service` didn't have `lifecycle { ignore_changes =
