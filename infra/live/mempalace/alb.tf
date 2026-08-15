@@ -132,8 +132,31 @@ resource "aws_wafv2_web_acl" "mempalace" {
     name     = "aws-managed-common"
     priority = 1
 
+    # Whole rule group set to Count, not Block, as of 2026-08-15 — was
+    # override_action=none with a single rule_action_override for
+    # GenericLFI_BODY, but that turned into whack-a-mole: confirmed a
+    # SECOND generic body-inspection rule (CrossSiteScripting_BODY) also
+    # false-positiving on ordinary stored content within the same test
+    # session (via aws wafv2 get-sampled-requests, since full WAF logging
+    # is off — see the logging-disabled note below).
+    #
+    # Stepping back rather than continuing to patch individually: this
+    # rule group's generic content-inspection rules (LFI, XSS, SQLi) are
+    # built for anonymous public form traffic, where "does this look like
+    # an injection attempt" is a meaningful signal. This endpoint's real
+    # access control is the bearer token — everything reaching /mcp is
+    # either an authenticated call legitimately storing arbitrary
+    # text/code/HTML verbatim, or gets 401'd before content inspection
+    # matters at all. The Common Rule Set is the wrong shape for a
+    # token-gated arbitrary-content-storage API. Kept for visibility
+    # (Count, not removed) rather than dropped entirely.
+    #
+    # AWSManagedRulesKnownBadInputsRuleSet below (Log4Shell-class exploit
+    # signatures — about attacking the server, not about stored content
+    # looking suspicious) and the rate-limit rule still actively block;
+    # only this group's blocking was disabled.
     override_action {
-      none {}
+      count {}
     }
 
     statement {
