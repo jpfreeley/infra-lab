@@ -412,6 +412,21 @@ resource "aws_ecs_service" "this" {
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
 
+  # Stop-then-start, not the ECS default of start-then-stop (200%/100%).
+  # Found the hard way (2026-08-15): mempalace holds a single-writer lock
+  # on the shared EFS palace, so a default rolling deployment — where the
+  # new task starts and tries to acquire that lock WHILE the old task is
+  # still running and holding it — reliably fails every single redeploy
+  # ("Writable MCP HTTP startup refused: ... palace is held by PID 1"),
+  # not occasionally. The deployment circuit breaker catches this and
+  # rolls back automatically, so it's self-healing rather than silently
+  # broken, but it means a token rotation or task-definition update never
+  # actually takes effect without this fix. Consistent with the module's
+  # own singleton design (desired_count capped at 1 elsewhere) — this is
+  # the deployment-strategy half of that same constraint.
+  deployment_maximum_percent         = 100
+  deployment_minimum_healthy_percent = 0
+
   # EFS mount targets must exist before tasks try to mount them
   depends_on = [aws_efs_mount_target.this]
 

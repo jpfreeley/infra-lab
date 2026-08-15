@@ -119,6 +119,7 @@ resource "aws_lb_listener" "https" {
 ###############################################################################
 
 resource "aws_wafv2_web_acl" "mempalace" {
+  # checkov:skip=CKV2_AWS_31: "Logging deliberately disabled 2026-08-15 after its Authorization-header redaction was verified NOT to work, leaking the bearer token in plaintext into CloudWatch Logs on every request. See the commented-out logging resources below for the full incident note. Re-enable only once redaction is proven working with a throwaway token first."
   name        = "${local.name_prefix}-waf"
   description = "MemPalace ALB, AWS managed common rules + rate limiting"
   scope       = "REGIONAL"
@@ -204,24 +205,38 @@ resource "aws_wafv2_web_acl" "mempalace" {
   tags = local.common_tags
 }
 
-# WAF logging — CloudWatch Logs, matching ADR-025's CloudWatch-native
-# observability pattern already used elsewhere in this repo, rather than
-# S3/Kinesis Firehose. The "aws-waf-logs-" name prefix is a hard AWS
-# requirement for CloudWatch Logs as a WAF log destination, not a style
-# choice.
-resource "aws_cloudwatch_log_group" "waf" {
-  # checkov:skip=CKV_AWS_338: "Retention policy varies by environment; default var.log_retention_days=30, same convention as every other log group in this deployment"
-  name              = "aws-waf-logs-${local.name_prefix}"
-  retention_in_days = var.log_retention_days
-  kms_key_id        = module.mempalace_kms.key_arn
-
-  tags = local.common_tags
-}
-
-resource "aws_wafv2_web_acl_logging_configuration" "mempalace" {
-  resource_arn            = aws_wafv2_web_acl.mempalace.arn
-  log_destination_configs = [aws_cloudwatch_log_group.waf.arn]
-}
+# WAF logging is DISABLED, deliberately, as of 2026-08-15 — was enabled
+# with a redacted_fields block for the Authorization header (which for
+# this deployment IS the bearer token, the only access control on the
+# whole service), but that redaction was verified NOT to work: the token
+# kept showing up in plaintext in CloudWatch Logs on every request even
+# after the redacted config was live and confirmed correct via
+# `aws wafv2 get-logging-configuration`, and after waiting well past any
+# reasonable propagation delay. Rather than keep leaking the token while
+# investigating why AWS's redaction didn't take effect, logging was cut
+# off immediately (`aws wafv2 delete-logging-configuration`) and the
+# token was rotated on the assumption it was already exposed.
+#
+# Re-enabling this needs the redaction actually proven to work first, not
+# just configured — test with a throwaway header value and confirm the
+# log shows REDACTED before trusting it with the real token again.
+#
+# resource "aws_cloudwatch_log_group" "waf" {
+#   name              = "aws-waf-logs-${local.name_prefix}"
+#   retention_in_days = var.log_retention_days
+#   kms_key_id        = module.mempalace_kms.key_arn
+#   tags              = local.common_tags
+# }
+#
+# resource "aws_wafv2_web_acl_logging_configuration" "mempalace" {
+#   resource_arn            = aws_wafv2_web_acl.mempalace.arn
+#   log_destination_configs = [aws_cloudwatch_log_group.waf.arn]
+#   redacted_fields {
+#     single_header {
+#       name = "authorization"
+#     }
+#   }
+# }
 
 resource "aws_wafv2_web_acl_association" "mempalace" {
   resource_arn = aws_lb.mempalace.arn
