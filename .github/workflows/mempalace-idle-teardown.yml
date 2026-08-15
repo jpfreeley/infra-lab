@@ -44,11 +44,31 @@ jobs:
     outputs:
       should-teardown: ${{ steps.check.outputs.should_teardown }}
     steps:
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (management account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::551452024305:role/infra-lab-github-actions-deploy
           aws-region: us-east-1
+
+      # The step above only gets management-account (551452024305)
+      # credentials — that's as far as mempalace-toggle.yml's own
+      # "Configure AWS credentials" step goes too, but that workflow
+      # never notices because Terraform's own provider config does a
+      # SECOND hop into the mempalace account internally (assume_role in
+      # providers.tf) whenever it runs apply/destroy. This job calls the
+      # AWS CLI directly instead of Terraform, so it never got that free
+      # second hop — meaning every prior run of this workflow was
+      # querying the ALB's existence in the WRONG account and always
+      # finding nothing, concluding "already down" unconditionally.
+      # Found and fixed 2026-08-15 by explicitly chaining a second
+      # assume-role into the same OrganizationAccountAccessRole
+      # Terraform's provider uses, mirroring providers.tf exactly.
+      - name: Configure AWS credentials (mempalace account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::310697203282:role/OrganizationAccountAccessRole
+          aws-region: us-east-1
+          role-chaining: true
 
       - name: Check whether the ALB exists and is idle
         id: check
