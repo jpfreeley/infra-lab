@@ -44,11 +44,33 @@ jobs:
     outputs:
       should-teardown: ${{ steps.check.outputs.should_teardown }}
     steps:
+      # Both credential steps below call the AWS CLI's own
+      # sts assume-role[-with-web-identity] directly instead of using
+      # aws-actions/configure-aws-credentials. That action has to be
+      # downloaded from codeload.github.com fresh on every run — fine at
+      # low frequency, but this workflow runs every 15 minutes, and
+      # codeload started intermittently 429-ing that download starting
+      # 2026-08-17 (3 failed runs within one hour: 15:04, 15:21, 16:03),
+      # each one skipping this run's idle check entirely. The AWS CLI is
+      # already on the runner image, so doing the same two STS calls
+      # directly removes the dependency, and therefore the failure mode,
+      # completely rather than hoping GitHub's CDN behaves. Same role
+      # ARNs, same permissions, same two-hop chain as before.
       - name: Configure AWS credentials (management account)
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: arn:aws:iam::551452024305:role/infra-lab-github-actions-deploy
-          aws-region: us-east-1
+        run: |
+          ID_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r '.value')
+
+          CREDS=$(aws sts assume-role-with-web-identity \
+            --role-arn arn:aws:iam::551452024305:role/infra-lab-github-actions-deploy \
+            --role-session-name gha-idle-teardown-check \
+            --web-identity-token "$ID_TOKEN" \
+            --region us-east-1 \
+            --query 'Credentials' --output json)
+
+          echo "AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r .AccessKeyId)" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r .SecretAccessKey)" >> "$GITHUB_ENV"
+          echo "AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r .SessionToken)" >> "$GITHUB_ENV"
 
       # The step above only gets management-account (551452024305)
       # credentials — that's as far as mempalace-toggle.yml's own
@@ -63,21 +85,23 @@ jobs:
       # Found and fixed 2026-08-15 by explicitly chaining a second
       # assume-role into the same OrganizationAccountAccessRole
       # Terraform's provider uses, mirroring providers.tf exactly.
+      #
+      # No session tagging here (matching the prior role-skip-session-tagging
+      # behavior): OrganizationAccountAccessRole's fixed AWS-managed trust
+      # policy doesn't grant sts:TagSession to arbitrary principals, and a
+      # plain assume-role call, like Terraform's own assume_role block,
+      # never tries to tag by default, so there's nothing to skip.
       - name: Configure AWS credentials (mempalace account)
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: arn:aws:iam::310697203282:role/OrganizationAccountAccessRole
-          aws-region: us-east-1
-          role-chaining: true
-          # role-chaining tags the assumed session by default (for
-          # auditability), which needs sts:TagSession on the target
-          # role — OrganizationAccountAccessRole's fixed AWS-managed
-          # trust policy doesn't grant that to arbitrary principals, so
-          # the first real attempt at this failed with "not authorized
-          # to perform: sts:TagSession." Terraform's own assume_role
-          # block never hits this because it doesn't tag sessions by
-          # default. Skip tagging here to match that behavior.
-          role-skip-session-tagging: true
+        run: |
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::310697203282:role/OrganizationAccountAccessRole \
+            --role-session-name gha-idle-teardown-chain \
+            --region us-east-1 \
+            --query 'Credentials' --output json)
+
+          echo "AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r .AccessKeyId)" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r .SecretAccessKey)" >> "$GITHUB_ENV"
+          echo "AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r .SessionToken)" >> "$GITHUB_ENV"
 
       - name: Check whether the ALB exists and is idle
         id: check
