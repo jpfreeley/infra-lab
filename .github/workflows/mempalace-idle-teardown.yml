@@ -68,9 +68,21 @@ jobs:
             --region us-east-1 \
             --query 'Credentials' --output json)
 
-          echo "AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r .AccessKeyId)" >> "$GITHUB_ENV"
-          echo "AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r .SecretAccessKey)" >> "$GITHUB_ENV"
-          echo "AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r .SessionToken)" >> "$GITHUB_ENV"
+          AKID=$(echo "$CREDS" | jq -r .AccessKeyId)
+          SECRET=$(echo "$CREDS" | jq -r .SecretAccessKey)
+          TOKEN=$(echo "$CREDS" | jq -r .SessionToken)
+
+          # Mask before anything else touches these — configure-aws-credentials
+          # does this automatically (core.setSecret), the raw CLI path doesn't
+          # get that for free, so it has to be explicit here or these values
+          # print in plaintext if any later step happens to echo the environment.
+          echo "::add-mask::$AKID"
+          echo "::add-mask::$SECRET"
+          echo "::add-mask::$TOKEN"
+
+          echo "AWS_ACCESS_KEY_ID=$AKID" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=$SECRET" >> "$GITHUB_ENV"
+          echo "AWS_SESSION_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
       # The step above only gets management-account (551452024305)
       # credentials — that's as far as mempalace-toggle.yml's own
@@ -99,9 +111,17 @@ jobs:
             --region us-east-1 \
             --query 'Credentials' --output json)
 
-          echo "AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r .AccessKeyId)" >> "$GITHUB_ENV"
-          echo "AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r .SecretAccessKey)" >> "$GITHUB_ENV"
-          echo "AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r .SessionToken)" >> "$GITHUB_ENV"
+          AKID=$(echo "$CREDS" | jq -r .AccessKeyId)
+          SECRET=$(echo "$CREDS" | jq -r .SecretAccessKey)
+          TOKEN=$(echo "$CREDS" | jq -r .SessionToken)
+
+          echo "::add-mask::$AKID"
+          echo "::add-mask::$SECRET"
+          echo "::add-mask::$TOKEN"
+
+          echo "AWS_ACCESS_KEY_ID=$AKID" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=$SECRET" >> "$GITHUB_ENV"
+          echo "AWS_SESSION_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
       - name: Check whether the ALB exists and is idle
         id: check
