@@ -682,12 +682,28 @@ local-scoped `mcpServers` block (empty everywhere, including
 `.mcp.json` file (none exist). No Claude Desktop config file is
 present on this machine at all. The VS Code extension reads the exact
 same `~/.claude.json`, so it's covered by the same check. Net: this
-machine is fully clean, nothing on it still points at local. Yet local
-kept receiving real writes as late as 2026-08-19T22:57 UTC, meaning at
-least one other device still has a live local `mempalace` entry
-somewhere this session has no visibility into. Which device is unknown
-from here and needs JP to identify, or that device's own Claude
-session to self-audit the same way.
+machine is fully clean, nothing on it still points at local.
+
+JP confirmed there is no second physical device in play, which
+reframes the question: not "which machine still points at local" but
+"why did local keep receiving writes after the config was fixed."
+Three things settle it. First, local's own peer-replication feature
+(`peers.json`-driven, independent of the external `mp_sync.py` tool)
+has no `peers.json` on this machine at all, so that background thread
+runs every 15s and does nothing — ruled out as a source. Second, the
+access log carries no per-request timestamp or client identity (every
+request logs as bare `127.0.0.1`), so it can't name a culprit
+directly. Third, and decisive: local's own write history stops dead
+at 2026-08-19T22:57 UTC (`mempalace_list_drawers(since=...)` still
+returns exactly the same 38, and the log's last "Filed drawer" entries
+match them) — no new local writes on 2026-08-20 despite four sibling
+Claude Code sessions running on this machine at the time of this
+check, all started within the hour. MCP config is read once, at
+connection time, not hot-reloaded; a session already connected to
+local before the entry was pulled from `~/.claude.json` keeps that
+connection until the process itself ends. The 38 drawers are debt from
+now-dead session instances that predated the cleanup, not a live leak
+from a still-misconfigured client. Nothing further to reconfigure here.
 
 **Backup repointing — blocked, not done.** The plan on record (Design
 Notes section, above) was to repurpose the existing `mp_sync.py` →
@@ -708,10 +724,11 @@ choice, not a mechanical repoint.
 
 **Step 4, not started.** Stopping the local `mempalace serve` process
 and deciding whether to archive or delete `~/.mempalace/palace` is
-deliberately not attempted yet: it's irreversible, at least one
-still-unidentified device is actively writing to local, and the
-backup repoint above isn't in place yet either. Needs explicit
-go-ahead once the other two gaps are closed.
+deliberately not attempted yet: it's irreversible, and the backup
+repoint above isn't in place yet. The client-audit question (step 2)
+is now fully closed — no live process anywhere still points at local —
+so this is the only remaining gate. Needs explicit go-ahead once the
+backup mechanism exists.
 
 ## Currently Torn Down (end of 2026-08-14 session)
 
