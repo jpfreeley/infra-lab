@@ -707,30 +707,57 @@ connection until the process itself ends. The 38 drawers are debt from
 now-dead session instances that predated the cleanup, not a live leak
 from a still-misconfigured client. Nothing further to reconfigure here.
 
-**Backup repointing — blocked, not done.** The plan on record (Design
-Notes section, above) was to repurpose the existing `mp_sync.py` →
-GitHub archive (`jpfreeley/mempalace-sync`) job to back up remote
-instead of local once remote became authoritative. That turns out not
-to be a config change: `mp_sync`'s export path talks directly to a
-Chroma collections API, and remote runs on `qdrant`
-(`mempalace_status` → `"backend": "qdrant"`), not Chroma. There is no
-code path in `mp_sync` today that understands a Qdrant backend, so
-pointing it at remote as-is would fail outright rather than quietly
-back up the wrong store. Closing this gap needs a real decision:
-either a new, backend-agnostic export mechanism built on the MCP
-`list_drawers`/`get_drawer` API (the same approach the delta migration
-above already used, just scheduled and complete rather than
-date-filtered), or an extension to `mp_sync` itself adding a Qdrant
-collector. Flagged here rather than guessed at, since it's a design
-choice, not a mechanical repoint.
+**Backup repointing — partially done (2026-08-25).** JP picked the
+backend-agnostic option: `scripts/mempalace_remote_backup.py` walks the
+MCP `mempalace_list_drawers`/`mempalace_get_drawer` surface instead of
+touching either backend's native API, so it works regardless of what's
+underneath. Building it surfaced a real bug, not just a design
+question: `mempalace_list_drawers` has no offset/limit pushdown on the
+qdrant backend, so every call does a full linear scan of whatever it
+matches before slicing out the requested page — measured directly,
+one page from a 15,197-record room took 28.4 seconds, and an
+unfiltered call against the full ~35k-record collection never
+completed inside the ALB's 60-second idle timeout at all, confirmed
+via a genuine `504` with the server itself never responding. Diffed
+the two versions live to rule out a regression: the relevant code is
+identical between the 3.7.1 this ADR migrated onto and the 3.8.0 now
+running (an unplanned auto-upgrade, `uvx --from mempalace` re-pulling
+latest on every container restart, same mechanism observed on local's
+own launchd job). Filed upstream:
+[MemPalace/mempalace#2363](https://github.com/MemPalace/mempalace/issues/2363).
+
+Given that ceiling, the script always calls `list_drawers` scoped to
+one `wing` at a time (never unfiltered — that's what keeps each call's
+scan bounded) and defaults to skipping one specific wing entirely
+(named via `--exclude-wing`/an env var, not hardcoded — see the
+script itself and its docstring, not this ADR, for which one and why):
+~33,044 of the ~34,906 total drawer-chunk records, a static
+pre-migration corpus, not part of day-to-day growth, and large enough
+that even wing-scoped pagination through it would take over an hour
+and repeatedly risk the same timeout. Run live the same day: 15
+actively-growing wings, 1,631 logical drawers, zero errors, committed
+to `jpfreeley/mempalace-sync` as `export-mempalace-remote/` (a
+private repo).
+
+This is real coverage for what actually changes day to day, not a
+complete backup of the palace — the excluded wing stays unprotected by
+this job until the upstream issue is fixed or a different transport (e.g.
+talking to qdrant's own scroll API directly, which would need a new
+access path since qdrant is a private sidecar with no route through
+the public ALB) gets built instead. Also out of scope, and undoable
+through any MCP tool: the `closets` collection and the typed
+knowledge-graph facts (`mempalace_kg_query` is per-entity only, no
+bulk-dump tool exists). Both documented in the script's own docstring
+so this doesn't get silently forgotten and mistaken for full parity.
 
 **Step 4, not started.** Stopping the local `mempalace serve` process
 and deciding whether to archive or delete `~/.mempalace/palace` is
-deliberately not attempted yet: it's irreversible, and the backup
-repoint above isn't in place yet. The client-audit question (step 2)
-is now fully closed — no live process anywhere still points at local —
-so this is the only remaining gate. Needs explicit go-ahead once the
-backup mechanism exists.
+deliberately not attempted yet: it's irreversible, and backup coverage
+is partial (see above), not complete. The client-audit question (step
+2) is fully closed — no live process anywhere still points at local.
+Needs explicit go-ahead, and a decision on whether partial backup
+coverage of the actively-growing wings is enough to proceed, or
+whether the excluded wing needs its own solution first.
 
 ## Currently Torn Down (end of 2026-08-14 session)
 
