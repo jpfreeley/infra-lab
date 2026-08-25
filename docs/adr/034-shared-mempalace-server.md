@@ -796,6 +796,28 @@ remaining hours under normal idle-teardown risk deliberately, in
 exchange for 2026-08-26 being an unambiguous, fully-protected billing
 day.
 
+That deliberate gap surfaced a real question the same day, before it
+was ever hit for real: if the stack tears down for genuine idleness
+sometime in the unprotected hours *before* the window opens, does it
+come back up automatically once the window starts? As first built, no
+— the window only ever blocked teardown of an already-up stack; if the
+ALB didn't exist, the check exited immediately with "already down,
+nothing to do" regardless of the protection variables, since that
+branch ran before anything looked at them relative to the ALB's
+absence specifically. A stack that tore down at, say, 11pm would have
+just stayed down through the entire protected day, defeating the
+point.
+
+Fixed the same day, before deploying the window for real: the
+window-check now runs first and is available to *both* branches of
+the ALB-existence check, not just the "ALB exists" one. If the ALB is
+missing and the window is active, `check-idle` now emits
+`should_bringup=true`, consumed by a new `bring-up` job (same shape as
+the existing `teardown` job, calling `mempalace-toggle.yml` with
+`action: up` instead of `down`). So the guarantee is now genuinely "up
+for this entire window," not just "won't be torn down if it happened
+to already be up when the window opened."
+
 ## Currently Torn Down (end of 2026-08-14 session)
 
 Deployed, verified live end-to-end (see below), then deliberately torn

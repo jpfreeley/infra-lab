@@ -4,10 +4,13 @@ name: MemPalace Idle Auto-Teardown
 # minutes whether the ALB has served any real client 2xx traffic in the
 # trailing 90 minutes, and tears the stack down (same target list as the
 # manual "down" toggle, via workflow_call so that list only lives in one
-# place) if it's been idle that whole window. If the ALB doesn't exist,
-# the stack is already down and this is a no-op — cheap enough to just
-# run on a schedule indefinitely rather than trying to only run while the
-# stack is up.
+# place) if it's been idle that whole window. If the ALB doesn't exist and
+# there's no protected-uptime window active (see below), the stack is
+# already down and this is a no-op — cheap enough to just run on a
+# schedule indefinitely rather than trying to only run while the stack is
+# up. If the ALB doesn't exist and a protected-uptime window IS active, it
+# brings the stack back up instead — see the "Protected-uptime window"
+# comment in the check-idle job below.
 #
 # Deliberately checks HTTPCode_Target_2XX_Count, not raw RequestCount:
 # the target group's own health check hits /healthz every 30s regardless
@@ -43,6 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should-teardown: ${{ steps.check.outputs.should_teardown }}
+      should-bringup: ${{ steps.check.outputs.should_bringup }}
     steps:
       # Both credential steps below call the AWS CLI's own
       # sts assume-role[-with-web-identity] directly instead of using
@@ -129,25 +133,35 @@ jobs:
           KEEP_UP_FROM: ${{ vars.MEMPALACE_KEEP_UP_FROM }}
           KEEP_UP_UNTIL: ${{ vars.MEMPALACE_KEEP_UP_UNTIL }}
         run: |
-          # Protected-uptime window (2026-08-25): an override for occasions JP wants
-          # the stack to stay up regardless of real traffic — e.g. to line up
-          # a full day's AWS cost against a clean UTC billing day, rather than
-          # against idle-teardown's usual 90-minute real-traffic window.
-          # Both repo variables are plain ISO 8601 UTC timestamps
+          # Protected-uptime window (2026-08-25): an override for occasions JP
+          # wants the stack to stay up regardless of real traffic — e.g. to
+          # line up a full day's AWS cost against a clean UTC billing day,
+          # rather than against idle-teardown's usual 90-minute real-traffic
+          # window. Both repo variables are plain ISO 8601 UTC timestamps
           # (`gh variable set MEMPALACE_KEEP_UP_FROM/_UNTIL --repo
-          # jpfreeley/infra-lab`); either being unset/malformed just falls
-          # through to the normal idle check below, no error. Self-expiring
-          # by design: once `now` passes UNTIL, this stops matching and the
-          # very next 15-minute run resumes normal behavior on its own —
-          # nothing has to actively re-enable anything.
+          # jpfreeley/infra-lab`); either being unset/malformed just leaves
+          # IN_WINDOW=false, no error. Self-expiring by design: once `now`
+          # passes UNTIL, this stops matching and the very next 15-minute run
+          # resumes normal behavior on its own — nothing has to actively
+          # re-enable anything.
+          #
+          # Deliberately computed before the ALB lookup below rather than
+          # short-circuiting here: the window needs to do more than just
+          # block teardown of an already-up stack — it also needs to
+          # recognize "should be up right now but isn't" and bring it back,
+          # or a stack that happened to tear down for real idleness a few
+          # minutes before the window opened would just stay down through
+          # the entire window instead of getting the guaranteed uptime it's
+          # there to provide (found and fixed 2026-08-25, same day this was
+          # first built, before that gap was ever actually hit for real).
+          IN_WINDOW=false
           if [ -n "$KEEP_UP_FROM" ] && [ -n "$KEEP_UP_UNTIL" ]; then
             NOW_S=$(date -u +%s)
             FROM_S=$(date -u -d "$KEEP_UP_FROM" +%s 2>/dev/null || echo "")
             UNTIL_S=$(date -u -d "$KEEP_UP_UNTIL" +%s 2>/dev/null || echo "")
             if [ -n "$FROM_S" ] && [ -n "$UNTIL_S" ] && [ "$NOW_S" -ge "$FROM_S" ] && [ "$NOW_S" -lt "$UNTIL_S" ]; then
-              echo "Protected-uptime window active ($KEEP_UP_FROM -> $KEEP_UP_UNTIL) — staying up regardless of idle."
-              echo "should_teardown=false" >> "$GITHUB_OUTPUT"
-              exit 0
+              IN_WINDOW=true
+              echo "Protected-uptime window active ($KEEP_UP_FROM -> $KEEP_UP_UNTIL)."
             fi
           fi
 
@@ -160,7 +174,22 @@ jobs:
           ALB_ARN=$(echo "$ALB_INFO" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['arn'] if d else 'None')")
 
           if [ "$ALB_ARN" = "None" ] || [ -z "$ALB_ARN" ]; then
-            echo "ALB not found — already down, nothing to do."
+            if [ "$IN_WINDOW" = "true" ]; then
+              echo "ALB not found but the protected-uptime window is active — bringing it up."
+              echo "should_teardown=false" >> "$GITHUB_OUTPUT"
+              echo "should_bringup=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "ALB not found — already down, nothing to do."
+              echo "should_teardown=false" >> "$GITHUB_OUTPUT"
+              echo "should_bringup=false" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          echo "should_bringup=false" >> "$GITHUB_OUTPUT"
+
+          if [ "$IN_WINDOW" = "true" ]; then
+            echo "Staying up regardless of idle."
             echo "should_teardown=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -218,6 +247,17 @@ jobs:
     uses: ./.github/workflows/mempalace-toggle.yml
     with:
       action: down
+    permissions:
+      id-token: write
+      contents: read
+
+  bring-up:
+    name: Bring up (protected-uptime window)
+    needs: check-idle
+    if: needs.check-idle.outputs.should-bringup == 'true'
+    uses: ./.github/workflows/mempalace-toggle.yml
+    with:
+      action: up
     permissions:
       id-token: write
       contents: read
