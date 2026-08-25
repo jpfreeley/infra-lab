@@ -646,8 +646,8 @@ this ADR's own Decision section, `mempalace-remote` was added
 server (`~/.mempalace/palace`, launchd job
 `com.freeleyj.mempalace-serve`, port 8765) kept running and kept
 receiving real writes for five more days. Confirmed 2026-08-20: a
-2026-08-19 recruiter-rejection drawer existed only in local, proving
-the "migration" hadn't actually stopped local from being a live write
+drawer filed 2026-08-19 existed only in local, proving the
+"migration" hadn't actually stopped local from being a live write
 target.
 
 **Delta migration.** The raw `total_drawers` gap between local
@@ -660,10 +660,12 @@ and this ADR already accounts for. The real question is how much
 local has picked up *since* the migration cutoff, answered directly
 with `mempalace_list_drawers(since="2026-08-15")` against local:
 exactly 38 logical drawers, all filed 2026-08-15 through 2026-08-19,
-across `jobsearch` (interview-prep, process, resume-variants,
-deloitte-applications, diary), `nycc-website` (decisions, diary,
-progress, project-overview), and `mempalace-sync` (runtime). Fetched
-full verbatim content and metadata for each directly from local's own
+spread across a handful of JP's personal wings (deliberately not
+enumerated here — this is a public repo, and the palace's internal
+wing/room taxonomy is personal information that doesn't belong in it,
+regardless of how mundane any individual name looks on its own).
+Fetched full verbatim content and metadata for each directly from
+local's own
 MCP endpoint and pushed every one through `mempalace_add_drawer`
 against remote. All 38 landed as new content (`success: true`, zero
 `already_exists` hits), confirming they were genuinely local-only, not
@@ -726,17 +728,20 @@ own launchd job). Filed upstream:
 
 Given that ceiling, the script always calls `list_drawers` scoped to
 one `wing` at a time (never unfiltered — that's what keeps each call's
-scan bounded) and defaults to skipping the `enterprise` wing entirely:
+scan bounded) and defaults to skipping one specific wing entirely
+(named via `--exclude-wing`/an env var, not hardcoded — see the
+script itself and its docstring, not this ADR, for which one and why):
 ~33,044 of the ~34,906 total drawer-chunk records, a static
 pre-migration corpus, not part of day-to-day growth, and large enough
 that even wing-scoped pagination through it would take over an hour
 and repeatedly risk the same timeout. Run live the same day: 15
 actively-growing wings, 1,631 logical drawers, zero errors, committed
-to `jpfreeley/mempalace-sync` as `export-mempalace-remote/`.
+to `jpfreeley/mempalace-sync` as `export-mempalace-remote/` (a
+private repo).
 
 This is real coverage for what actually changes day to day, not a
-complete backup of the palace — `enterprise` stays unprotected by this
-job until the upstream issue is fixed or a different transport (e.g.
+complete backup of the palace — the excluded wing stays unprotected by
+this job until the upstream issue is fixed or a different transport (e.g.
 talking to qdrant's own scroll API directly, which would need a new
 access path since qdrant is a private sidecar with no route through
 the public ALB) gets built instead. Also out of scope, and undoable
@@ -752,7 +757,7 @@ is partial (see above), not complete. The client-audit question (step
 2) is fully closed — no live process anywhere still points at local.
 Needs explicit go-ahead, and a decision on whether partial backup
 coverage of the actively-growing wings is enough to proceed, or
-whether `enterprise` needs its own solution first.
+whether the excluded wing needs its own solution first.
 
 ## Currently Torn Down (end of 2026-08-14 session)
 

@@ -11,7 +11,7 @@ all — pointing it at remote would just fail. This script sidesteps the
 backend entirely by walking the same MCP tool surface any client uses
 (mempalace_list_drawers + mempalace_get_drawer).
 
-KNOWN LIMITATION, READ BEFORE CHANGING THE DEFAULT EXCLUDE LIST:
+KNOWN LIMITATION, READ BEFORE CHANGING --exclude-wing:
 `mempalace_list_drawers` has a real scaling ceiling on a qdrant-backed
 palace — filed upstream at https://github.com/MemPalace/mempalace/issues/2363.
 It does a full linear scan of whatever it's asked to match (the *whole*
@@ -24,24 +24,26 @@ the load balancer's 60s timeout at all. Because of this, this script:
 
   - always calls list_drawers with a `wing` filter (never unfiltered),
     which keeps each call scoped to one wing's own record count, and
-  - defaults to skipping the `enterprise` wing (~33k of the ~35k total
-    records, a static pre-existing corpus that isn't part of day-to-day
-    growth) via --exclude-wing, since even wing-scoped pagination through
-    something that size would take over an hour and repeatedly risk the
-    same timeout.
+  - takes --exclude-wing / MEMPALACE_BACKUP_EXCLUDE_WINGS from the
+    caller rather than hardcoding one here (this is a public repo — a
+    palace's wing names are personal information, not infra config),
+    for whichever wing(s) are too large to finish a wing-scoped scan
+    inside the timeout. Check mempalace_status for each wing's size
+    before excluding or including one.
 
-This means the default run does NOT produce a complete backup of the
-palace — only of the actively-growing wings. Don't widen --exclude-wing
-to cover more than `enterprise` without checking that wing's size first
-(mempalace_status) and confirming a wing-scoped scan of it will actually
-finish; don't drop --exclude-wing to back up `enterprise` itself until the
-upstream issue is fixed or a different transport (e.g. talking to qdrant's
-own scroll API directly, bypassing this MCP endpoint) is built instead.
+This means a run with wings excluded does NOT produce a complete
+backup of the palace — only of whatever wasn't excluded. Don't drop a
+wing from --exclude-wing until you've confirmed a wing-scoped scan of
+it will actually finish (see the timing above) — the upstream issue
+would need fixing first, or a different transport built (e.g. talking
+to qdrant's own scroll API directly, bypassing this MCP endpoint).
 
 Usage:
     MEMPALACE_URL=https://mempalace.lintwiselabs.com/mcp \
     MEMPALACE_TOKEN=... \
-    python3 scripts/mempalace_remote_backup.py --out-dir /path/to/mempalace-sync/export-mempalace-remote
+    python3 scripts/mempalace_remote_backup.py \
+        --out-dir /path/to/mempalace-sync/export-mempalace-remote \
+        --exclude-wing <wing-name> [--exclude-wing <another-wing>]
 
 Writes (schema matches mp_sync.py's own export format, so this is a
 drop-in-compatible backup):
@@ -59,7 +61,6 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-DEFAULT_EXCLUDE_WINGS = ["enterprise"]
 LIST_PAGE_SIZE = 100  # max the API allows
 HTTP_TIMEOUT_S = 90  # generous margin over the ALB's own 60s idle timeout
 MAX_RETRIES = 3
@@ -134,11 +135,22 @@ def fetch_full_drawer(url: str, token: str, drawer_id: str) -> dict:
     }
 
 
+def _env_exclude_wings() -> list:
+    raw = os.environ.get("MEMPALACE_BACKUP_EXCLUDE_WINGS", "")
+    return [w.strip() for w in raw.split(",") if w.strip()]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out-dir", required=True, help="Destination snapshot root, e.g. .../mempalace-sync/export-mempalace-remote")
-    parser.add_argument("--exclude-wing", action="append", default=None,
-                         help=f"Wing to skip (repeatable). Default: {DEFAULT_EXCLUDE_WINGS}")
+    parser.add_argument(
+        "--exclude-wing", action="append", default=None,
+        help=(
+            "Wing to skip (repeatable). Falls back to "
+            "MEMPALACE_BACKUP_EXCLUDE_WINGS (comma-separated) if not "
+            "given; no built-in default — see the module docstring."
+        ),
+    )
     parser.add_argument("--url", default=os.environ.get("MEMPALACE_URL", "https://mempalace.lintwiselabs.com/mcp"))
     parser.add_argument("--token", default=os.environ.get("MEMPALACE_TOKEN"))
     args = parser.parse_args()
@@ -147,7 +159,16 @@ def main() -> int:
         print("ERROR: set MEMPALACE_TOKEN or pass --token", file=sys.stderr)
         return 1
 
-    exclude = set(args.exclude_wing) if args.exclude_wing else set(DEFAULT_EXCLUDE_WINGS)
+    exclude = set(args.exclude_wing) if args.exclude_wing else set(_env_exclude_wings())
+    if not exclude:
+        print(
+            "WARNING: no --exclude-wing / MEMPALACE_BACKUP_EXCLUDE_WINGS "
+            "given — every wing gets scanned. Check mempalace_status "
+            "first; a large wing can take a long time or hit the "
+            "list_drawers scaling ceiling "
+            "(github.com/MemPalace/mempalace/issues/2363).",
+            file=sys.stderr,
+        )
 
     print(f"Fetching wing list from {args.url} ...")
     wings = get_wings(args.url, args.token)
