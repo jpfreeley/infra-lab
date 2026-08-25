@@ -646,8 +646,8 @@ this ADR's own Decision section, `mempalace-remote` was added
 server (`~/.mempalace/palace`, launchd job
 `com.freeleyj.mempalace-serve`, port 8765) kept running and kept
 receiving real writes for five more days. Confirmed 2026-08-20: a
-2026-08-19 recruiter-rejection drawer existed only in local, proving
-the "migration" hadn't actually stopped local from being a live write
+drawer filed 2026-08-19 existed only in local, proving the
+"migration" hadn't actually stopped local from being a live write
 target.
 
 **Delta migration.** The raw `total_drawers` gap between local
@@ -660,10 +660,12 @@ and this ADR already accounts for. The real question is how much
 local has picked up *since* the migration cutoff, answered directly
 with `mempalace_list_drawers(since="2026-08-15")` against local:
 exactly 38 logical drawers, all filed 2026-08-15 through 2026-08-19,
-across `jobsearch` (interview-prep, process, resume-variants,
-deloitte-applications, diary), `nycc-website` (decisions, diary,
-progress, project-overview), and `mempalace-sync` (runtime). Fetched
-full verbatim content and metadata for each directly from local's own
+spread across a handful of JP's personal wings (deliberately not
+enumerated here — this is a public repo, and the palace's internal
+wing/room taxonomy is personal information that doesn't belong in it,
+regardless of how mundane any individual name looks on its own).
+Fetched full verbatim content and metadata for each directly from
+local's own
 MCP endpoint and pushed every one through `mempalace_add_drawer`
 against remote. All 38 landed as new content (`success: true`, zero
 `already_exists` hits), confirming they were genuinely local-only, not
