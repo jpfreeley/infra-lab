@@ -759,6 +759,43 @@ Needs explicit go-ahead, and a decision on whether partial backup
 coverage of the actively-growing wings is enough to proceed, or
 whether the excluded wing needs its own solution first.
 
+## Protected-Uptime Window (2026-08-25)
+
+JP occasionally wants the stack to stay up for a deliberate stretch
+regardless of real traffic — e.g. to check its cost against one full,
+clean AWS billing day (AWS bills in UTC calendar days) rather than
+against idle-teardown's usual 90-minute real-traffic window. Rather
+than disabling `mempalace-idle-teardown.yml` and remembering to
+re-enable it later (a real footgun — an unattended disabled safety net
+is easy to forget about), added a self-expiring override: two repo
+variables, `MEMPALACE_KEEP_UP_FROM` / `MEMPALACE_KEEP_UP_UNTIL` (plain
+ISO 8601 UTC timestamps, set via `gh variable set`), checked at the
+top of the same idle-check step. While `now` falls inside that window,
+the step short-circuits straight to `should_teardown=false` before
+even looking at the ALB or CloudWatch. Outside the window (unset,
+malformed, or simply expired), it falls straight through to the
+existing logic, unchanged.
+
+Deliberately self-expiring rather than a manual on/off toggle: once
+`now` passes `MEMPALACE_KEEP_UP_UNTIL`, the very next scheduled run
+(within 15 minutes) resumes normal idle-teardown behavior on its own —
+nothing has to actively re-enable anything, so there's no failure mode
+where a temporary override quietly becomes a permanent one.
+
+First real use, same day: JP wanted one clean full UTC billing day of
+guaranteed uptime, but the stack was already up mid-day and could
+plausibly go idle before midnight if left unprotected — three shapes
+were on the table (protect starting immediately for a rolling 24h;
+protect immediately through the end of the *next* day for zero gap
+risk at the cost of running longer than 24h; or accept the gap
+tonight and protect only the next full UTC day, exactly 24h, the
+cleanest possible billing-day alignment). JP chose the last one:
+`MEMPALACE_KEEP_UP_FROM=2026-08-26T00:00:00Z`,
+`MEMPALACE_KEEP_UP_UNTIL=2026-08-27T00:00:00Z`, leaving today's
+remaining hours under normal idle-teardown risk deliberately, in
+exchange for 2026-08-26 being an unambiguous, fully-protected billing
+day.
+
 ## Currently Torn Down (end of 2026-08-14 session)
 
 Deployed, verified live end-to-end (see below), then deliberately torn

@@ -125,7 +125,32 @@ jobs:
 
       - name: Check whether the ALB exists and is idle
         id: check
+        env:
+          KEEP_UP_FROM: ${{ vars.MEMPALACE_KEEP_UP_FROM }}
+          KEEP_UP_UNTIL: ${{ vars.MEMPALACE_KEEP_UP_UNTIL }}
         run: |
+          # Protected-uptime window (2026-08-25): an override for occasions JP wants
+          # the stack to stay up regardless of real traffic — e.g. to line up
+          # a full day's AWS cost against a clean UTC billing day, rather than
+          # against idle-teardown's usual 90-minute real-traffic window.
+          # Both repo variables are plain ISO 8601 UTC timestamps
+          # (`gh variable set MEMPALACE_KEEP_UP_FROM/_UNTIL --repo
+          # jpfreeley/infra-lab`); either being unset/malformed just falls
+          # through to the normal idle check below, no error. Self-expiring
+          # by design: once `now` passes UNTIL, this stops matching and the
+          # very next 15-minute run resumes normal behavior on its own —
+          # nothing has to actively re-enable anything.
+          if [ -n "$KEEP_UP_FROM" ] && [ -n "$KEEP_UP_UNTIL" ]; then
+            NOW_S=$(date -u +%s)
+            FROM_S=$(date -u -d "$KEEP_UP_FROM" +%s 2>/dev/null || echo "")
+            UNTIL_S=$(date -u -d "$KEEP_UP_UNTIL" +%s 2>/dev/null || echo "")
+            if [ -n "$FROM_S" ] && [ -n "$UNTIL_S" ] && [ "$NOW_S" -ge "$FROM_S" ] && [ "$NOW_S" -lt "$UNTIL_S" ]; then
+              echo "Protected-uptime window active ($KEEP_UP_FROM -> $KEEP_UP_UNTIL) — staying up regardless of idle."
+              echo "should_teardown=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
           ALB_INFO=$(aws elbv2 describe-load-balancers \
             --names infra-lab-mempalace-alb \
             --region us-east-1 \
