@@ -638,6 +638,98 @@ needed, PR #119) — `512`/`1024` is what the stack actually deploys at
 now, combined with the idle teardown above so the larger steady-state
 size only costs money while genuinely in use.
 
+## Full Cutover to Remote: Delta Migration, Client Audit, and the Backup Gap (2026-08-20)
+
+The 2026-08-15 migration moved data, but not the cutover itself: per
+this ADR's own Decision section, `mempalace-remote` was added
+"alongside the existing local entry, not replacing it." The local
+server (`~/.mempalace/palace`, launchd job
+`com.freeleyj.mempalace-serve`, port 8765) kept running and kept
+receiving real writes for five more days. Confirmed 2026-08-20: a
+2026-08-19 recruiter-rejection drawer existed only in local, proving
+the "migration" hadn't actually stopped local from being a live write
+target.
+
+**Delta migration.** The raw `total_drawers` gap between local
+(41,313) and remote (34,738) looked alarming at first glance, ~6,575
+records, until it became clear both sides report chunk-record counts,
+not logical-drawer counts (a drawer with 4 `chunk_ids` contributes 4
+to `total_drawers`), and most of that gap is the same
+content-hash-idempotent dedup the original migration already produced
+and this ADR already accounts for. The real question is how much
+local has picked up *since* the migration cutoff, answered directly
+with `mempalace_list_drawers(since="2026-08-15")` against local:
+exactly 38 logical drawers, all filed 2026-08-15 through 2026-08-19,
+across `jobsearch` (interview-prep, process, resume-variants,
+deloitte-applications, diary), `nycc-website` (decisions, diary,
+progress, project-overview), and `mempalace-sync` (runtime). Fetched
+full verbatim content and metadata for each directly from local's own
+MCP endpoint and pushed every one through `mempalace_add_drawer`
+against remote. All 38 landed as new content (`success: true`, zero
+`already_exists` hits), confirming they were genuinely local-only, not
+previously-migrated content resurfacing under a new ID. Remote's
+`total_drawers` moved from 34,738 to 34,838, a +100 chunk-record delta
+from 38 logical drawers, consistent with the per-drawer `chunks`
+counts already in each one's metadata. Nothing from this batch was
+lost or double-counted.
+
+**Client audit, this machine only.** Checked every place a local
+`mempalace` MCP entry could still be configured on this machine:
+global `~/.claude.json` (`mcpServers`: only `trello` and
+`mempalace-remote`, already fixed a session prior), every project's
+local-scoped `mcpServers` block (empty everywhere, including
+`infra-lab`, `js2026`, `mempalace-sync`), and any per-project
+`.mcp.json` file (none exist). No Claude Desktop config file is
+present on this machine at all. The VS Code extension reads the exact
+same `~/.claude.json`, so it's covered by the same check. Net: this
+machine is fully clean, nothing on it still points at local.
+
+JP confirmed there is no second physical device in play, which
+reframes the question: not "which machine still points at local" but
+"why did local keep receiving writes after the config was fixed."
+Three things settle it. First, local's own peer-replication feature
+(`peers.json`-driven, independent of the external `mp_sync.py` tool)
+has no `peers.json` on this machine at all, so that background thread
+runs every 15s and does nothing — ruled out as a source. Second, the
+access log carries no per-request timestamp or client identity (every
+request logs as bare `127.0.0.1`), so it can't name a culprit
+directly. Third, and decisive: local's own write history stops dead
+at 2026-08-19T22:57 UTC (`mempalace_list_drawers(since=...)` still
+returns exactly the same 38, and the log's last "Filed drawer" entries
+match them) — no new local writes on 2026-08-20 despite four sibling
+Claude Code sessions running on this machine at the time of this
+check, all started within the hour. MCP config is read once, at
+connection time, not hot-reloaded; a session already connected to
+local before the entry was pulled from `~/.claude.json` keeps that
+connection until the process itself ends. The 38 drawers are debt from
+now-dead session instances that predated the cleanup, not a live leak
+from a still-misconfigured client. Nothing further to reconfigure here.
+
+**Backup repointing — blocked, not done.** The plan on record (Design
+Notes section, above) was to repurpose the existing `mp_sync.py` →
+GitHub archive (`jpfreeley/mempalace-sync`) job to back up remote
+instead of local once remote became authoritative. That turns out not
+to be a config change: `mp_sync`'s export path talks directly to a
+Chroma collections API, and remote runs on `qdrant`
+(`mempalace_status` → `"backend": "qdrant"`), not Chroma. There is no
+code path in `mp_sync` today that understands a Qdrant backend, so
+pointing it at remote as-is would fail outright rather than quietly
+back up the wrong store. Closing this gap needs a real decision:
+either a new, backend-agnostic export mechanism built on the MCP
+`list_drawers`/`get_drawer` API (the same approach the delta migration
+above already used, just scheduled and complete rather than
+date-filtered), or an extension to `mp_sync` itself adding a Qdrant
+collector. Flagged here rather than guessed at, since it's a design
+choice, not a mechanical repoint.
+
+**Step 4, not started.** Stopping the local `mempalace serve` process
+and deciding whether to archive or delete `~/.mempalace/palace` is
+deliberately not attempted yet: it's irreversible, and the backup
+repoint above isn't in place yet. The client-audit question (step 2)
+is now fully closed — no live process anywhere still points at local —
+so this is the only remaining gate. Needs explicit go-ahead once the
+backup mechanism exists.
+
 ## Currently Torn Down (end of 2026-08-14 session)
 
 Deployed, verified live end-to-end (see below), then deliberately torn
