@@ -32,3 +32,23 @@ output "acm_certificate_arn" {
   description = "Validated ACM cert ARN for mempalace.lintwiselabs.com — supply as var.acm_certificate_arn once ready to set enable_https=true"
   value       = aws_acm_certificate_validation.mempalace.certificate_arn
 }
+
+output "magnetlegal_bearer_token_secret_arn" {
+  description = "Secrets Manager ARN for the MagNet Legal instance's bearer token — populate out-of-band (see secrets.tf)"
+  value       = module.mempalace_magnetlegal_token.secret_arn
+}
+
+output "magnetlegal_bearer_token_secret_name" {
+  description = "Secrets Manager secret name for the MagNet Legal instance, for `aws secretsmanager put-secret-value --secret-id`"
+  value       = module.mempalace_magnetlegal_token.secret_name
+}
+
+output "magnetlegal_ecs_service_name" {
+  description = "MagNet Legal instance's ECS service name"
+  value       = module.mempalace_magnetlegal.service_name
+}
+
+output "magnetlegal_url" {
+  description = "MagNet Legal instance's MCP endpoint"
+  value       = "https://magnetlegal.mempalace.lintwiselabs.com/mcp"
+}

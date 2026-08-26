@@ -818,6 +818,97 @@ the existing `teardown` job, calling `mempalace-toggle.yml` with
 for this entire window," not just "won't be torn down if it happened
 to already be up when the window opened."
 
+## MagNet Legal Instance (2026-08-26)
+
+A second, independent mempalace instance for the MagNet Legal team,
+realizing their own ADR-075 ("Shared MemPalace Instance for Team
+Development Memory," Proposed/Urgent, never built) on infra-lab's
+existing footprint rather than new infrastructure of their own —
+checked their ADR-078 (AWS infra decision, decided 2026-08-18) directly
+and confirmed they chose the Hybrid option specifically to avoid
+standing up any ECS/VPC compute themselves, so reuse here isn't just
+the cheaper path, it's the only one they actually have.
+
+This was designed as a back-pocket idea back on 2026-08-14/15 ("second
+ECS/mempalace instance behind the same ALB via port-based listener
+routing," deliberately deferred "until MagNet Legal reuse actually
+happens") and picked back up once it did. Re-checked the blocker it was
+waiting on — MemPalace/mempalace#2258 (per-wing bearer-token scoping) —
+still open, so a genuinely separate instance is still the right shape,
+not a software permissioning fix on the existing one.
+
+**Shape.** One shared ALB/WAF/VPC/ECS cluster now fronts two independent
+target groups, each with its own ECS service, EFS, and bearer token.
+Routing is host-header based on the same HTTPS listener (SNI, a second
+ACM cert) rather than a port number — the personal instance's listener
+default action, cert, and target group are completely untouched; the new
+instance is matched by an added `aws_lb_listener_rule` instead of
+replacing anything. WAF coverage is automatic (the Web ACL association is
+ALB-level, not per-listener). Terraform-side, this is exactly the reuse
+`infra/modules/mempalace_server` was built for back on 2026-08-14 —
+confirmed by reading its own `variables.tf` before writing anything: `name`,
+`cluster_arn`/`cluster_name`, `target_group_arn`, `bearer_token_secret_arn`,
+and `kms_key_arn` are all inputs, so a second instantiation
+(`module.mempalace_magnetlegal`) needed no module changes at all, just a
+second call.
+
+**Audience and content**, both explicit decisions from JP this session:
+the MagNet Legal team (not personal-only), and a one-time backfill of the
+existing `magnetlegal` wing followed by direct writes to the new instance
+going forward — no ongoing sync job. `scripts/mempalace_migrate_wing.py`
+generalizes the pattern already proven twice this session (the 38-drawer
+delta migration and `mempalace_remote_backup.py`) into a reusable
+source-instance → dest-instance, wing-scoped copy.
+
+**Teardown had to change, not just add.** Before this, "tear the stack
+down" meant destroying the entire ALB stack — fine with one instance
+depending on it, wrong once two do: the personal instance going idle
+would take the ALB down with it regardless of whether MagNet Legal was
+actively using their own instance at that exact moment. JP's explicit
+choice (offered against a simpler always-on alternative) was to keep the
+existing all-or-nothing destroy-the-whole-ALB behavior, but gate it on
+**both** instances being idle rather than either one alone —
+`mempalace-idle-teardown.yml` now queries `HTTPCode_Target_2XX_Count`
+per target group (`LoadBalancer` + `TargetGroup` dimensions together,
+not `LoadBalancer` alone — that alone would have summed both instances'
+traffic into one signal, silently wrong) and only tears down when both
+come back idle. No partial states — it's still genuinely all-or-nothing,
+just with two idle signals feeding the one decision instead of one.
+
+**Self-serve wake-up, deliberately outside infra-lab's own access
+boundary.** MagNet Legal developers hitting an idle-torn-down stack have
+no way to bring it back themselves without either infra-lab GitHub
+access (explicitly ruled out — that boundary stays personal) or pinging
+JP every time. Built a small standalone Lambda + Function URL instead:
+bearer-token auth (a separate credential from mempalace's own token,
+distributed directly to the team) checked inside the handler, which on
+success triggers `mempalace-toggle.yml`'s existing, already-tested `up`
+action via GitHub's REST API — the same thing a human clicking "Run
+workflow" does. The Lambda never touches ECS/ALB/Terraform directly and
+never sees or returns the GitHub credential it uses server-side.
+
+**Found a real deployment blocker before it became one**: the natural
+first instinct was to put this Lambda in `infra/live/mempalace`,
+alongside everything else this ADR covers. Reading the mempalace
+account's own service-boundary SCP first
+(`infra/mgmt/org/mempalace_account.tf`) turned up that it's a deny-list
+scoped deliberately narrow to exactly what the ECS Fargate deployment
+uses — `lambda:*` was never in its allow-list, on purpose ("no
+lambda/apigateway/dynamodb self-service API surface here," per the SCP's
+own comment). The Lambda doesn't actually need to run inside that
+boundary at all — it only calls Secrets Manager and the public GitHub
+API — so it's deployed in `infra/live/dev` (the management account)
+instead, the same account `rds_auto_stop.tf` already lives in for the
+same reason: small, single-purpose, doesn't need the mempalace account's
+tighter boundary. Caught by actually reading the SCP before writing
+Terraform against it, not by assuming the account could host arbitrary
+services.
+
+**Sizing**: `cpu=256`/`memory=512`, the same conservative floor the
+personal instance itself started at — right-size from real CloudWatch
+usage after the first real deploy, not a guess, same as the personal
+instance's own sizing history above.
+
 ## Currently Torn Down (end of 2026-08-14 session)
 
 Deployed, verified live end-to-end (see below), then deliberately torn

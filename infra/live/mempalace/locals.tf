@@ -6,6 +6,13 @@ locals {
   environment = var.environment
   name_prefix = "${local.project}-${local.environment}"
 
+  # Shorter prefix for the MagNet Legal instance's own resources —
+  # "${local.name_prefix}-magnetlegal-tg" (34 chars) exceeds the ALB
+  # target group name limit (32 chars). Drops the redundant "mempalace"
+  # (already implied by being in this live directory) rather than
+  # abbreviating "magnetlegal", which needs to stay recognizable.
+  magnetlegal_prefix = "${local.project}-magnetlegal"
+
   # MemPalace VPC — allocated from the "reserved / future" block in
   # docs/networking-cidr-plan.md (10.0.112.0/20)
   vpc_cidr = "10.0.112.0/20"

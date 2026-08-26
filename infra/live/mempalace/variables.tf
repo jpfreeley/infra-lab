@@ -60,3 +60,15 @@ variable "log_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "magnetlegal_cpu" {
+  description = "Fargate task CPU units for the MagNet Legal mempalace_server instance (passed through). Starts at the same conservative floor the personal instance started at (256) rather than guessing higher — right-size from real CloudWatch usage after the first real deploy, same as the personal instance's own sizing history (see mempalace_cpu above)."
+  type        = number
+  default     = 256
+}
+
+variable "magnetlegal_memory" {
+  description = "Fargate task memory in MiB for the MagNet Legal mempalace_server instance (passed through). 512 is Fargate's minimum allowed memory at cpu=256."
+  type        = number
+  default     = 512
+}

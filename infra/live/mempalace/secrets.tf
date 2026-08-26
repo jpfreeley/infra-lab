@@ -26,3 +26,22 @@ module "mempalace_token" {
 
   tags = local.common_tags
 }
+
+# MagNet Legal instance's own bearer token — deliberately a separate
+# secret, never the same value as mempalace_token above. Same out-of-band
+# population pattern:
+#
+#   openssl rand -base64 32 | aws secretsmanager put-secret-value \
+#     --secret-id ${local.name_prefix}/mempalace-magnetlegal/mcp-http-token \
+#     --secret-string file:///dev/stdin --profile infra-lab \
+#     --region us-east-1
+module "mempalace_magnetlegal_token" {
+  source = "../../modules/secrets_manager"
+
+  secret_name   = "${local.name_prefix}/mempalace-magnetlegal/mcp-http-token"
+  description   = "MEMPALACE_MCP_HTTP_TOKEN — bearer token for the MagNet Legal mempalace instance. Value set out-of-band, never via Terraform."
+  secret_string = null
+  kms_key_arn   = module.mempalace_kms.key_arn
+
+  tags = local.common_tags
+}
