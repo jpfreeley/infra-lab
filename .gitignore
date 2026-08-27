@@ -39,3 +39,15 @@ terraform.rc
 # Terraform plan files (generated during compliance testing)
 tfplan.binary
 tfplan.json
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# Local-only operational runbooks — infra-lab is public; deployment docs
+# with real secret-population commands, endpoint URLs, and credential
+# handling steps for a specific rollout don't belong in a public repo
+# even though they contain no actual secret values (those are always
+# populated out-of-band, never committed, per every secrets.tf in this
+# repo). Naming convention: *.local.md.
+*.local.md

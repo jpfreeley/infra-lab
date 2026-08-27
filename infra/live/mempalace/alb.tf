@@ -105,9 +105,76 @@ resource "aws_lb_listener" "https" {
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
   certificate_arn   = var.acm_certificate_arn
 
+  # Default action stays the personal instance, unchanged — the MagNet
+  # Legal host below is matched by an explicit listener_rule (host_header
+  # condition) instead, added on top rather than replacing this. Any
+  # request that doesn't match magnetlegal.mempalace.lintwiselabs.com
+  # keeps hitting this default action exactly as it always has.
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.mempalace.arn
+  }
+
+  tags = local.common_tags
+}
+
+###############################################################################
+# MagNet Legal instance — second target on the same ALB
+# (docs/adr/034-shared-mempalace-server.md, "MagNet Legal Instance" section)
+###############################################################################
+
+resource "aws_lb_target_group" "magnetlegal" {
+  # checkov:skip=CKV_AWS_378: "Same deliberate TLS-terminates-at-ALB pattern as aws_lb_target_group.mempalace above — this is the ALB-to-task hop inside the VPC."
+  name        = "${local.magnetlegal_prefix}-tg"
+  port        = 8765
+  protocol    = "HTTP"
+  vpc_id      = module.mempalace_vpc.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    interval            = 30
+    timeout             = 10
+    path                = "/healthz"
+    protocol            = "HTTP"
+    matcher             = "200"
+  }
+
+  deregistration_delay = 30
+
+  tags = merge(local.common_tags, {
+    "Name" = "${local.magnetlegal_prefix}-tg"
+  })
+}
+
+# SNI: ALB HTTPS listeners support more than one certificate once you
+# attach additional ones this way — no listener changes needed, no
+# second HTTPS port, and aws_lb_listener.https's own certificate_arn
+# (the personal instance's cert) is untouched.
+resource "aws_lb_listener_certificate" "magnetlegal" {
+  count = var.enable_https ? 1 : 0
+
+  listener_arn    = aws_lb_listener.https[0].arn
+  certificate_arn = aws_acm_certificate_validation.magnetlegal.certificate_arn
+}
+
+resource "aws_lb_listener_rule" "magnetlegal" {
+  count = var.enable_https ? 1 : 0
+
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.magnetlegal.arn
+  }
+
+  condition {
+    host_header {
+      values = ["magnetlegal.mempalace.lintwiselabs.com"]
+    }
   }
 
   tags = local.common_tags

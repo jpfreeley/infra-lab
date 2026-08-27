@@ -1,9 +1,16 @@
 name: MemPalace Server Toggle
 
 # Manual up/down control for the mempalace server's billable resources
-# (ALB, WAF, ECS service). Everything else (VPC, EFS, KMS key, Secrets
-# Manager secret, ECS cluster, IAM roles, task definition) costs close to
-# nothing and is never touched here, up or down.
+# (ALB, WAF, both ECS services). Everything else (VPC, EFS, KMS key,
+# Secrets Manager secrets, ECS cluster, IAM roles, task definitions) costs
+# close to nothing and is never touched here, up or down.
+#
+# The ALB, WAF, and listener are shared infrastructure as of the MagNet
+# Legal instance (docs/adr/034-shared-mempalace-server.md, "MagNet Legal
+# Instance") — this toggle is all-or-nothing for both instances together,
+# deliberately, not per-instance. It's mempalace-idle-teardown.yml's job
+# to decide *when* "down" is warranted (both instances idle, not just
+# one); this workflow just executes whichever action it's told.
 #
 # Start of the nightly-teardown plan from ADR-034 ("Decided, Not Yet
 # Built"): this is the manual trigger first, a schedule comes later once
@@ -76,28 +83,46 @@ jobs:
         if: inputs.action == 'down'
         # Targeted, deliberately: this destroys only the resources that
         # cost real standing money. VPC/EFS/KMS/Secrets/cluster/IAM stay.
-        # ECS service is included: destroying its target group forces its
-        # replacement anyway (Terraform can't leave a service pointing at
-        # a target group that won't exist), so it's listed explicitly
-        # rather than relying on that cascade to do it implicitly.
+        # Both ECS services are included: destroying their target groups
+        # forces their replacement anyway (Terraform can't leave a service
+        # pointing at a target group that won't exist), so they're listed
+        # explicitly rather than relying on that cascade to do it
+        # implicitly — same reasoning extended to the MagNet Legal
+        # instance's listener rule and cert attachment below, both of
+        # which reference aws_lb_listener.https and would get swept in via
+        # dependency-order destroy anyway, but explicit beats implicit here.
         #
-        # Tested end-to-end 2026-08-14, not just written and assumed:
+        # ACM certs (both) are deliberately NOT targeted — same as the
+        # original personal-instance cert, they're cheap, don't depend on
+        # the ALB existing, and re-validating DNS on every up/down cycle
+        # would be pure friction for zero benefit.
+        #
+        # Tested end-to-end 2026-08-14 (personal instance only, before the
+        # MagNet Legal instance existed), not just written and assumed:
         # destroying aws_lb.mempalace also pulls in the Route53 alias
         # record automatically (Terraform won't leave it referencing a
         # destroyed ALB's live attributes), confirmed via `terraform plan`
         # showing all 8 resources (7 targeted + the DNS record) correctly
         # back to "to add" afterward, and directly via AWS CLI
         # (ecs list-tasks / elbv2 describe-load-balancers / wafv2
-        # list-web-acls all empty). Nothing is left dangling.
+        # list-web-acls all empty). Nothing is left dangling. The same
+        # cascade should cover magnetlegal's own Route53 alias record once
+        # the second instance exists — re-verify this specific claim live
+        # the first time this runs with both instances deployed, don't
+        # just assume the pattern holds.
         run: |
           terraform destroy -auto-approve \
             -target=aws_wafv2_web_acl_association.mempalace \
             -target=aws_wafv2_web_acl.mempalace \
+            -target=aws_lb_listener_rule.magnetlegal \
+            -target=aws_lb_listener_certificate.magnetlegal \
             -target=aws_lb_listener.https \
             -target=aws_lb_listener.http \
             -target=aws_lb_target_group.mempalace \
+            -target=aws_lb_target_group.magnetlegal \
             -target=aws_lb.mempalace \
-            -target=module.mempalace.aws_ecs_service.this
+            -target=module.mempalace.aws_ecs_service.this \
+            -target=module.mempalace_magnetlegal.aws_ecs_service.this
 
       - name: Show current outputs
         if: always()
