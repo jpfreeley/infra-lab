@@ -909,6 +909,41 @@ personal instance itself started at — right-size from real CloudWatch
 usage after the first real deploy, not a guess, same as the personal
 instance's own sizing history above.
 
+**Deployed (2026-08-27).** All 24 Terraform resources applied cleanly,
+0 changes to anything existing — confirmed by reading the plan before
+applying, not just trusting the resource count. The backfill (242
+drawers) landed with 0 errors, chunk counts matching exactly (291 on
+both source and destination). The dual-idle-gate's `TargetGroup`
+dimension scoping was verified against real ground truth rather than
+just trusted: personal (247) and magnetlegal (249) traffic sums exactly
+to the ALB-wide total (496) over the same window, confirming each
+instance's idle signal is genuinely independent, not both silently
+reading the same aggregate.
+
+**One real unresolved issue, found during verification.** The wake
+Lambda's Function URL returns `403 Forbidden` for every request,
+including ones with the correct bearer token — happening before the
+Lambda code even runs. Isolated cleanly: invoking the function directly
+via the Lambda API (bypassing the URL entirely) works correctly and
+returns the right `401` for a bad token, so the handler, the Secrets
+Manager reads, and the auth logic are all fine — this is purely a
+Function-URL-layer problem. Ruled out via direct verification, not
+guessing: the resource policy (matches AWS's documented public-URL
+pattern exactly), a stale/duplicate permission statement (removed the
+Terraform-managed one entirely — AWS's own auto-added
+`FunctionURLAllowPublicAccess` statement alone still 403s), propagation
+delay (persisted across repeated retries), organization-level Resource
+Control Policies (none exist), Service Control Policies (the management
+account only carries the default `FullAWSAccess`, and SCPs don't apply
+to the management account regardless), and Lambda account settings
+(nothing relevant in `get-account-settings`). Root cause not found —
+flagged for JP to investigate directly (AWS Console, or AWS Support),
+not worked around. The GitHub PAT secret was also never populated
+(needs JP's own GitHub account — fine-grained PATs require the web UI),
+so the wake endpoint's actual dispatch call is untested end-to-end
+regardless. Credentials have deliberately not been sent to Michael or
+Laura yet — no point handing out a link that doesn't work.
+
 ## Currently Torn Down (end of 2026-08-14 session)
 
 Deployed, verified live end-to-end (see below), then deliberately torn
