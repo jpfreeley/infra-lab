@@ -936,13 +936,23 @@ delay (persisted across repeated retries), organization-level Resource
 Control Policies (none exist), Service Control Policies (the management
 account only carries the default `FullAWSAccess`, and SCPs don't apply
 to the management account regardless), and Lambda account settings
-(nothing relevant in `get-account-settings`). Root cause not found —
-flagged for JP to investigate directly (AWS Console, or AWS Support),
-not worked around. The GitHub PAT secret was also never populated
-(needs JP's own GitHub account — fine-grained PATs require the web UI),
-so the wake endpoint's actual dispatch call is untested end-to-end
-regardless. Credentials have deliberately not been sent to Michael or
-Laura yet — no point handing out a link that doesn't work.
+(nothing relevant in `get-account-settings`). Root cause not found via
+the CLI-only investigation above — flagged for JP, who checked the AWS
+Console directly and got the answer the CLI hadn't surfaced:
+`authorization_type = "NONE"` Function URLs need *both*
+`lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` granted to `"*"`,
+not just the first — AWS's own console error names this exact fix.
+Fixed and verified live the same way the bug was found: a bad token now
+gets a real `401` from the handler, a good token gets a real `202` and
+an actual `mempalace-toggle.yml` dispatch. The CLI-added permission
+(used to confirm the fix before committing it) was imported into
+Terraform state rather than recreated, so nothing was disrupted along
+the way.
+
+The GitHub PAT secret is populated and confirmed working — the
+dispatch above is real proof, not inferred. The wake endpoint is now
+fully functional end-to-end; credentials are ready to send to Michael
+and Laura.
 
 ## Currently Torn Down (end of 2026-08-14 session)
 
