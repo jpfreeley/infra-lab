@@ -51,3 +51,10 @@ __pycache__/
 # populated out-of-band, never committed, per every secrets.tf in this
 # repo). Naming convention: *.local.md.
 *.local.md
+
+# Lambda build artifacts (data.archive_file output) — deterministically
+# regenerated from source on every terraform apply, no reason to commit
+# them. Found infra/live/workspaces/lambda/desktop_provisioner.zip
+# already tracked from before this rule existed; leaving that one as-is
+# rather than churning an unrelated history, but nothing new should be.
+infra/live/*/lambda/**/*.zip
