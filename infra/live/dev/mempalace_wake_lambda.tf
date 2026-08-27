@@ -37,20 +37,36 @@
 # Secrets
 ###############################################################################
 
-resource "aws_secretsmanager_secret" "mempalace_wake_token" {
-  # checkov:skip=CKV_AWS_149: "AWS-managed key, not a CMK, deliberate: this secret only gates 'permission to click the up button' (not mempalace content access itself), and the account's one existing CMK (module.evidence_kms in s3_evidence.tf) is purpose-built for a different, unrelated resource — mixing key purposes for a secret this low-stakes isn't worth a second dedicated CMK's ~$1/mo."
-  name        = "infra-lab/mempalace-wake/wake-token"
-  description = "Bearer token MagNet Legal developers use to call the wake endpoint. Value set out-of-band, never via Terraform."
+# Both secrets use the existing secrets_manager module (../../modules/
+# secrets_manager) rather than raw aws_secretsmanager_secret resources —
+# matching infra/live/mempalace/secrets.tf's own pattern, and picking up
+# that module's already-justified checkov:skip=CKV2_AWS_57 (auto-rotation
+# not applicable to a manually-populated bearer token/PAT) for free
+# instead of duplicating the same reasoning inline. No CMK
+# (kms_key_arn left null): these gate "permission to click the up
+# button," not mempalace content access itself, and the account's one
+# existing CMK (module.evidence_kms in s3_evidence.tf) is purpose-built
+# for an unrelated resource — not worth a second dedicated CMK's ~$1/mo
+# for something this low-stakes.
+
+module "mempalace_wake_token" {
+  source = "../../modules/secrets_manager"
+
+  secret_name   = "infra-lab/mempalace-wake/wake-token"
+  description   = "Bearer token MagNet Legal developers use to call the wake endpoint. Value set out-of-band, never via Terraform."
+  secret_string = null
 
   tags = merge(local.common_tags, {
     "Name" = "infra-lab-mempalace-wake-token"
   })
 }
 
-resource "aws_secretsmanager_secret" "mempalace_wake_github_pat" {
-  # checkov:skip=CKV_AWS_149: "Same reasoning as aws_secretsmanager_secret.mempalace_wake_token above — AWS-managed key is proportionate here, not worth a dedicated CMK."
-  name        = "infra-lab/mempalace-wake/github-pat"
-  description = "Fine-grained GitHub PAT (actions:write on jpfreeley/infra-lab only) used server-side to trigger mempalace-toggle.yml. Never returned to callers. Value set out-of-band, never via Terraform."
+module "mempalace_wake_github_pat" {
+  source = "../../modules/secrets_manager"
+
+  secret_name   = "infra-lab/mempalace-wake/github-pat"
+  description   = "Fine-grained GitHub PAT (actions:write on jpfreeley/infra-lab only) used server-side to trigger mempalace-toggle.yml. Never returned to callers. Value set out-of-band, never via Terraform."
+  secret_string = null
 
   tags = merge(local.common_tags, {
     "Name" = "infra-lab-mempalace-wake-github-pat"
@@ -89,8 +105,8 @@ resource "aws_lambda_function" "mempalace_wake" {
     variables = {
       GITHUB_REPO           = "jpfreeley/infra-lab"
       WORKFLOW_FILE         = "mempalace-toggle.yml"
-      WAKE_TOKEN_SECRET_ARN = aws_secretsmanager_secret.mempalace_wake_token.arn
-      GITHUB_PAT_SECRET_ARN = aws_secretsmanager_secret.mempalace_wake_github_pat.arn
+      WAKE_TOKEN_SECRET_ARN = module.mempalace_wake_token.secret_arn
+      GITHUB_PAT_SECRET_ARN = module.mempalace_wake_github_pat.secret_arn
     }
   }
 
@@ -162,8 +178,8 @@ resource "aws_iam_role_policy" "mempalace_wake" {
           "secretsmanager:GetSecretValue"
         ]
         Resource = [
-          aws_secretsmanager_secret.mempalace_wake_token.arn,
-          aws_secretsmanager_secret.mempalace_wake_github_pat.arn,
+          module.mempalace_wake_token.secret_arn,
+          module.mempalace_wake_github_pat.secret_arn,
         ]
       },
       {
