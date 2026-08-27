@@ -126,10 +126,18 @@ resource "aws_lambda_function_url" "mempalace_wake" {
   }
 }
 
-# Function URLs with authorization_type=NONE still need this explicit
-# permission, or every request 403s at the URL level before ever reaching
-# the handler's own bearer-token check — a common gotcha, called out here
-# so it isn't "discovered" again later.
+# Function URLs with authorization_type=NONE need BOTH of the two
+# permissions below, not just the InvokeFunctionUrl one — found the hard
+# way (2026-08-27): with only lambda:InvokeFunctionUrl granted, every
+# request 403s at the URL level before ever reaching the handler's own
+# bearer-token check, even with a correct token, even with the
+# resource policy otherwise looking completely correct. AWS's own
+# console error for this exact symptom names the fix directly:
+# lambda:InvokeFunction ALSO has to be granted to "*", separately from
+# lambda:InvokeFunctionUrl. Confirmed the whole chain works end-to-end
+# live once both are in place — a real 401 from the handler for a bad
+# token, a real 202 and an actual mempalace-toggle.yml dispatch for a
+# good one.
 resource "aws_lambda_permission" "mempalace_wake_url" {
   # checkov:skip=CKV_AWS_301: "Same deliberate public-URL design as aws_lambda_function_url.mempalace_wake above — the endpoint has to be reachable without AWS credentials by design; the handler's own bearer-token check is the real access control, not IAM."
   statement_id           = "AllowPublicFunctionUrlInvoke"
@@ -137,6 +145,14 @@ resource "aws_lambda_permission" "mempalace_wake_url" {
   function_name          = aws_lambda_function.mempalace_wake.function_name
   principal              = "*"
   function_url_auth_type = "NONE"
+}
+
+resource "aws_lambda_permission" "mempalace_wake_invoke" {
+  # checkov:skip=CKV_AWS_301: "Required alongside aws_lambda_permission.mempalace_wake_url above for Function URL AuthType=NONE to actually work — AWS's own console guidance names this exact fix. No function_url_auth_type condition available for this action (AWS rejects it — confirmed live, not assumed), so this genuinely is an unconditional public grant of the base invoke action; the handler's own bearer-token check is what actually gates access, matching the same accepted design as the sibling resources above."
+  statement_id  = "AllowPublicInvokeFunction"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.mempalace_wake.function_name
+  principal     = "*"
 }
 
 ###############################################################################
