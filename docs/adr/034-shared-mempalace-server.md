@@ -1132,3 +1132,107 @@ given account creation and public exposure are both hard to reverse):
   operating mp_sync/mempalace-cloud-sync — backend, write-lock, corpus
   size, and migration-format facts above came from there directly, not
   from documentation
+
+## Reliable Idle-Teardown Trigger via EventBridge Scheduler (2026-09-03)
+
+`mempalace-idle-teardown.yml`'s own `schedule: cron("*/15 * * * *")`
+trigger turned out to be wildly unreliable in practice: measured real
+gaps between runs growing from ~40 minutes up to ~225 minutes (nearly
+4 hours) over the course of 2026-08-26/27, worse as the day went on.
+This is a documented GitHub Actions platform limitation — scheduled
+triggers are best-effort with no SLA, and delays get worse specifically
+for short intervals like 15 minutes under platform-wide load — not a
+bug in this workflow. But the severity meaningfully undermined the
+workflow's actual purpose: it exists to catch an idle stack within
+roughly 90 minutes for cost control, and a 4-hour gap between checks
+means a stack could sit up (and billing) for hours longer than
+intended before it's even evaluated again.
+
+**Decision**: add a second, independent trigger path with a real SLA,
+rather than accept the drift or disable/rebuild GitHub's own scheduler
+(not something a repo can control). `infra/live/dev/mempalace_idle_teardown_trigger.tf`
+adds an **EventBridge Scheduler** `rate(15 minutes)` schedule invoking
+a small Lambda (`infra/live/dev/lambda/idle_teardown_trigger/handler.py`)
+that calls `mempalace-idle-teardown.yml` via GitHub's REST API — the
+same way GitHub's own cron trigger would, no teardown logic
+reimplemented. Runs *alongside* the existing cron trigger, not instead
+of it, so neither path is a single point of failure.
+
+Deployed in `infra/live/dev` (management account), same reasoning as
+the sibling wake Lambda earlier in this ADR: the mempalace account's
+own SCP denies `events:*` alongside `lambda:*`. Reuses the **existing**
+`mempalace_wake_github_pat` secret (scope: `actions:write` on
+`jpfreeley/infra-lab` only) rather than creating a second credential —
+no new secret to populate. EventBridge Scheduler invokes the Lambda
+directly via the schedule's own IAM execution role (`lambda:InvokeFunction`,
+scoped to just this function), not a Function URL — unlike the wake
+Lambda, this one is never publicly reachable at all.
+
+**Verified end-to-end before merging, not just planned**: applied to
+real AWS, manually invoked the Lambda (real `204` from GitHub, a real
+new workflow run appeared), then confirmed via CloudWatch a second,
+genuinely distinct invocation (different RequestId) happened on its
+own shortly after — EventBridge Scheduler's real first tick, correctly
+assuming its IAM role with no manual trigger. (EventBridge rate-based
+schedules fire an initial tick on activation, then every interval after.)
+
+## ALB Access Logs + Athena — Usage Split by Domain (2026-09-03)
+
+Splitting personal-vs-MagNet-Legal traffic needed a stable join key.
+Target-group ARNs looked like the obvious choice (already used for the
+dual-idle-gate's CloudWatch dimensions), but they churn on every
+idle-teardown destroy/recreate cycle — confirmed empirically: a fresh
+ALB incarnation starts with zero CloudWatch metric history under its
+new ARN, so there's no continuous per-instance history across teardown
+cycles. `domain_name` (the Host header/SNI) is stable across every
+recreation: `mempalace.lintwiselabs.com` vs
+`magnetlegal.mempalace.lintwiselabs.com` never change even though the
+ALB/target-group ARNs behind them do.
+
+**Decision**: enable ALB access logging to S3 (`infra/live/mempalace/alb_access_logs.tf`),
+query by `domain_name` via Athena. This also closes the CKV_AWS_91
+`checkov:skip` on the ALB itself, whose own comment already said
+"revisit if this account ever holds more than one person's data" —
+true since the MagNet Legal instance above.
+
+Standalone SSE-S3 bucket, **not** the shared `s3_secure_bucket` module
+used elsewhere in this repo — that module hardcodes SSE-KMS, and AWS's
+ELB log-delivery service cannot write to a customer-managed-KMS-encrypted
+bucket, only SSE-S3 (or no encryption) is supported for ALB access
+logging (AWS's own documented constraint). Deliberately **not**
+reusing the WAF logging path already present in `alb.tf` either, even
+though it's the more obviously-reusable option — that path has been
+off on purpose since a real 2026-08-15 incident (the bearer token
+leaked in plaintext despite a redaction config verified live and still
+failing). ALB access logs are a structurally different, safer format:
+fixed fields only, no request headers captured at all, so the token
+can't leak through this path regardless of any redaction working.
+
+Athena + Glue table with partition projection (`infra_lab_mempalace_alb_logs.alb_logs`),
+no manual `ALTER TABLE ADD PARTITION` needed.
+
+**Two real bugs found only by testing against live traffic**, neither
+caught by `terraform validate`/`tflint`/`checkov`/CI:
+
+1. The Glue table's column list used `dynamic "columns" { for_each = {map} }`
+   — Terraform's `for_each` over a plain map sorts by key alphabetically,
+   not definition order, silently misaligning every column against the
+   regex SerDe's positional capture groups. Fixed with an ordered list
+   of objects instead of a map.
+2. The `input.regex` only handled AWS's older/shorter ALB log format.
+   Real logs now include a trailing `conn_trace_id` field plus more,
+   and Hive's RegexSerDe requires the regex to match the **entire**
+   line (like Python's `re.fullmatch`), not just a prefix
+   (`re.match`) — the regex matched as a prefix in local testing but
+   failed Hive's full-line requirement, so every column came back null
+   for every row despite the table existing and queries succeeding
+   with no error (silently wrong data, not a visible failure). Fixed by
+   pulling AWS's current documented DDL directly from their own docs
+   rather than trusting a memorized/outdated version.
+
+**Verified against real generated traffic after the fix**:
+`SELECT domain_name, count(*) FROM infra_lab_mempalace_alb_logs.alb_logs WHERE day='2026/09/03' GROUP BY domain_name`
+correctly returned `mempalace.lintwiselabs.com`=2,
+`magnetlegal.mempalace.lintwiselabs.com`=2, `-`=3 (raw-IP bot-scan
+traffic with no SNI match) — matching exactly the real curl requests
+generated during testing.
