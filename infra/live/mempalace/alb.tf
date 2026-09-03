@@ -13,7 +13,6 @@
 
 resource "aws_lb" "mempalace" {
   # checkov:skip=CKV_AWS_150: "Deletion protection off — matches infra-lab's other lab/dev ALBs, single-owner account"
-  # checkov:skip=CKV_AWS_91: "Access logs off for cost; revisit if this account ever holds more than one person's data"
   # checkov:skip=CKV2_AWS_28: "WAF is associated below (aws_wafv2_web_acl_association) — checkov doesn't always resolve the cross-resource association statically"
   # checkov:skip=CKV2_AWS_76: "The Log4j-covering rule group (AWSManagedRulesKnownBadInputsRuleSet) IS attached, in aws_wafv2_web_acl.mempalace below (see its 'aws-managed-known-bad-inputs' rule) — checkov can't resolve that across the ALB/WebACL/rule resource graph"
   # checkov:skip=CKV2_AWS_20: "The HTTP listener below DOES redirect to HTTPS when enable_https=true (its first dynamic default_action block, type=redirect to :443) — checkov isn't resolving that dynamic-block ternary against the variable's default for this specific check, though it does for CKV_AWS_2 on the same resource"
@@ -25,6 +24,20 @@ resource "aws_lb" "mempalace" {
 
   drop_invalid_header_fields = true
   enable_deletion_protection = false
+
+  # Access logs turned back on 2026-09-03 — the CKV_AWS_91 skip this
+  # replaced said "revisit if this account ever holds more than one
+  # person's data," which has been true since the MagNet Legal instance
+  # (2026-08-26). Needed to split personal-vs-magnetlegal usage by
+  # domain_name (Host header), the one identity that's stable across
+  # idle-teardown's destroy/recreate cycles — target-group ARNs aren't,
+  # confirmed empirically 2026-09-03 (a fresh ALB incarnation has zero
+  # CloudWatch history under its new ARN). See alb_access_logs.tf.
+  access_logs {
+    enabled = true
+    bucket  = aws_s3_bucket.alb_access_logs.id
+    prefix  = "alb"
+  }
 
   tags = merge(local.common_tags, {
     "Name" = "${local.name_prefix}-alb"
