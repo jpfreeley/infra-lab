@@ -34,6 +34,9 @@
 resource "aws_s3_bucket" "alb_access_logs" {
   # checkov:skip=CKV_AWS_144: "Cross-region replication not needed — these are operational logs for cost/usage analysis, not compliance evidence with a DR requirement"
   # checkov:skip=CKV_AWS_18: "Access logging ON this bucket (logs of who read the logs) not needed — this isn't a compliance evidence store, just usage-analysis input; matches this account's other non-evidence buckets"
+  # checkov:skip=CKV_AWS_21: "Versioning not needed — ELB-delivered log objects are already append-only/immutable by nature, never overwritten in place; versioning would only retain noise from the 90-day expiration lifecycle rule"
+  # checkov:skip=CKV2_AWS_62: "Event notifications not needed — nothing consumes bucket-write events here, this bucket is read via Athena/Glue, not event-driven"
+  # checkov:skip=CKV_AWS_145: "SSE-S3, not KMS, is deliberate — see this file's header comment: AWS's ELB log-delivery service cannot write to a customer-managed-KMS-encrypted bucket, only SSE-S3 or no encryption is supported"
   bucket = "${local.name_prefix}-alb-access-logs"
 
   tags = merge(local.common_tags, {
