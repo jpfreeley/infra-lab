@@ -173,49 +173,57 @@ resource "aws_glue_catalog_table" "alb_logs" {
       serialization_library = "org.apache.hadoop.hive.serde2.RegexSerDe"
       parameters = {
         "serialization.format" = "1"
-        "input.regex"          = "([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*):([0-9]*) ([^ ]*)[:-]([0-9]*) ([-.0-9]*) ([-.0-9]*) ([-.0-9]*) (|[-0-9]*) (-|[-0-9]*) ([-0-9]*) ([-0-9]*) \"([^ ]*) (.*) (- |[^ ]*)\" \"([^\"]*)\" ([A-Z0-9-_]+) ([A-Za-z0-9.-]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^\"]*)\" ([-.0-9]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^ ]*)\" \"([^\\s]+?)\" \"([^\\s]+)\" \"([^ ]*)\" \"([^ ]*)\""
+        "input.regex"          = "([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*):([0-9]*) ([^ ]*)[:-]([0-9]*) ([-.0-9]*) ([-.0-9]*) ([-.0-9]*) (|[-0-9]*) (-|[-0-9]*) ([-0-9]*) ([-0-9]*) \"([^ ]*) (.*) (- |[^ ]*)\" \"([^\"]*)\" ([A-Z0-9-_]+) ([A-Za-z0-9.-]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^\"]*)\" ([-.0-9]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^ ]*)\" \"([^\\s]+?)\" \"([^\\s]+)\" \"([^ ]*)\" \"([^ ]*)\" ?([^ ]*)? ?( .*)?"
       }
     }
 
+    # A plain map's for_each iterates in sorted-key order, not the order
+    # written here — that silently scrambled every column against the
+    # regex's positional capture groups on first deploy (confirmed live:
+    # domain_name came back empty for every row; `aws glue get-table`
+    # showed columns alphabetized, actions_executed first instead of
+    # type). A list of objects preserves definition order, which
+    # positional regex-group mapping actually requires.
     dynamic "columns" {
-      for_each = {
-        type                     = "string"
-        time                     = "string"
-        elb                      = "string"
-        client_ip                = "string"
-        client_port              = "int"
-        target_ip                = "string"
-        target_port              = "int"
-        request_processing_time  = "double"
-        target_processing_time   = "double"
-        response_processing_time = "double"
-        elb_status_code          = "int"
-        target_status_code       = "string"
-        received_bytes           = "bigint"
-        sent_bytes               = "bigint"
-        request_verb             = "string"
-        request_url              = "string"
-        request_proto            = "string"
-        user_agent               = "string"
-        ssl_cipher               = "string"
-        ssl_protocol             = "string"
-        target_group_arn         = "string"
-        trace_id                 = "string"
-        domain_name              = "string"
-        chosen_cert_arn          = "string"
-        matched_rule_priority    = "string"
-        request_creation_time    = "string"
-        actions_executed         = "string"
-        redirect_url             = "string"
-        lambda_error_reason      = "string"
-        target_port_list         = "string"
-        target_status_code_list  = "string"
-        classification           = "string"
-        classification_reason    = "string"
-      }
+      for_each = [
+        { name = "type", type = "string" },
+        { name = "time", type = "string" },
+        { name = "elb", type = "string" },
+        { name = "client_ip", type = "string" },
+        { name = "client_port", type = "int" },
+        { name = "target_ip", type = "string" },
+        { name = "target_port", type = "int" },
+        { name = "request_processing_time", type = "double" },
+        { name = "target_processing_time", type = "double" },
+        { name = "response_processing_time", type = "double" },
+        { name = "elb_status_code", type = "int" },
+        { name = "target_status_code", type = "string" },
+        { name = "received_bytes", type = "bigint" },
+        { name = "sent_bytes", type = "bigint" },
+        { name = "request_verb", type = "string" },
+        { name = "request_url", type = "string" },
+        { name = "request_proto", type = "string" },
+        { name = "user_agent", type = "string" },
+        { name = "ssl_cipher", type = "string" },
+        { name = "ssl_protocol", type = "string" },
+        { name = "target_group_arn", type = "string" },
+        { name = "trace_id", type = "string" },
+        { name = "domain_name", type = "string" },
+        { name = "chosen_cert_arn", type = "string" },
+        { name = "matched_rule_priority", type = "string" },
+        { name = "request_creation_time", type = "string" },
+        { name = "actions_executed", type = "string" },
+        { name = "redirect_url", type = "string" },
+        { name = "lambda_error_reason", type = "string" },
+        { name = "target_port_list", type = "string" },
+        { name = "target_status_code_list", type = "string" },
+        { name = "classification", type = "string" },
+        { name = "classification_reason", type = "string" },
+        { name = "conn_trace_id", type = "string" }, # added 2026-09-03 — AWS's own docs show this field plus a forward-compat catch-all tail on the regex; my first version omitted both and every row came back null (Hive's RegexSerDe requires a FULL-line match, not just a prefix like Python's re.match — confirmed live against a real log line)
+      ]
       content {
-        name = columns.key
-        type = columns.value
+        name = columns.value.name
+        type = columns.value.type
       }
     }
   }
