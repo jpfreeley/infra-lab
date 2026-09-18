@@ -107,16 +107,41 @@ variable "desired_count" {
 # Images
 ###############################################################################
 
+# Pinned to a digest, not :latest, deliberately — 2026-09-18, a real
+# incident on the magnetlegal instance. Both task definitions were
+# floating on :latest, so an unrelated ECS service recreation (a normal
+# mempalace-toggle up, no image-upgrade intent at all) pulled whatever
+# :latest currently resolved to upstream — 3.10.0, a genuinely different
+# build than what was previously running. That version computed a
+# different per-tenant qdrant collection name than the prior one, found
+# nothing there, and silently auto-created a fresh empty collection,
+# while the real data sat untouched under the old collection name on
+# EFS the whole time (confirmed via qdrant boot logs showing the old
+# collection still present and fully recovered — "Recovered collection
+# ...: 1/1 (100%)"). Not data loss, but looked exactly like it until
+# diagnosed. Both digests below are what was actually running on both
+# instances at the time this was fixed (confirmed identical across
+# both `infra-lab-mempalace` and `infra-lab-magnetlegal` via
+# `aws ecs describe-tasks ... --query containers[].imageDigest`), so
+# applying this pin is a no-op for what's currently live — it only
+# stops the NEXT recreation from silently drifting.
+#
+# To intentionally upgrade later: resolve the new digest
+# (`docker buildx imagetools inspect ghcr.io/mempalace/mempalace:latest`
+# or pull+inspect), update the default below deliberately, and expect
+# to verify the qdrant collection-naming/version-compat question
+# directly before rolling it out — this exact bug is what happens when
+# that step gets skipped.
 variable "qdrant_image" {
-  description = "Qdrant container image."
+  description = "Qdrant container image, pinned to a digest — see the comment above this variable block for why."
   type        = string
-  default     = "qdrant/qdrant:latest"
+  default     = "qdrant/qdrant@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10"
 }
 
 variable "mempalace_image" {
-  description = "MemPalace server container image."
+  description = "MemPalace server container image, pinned to a digest — see the comment above this variable block for why."
   type        = string
-  default     = "ghcr.io/mempalace/mempalace:latest"
+  default     = "ghcr.io/mempalace/mempalace@sha256:db5761316990215fc6f2db332e63db50f1e35b86fa8c5b3ae6bbf4ab1e61f902"
 }
 
 variable "mempalace_port" {
