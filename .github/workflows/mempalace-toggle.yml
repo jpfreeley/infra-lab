@@ -7,10 +7,22 @@ name: MemPalace Server Toggle
 #
 # The ALB, WAF, and listener are shared infrastructure as of the MagNet
 # Legal instance (docs/adr/034-shared-mempalace-server.md, "MagNet Legal
-# Instance") — this toggle is all-or-nothing for both instances together,
-# deliberately, not per-instance. It's mempalace-idle-teardown.yml's job
-# to decide *when* "down" is warranted (both instances idle, not just
-# one); this workflow just executes whichever action it's told.
+# Instance") — "down" stays all-or-nothing for both instances together,
+# deliberately: mempalace-idle-teardown.yml only calls it once both
+# target groups have been idle, and there's no partial-down state worth
+# building.
+#
+# "up" changed 2026-09-24: it no longer starts the MagNet Legal ECS
+# service. Michael and Laura stopped using their instance (see the
+# mempalace-server room note the same day), so its Fargate task — the
+# actual cost center, everything else about that instance is either
+# already-persistent (task def, IAM, log group) or effectively free
+# (target group, listener rule, cert attachment) — has no reason to come
+# back up automatically every time JP spins up his own instance. The
+# shared ALB/WAF/listener still get created (personal needs them
+# regardless), and magnetlegal's target group/listener rule/cert stay
+# targeted too so routing is consistent if the service is ever started by
+# hand — only its ECS service is excluded from "up".
 #
 # Start of the nightly-teardown plan from ADR-034 ("Decided, Not Yet
 # Built"): this is the manual trigger first, a schedule comes later once
@@ -77,7 +89,26 @@ jobs:
 
       - name: Spin Up
         if: inputs.action == 'up'
-        run: terraform apply -auto-approve
+        # Targeted, deliberately: everything except the MagNet Legal ECS
+        # service (the actual cost center — see the file header comment).
+        # Terraform 1.7.0 predates -exclude (added in 1.9), so this is an
+        # explicit "everything else" target list rather than a real
+        # exclude flag. If a future resource is added to this stack,
+        # remember to add it here too, or it silently won't come up.
+        run: |
+          terraform apply -auto-approve \
+            -target=aws_wafv2_web_acl_association.mempalace \
+            -target=aws_wafv2_web_acl.mempalace \
+            -target=aws_lb_listener_rule.magnetlegal \
+            -target=aws_lb_listener_certificate.magnetlegal \
+            -target=aws_lb_listener.https \
+            -target=aws_lb_listener.http \
+            -target=aws_lb_target_group.mempalace \
+            -target=aws_lb_target_group.magnetlegal \
+            -target=aws_lb.mempalace \
+            -target=aws_route53_record.mempalace \
+            -target=aws_route53_record.magnetlegal \
+            -target=module.mempalace.aws_ecs_service.this
 
       - name: Tear Down
         if: inputs.action == 'down'
