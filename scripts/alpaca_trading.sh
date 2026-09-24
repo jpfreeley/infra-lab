@@ -111,7 +111,10 @@ invoke_slot() {
     payload="{\"slot\": $slot, \"dry_run\": true}"
   fi
   out="$(mktemp)"
-  aws_cli lambda invoke --function-name "$FUNCTION" \
+  # A run can take minutes. The CLI's default 60s read timeout would retry the
+  # invocation, so allow the full Lambda timeout and never retry.
+  AWS_MAX_ATTEMPTS=1 aws_cli lambda invoke --function-name "$FUNCTION" \
+    --cli-read-timeout 900 --cli-connect-timeout 60 \
     --cli-binary-format raw-in-base64-out --payload "$payload" "$out" >/dev/null
   cat "$out"
   echo
