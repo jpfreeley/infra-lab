@@ -12,8 +12,13 @@
 # live in DIR (kept outside git) and are uploaded to the private state bucket.
 set -euo pipefail
 
-PROFILE="${AWS_PROFILE:-infra-lab}"
-REGION="${AWS_REGION:-us-east-1}"
+# Always target the infra-lab account. An ambient AWS_PROFILE or static AWS
+# credentials in the caller's shell (for example a different project's profile)
+# are deliberately ignored, and the account id is verified before any call.
+PROFILE="${ALPACA_TRADING_AWS_PROFILE:-infra-lab}"
+REGION="us-east-1"
+EXPECTED_ACCOUNT="551452024305"
+unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 BUCKET="infra-lab-dev-alpaca-trading"
 FUNCTION="infra-lab-dev-alpaca-trader"
 ALPACA_SECRET="infra-lab/alpaca-trading/alpaca-paper-keys"
@@ -21,6 +26,16 @@ NTFY_SECRET="infra-lab/alpaca-trading/ntfy-topic"
 
 aws_cli() {
   aws --profile "$PROFILE" --region "$REGION" "$@"
+}
+
+verify_account() {
+  local actual
+  actual="$(aws_cli sts get-caller-identity --query Account --output text 2>/dev/null || true)"
+  if [[ "$actual" != "$EXPECTED_ACCOUNT" ]]; then
+    echo "Refusing to run: expected AWS account $EXPECTED_ACCOUNT but got '${actual:-none}'." >&2
+    echo "Log in with: aws sso login --profile $PROFILE" >&2
+    exit 1
+  fi
 }
 
 usage() {
@@ -105,6 +120,9 @@ invoke_slot() {
 
 cmd="${1:-}"
 shift || true
+case "$cmd" in
+  set-secret | sync-config | enable | disable | status | invoke) verify_account ;;
+esac
 case "$cmd" in
   set-secret) set_secret "$@" ;;
   sync-config) sync_config "$@" ;;
