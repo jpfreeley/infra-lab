@@ -305,6 +305,15 @@ class Toolbox:
         try:
             order = self.client.submit_order(body)
         except AlpacaError as exc:
+            if exc.status == 422 and "unique" in str(exc.body):
+                self.journal(
+                    "rejected", client_order_id=cid, reason="duplicate order id"
+                )
+                return {
+                    "ok": False,
+                    "rejected_by_guardrail": "an order for this symbol was already "
+                    "submitted in this slot today; wait for a later slot to re-enter",
+                }
             self.journal("error", client_order_id=cid, error=str(exc))
             return {"ok": False, "error": str(exc)}
         self.ctx.orders_run += 1

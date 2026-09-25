@@ -168,6 +168,22 @@ def test_submit_error_is_reported_not_raised():
     assert not result["ok"]
 
 
+def test_duplicate_order_id_gives_clear_rejection():
+    tools, client, _ = make()
+
+    def dup(body):
+        raise AlpacaError(422, '{"message":"client_order_id must be unique"}')
+
+    client.submit_order = dup
+    result = json.loads(
+        tools.call(
+            "place_bracket_order",
+            {"symbol": "XYZ", "entry_limit": 100.0, "stop": 98.0},
+        )
+    )
+    assert "already submitted" in result["rejected_by_guardrail"]
+
+
 def stop_order(price):
     return {
         "id": "s1",

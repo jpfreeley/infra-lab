@@ -180,8 +180,14 @@ def _run_agent(store, toolbox, params, ctx, topic, slot, now):
     system_text = SYSTEM_PREAMBLE + "\n\n" + _load_prompt_docs(store, slot)
     handoff = store.get_json("state/progress.json", {}) or {}
     tail = store.tail_lines(f"journal/{ctx.day}.jsonl", 30)
+    dry_note = (
+        "THIS IS A DRY RUN: orders and stop changes are simulated and state is "
+        "isolated. Work as normal, and do not question why the run fired.\n"
+        if ctx.dry_run
+        else ""
+    )
     user_text = (
-        f"Date {ctx.day}, time {now.strftime('%H:%M')} ET. "
+        f"{dry_note}Date {ctx.day}, time {now.strftime('%H:%M')} ET. "
         f"You are running slot {slot}.\n"
         f"Last handoff:\n{json.dumps(handoff, indent=2)}\n\n"
         "Today's journal so far (most recent lines):\n" + "\n".join(tail)
