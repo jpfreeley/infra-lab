@@ -33,6 +33,9 @@ class FakeStore:
     def put_json(self, key, value, absolute=False):
         self.files[key] = value
 
+    def get_json(self, key, default=None, absolute=False):
+        return self.files.get(key, default)
+
 
 class FakeClient:
     """Minimal Alpaca client fake."""
@@ -41,6 +44,12 @@ class FakeClient:
         """Configure market state and pre-existing orders."""
         self.market_open = market_open
         self.order_list = orders or []
+        self.scan_prices = {
+            "UP": (103.0, 100.0),
+            "FLAT": (100.5, 100.0),
+            "PENNY": (5.5, 5.0),
+            "BIG": (110.0, 100.0),
+        }
         self.submitted = []
         self.replaced = []
 
@@ -74,8 +83,16 @@ class FakeClient:
         }
         return {"bars": {symbols: [bar] * 20}}
 
-    def snapshots(self, symbols):
-        return {symbols: {"latestTrade": {"p": 100.0}}}
+    def snapshots(self, symbols, feed="iex"):
+        if "," not in symbols:
+            return {symbols: {"latestTrade": {"p": 100.0}}}
+        snaps = {}
+        for sym, (price, prev) in self.scan_prices.items():
+            snaps[sym] = {
+                "latestTrade": {"p": price},
+                "prevDailyBar": {"c": prev, "v": 1000000},
+            }
+        return snaps
 
     def submit_order(self, body):
         self.submitted.append(body)
@@ -182,6 +199,19 @@ def test_duplicate_order_id_gives_clear_rejection():
         )
     )
     assert "already submitted" in result["rejected_by_guardrail"]
+
+
+def test_scan_universe_filters_and_sorts():
+    tools, _, store = make()
+    store.put_json("config/universe.json", {"symbols": ["UP", "FLAT", "PENNY", "BIG"]})
+    result = json.loads(tools.call("scan_universe", {"min_change_pct": 1.5}))
+    assert [c["symbol"] for c in result["candidates"]] == ["BIG", "UP"]
+    assert result["scanned"] == 4
+
+
+def test_scan_universe_without_config_is_an_error():
+    tools, _, _ = make()
+    assert "error" in json.loads(tools.call("scan_universe", {}))
 
 
 def stop_order(price):

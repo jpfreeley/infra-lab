@@ -17,6 +17,7 @@ ET = ZoneInfo("America/New_York")
 MAX_RESULT_CHARS = 24000
 TIMEFRAMES = {"1Min", "5Min", "15Min", "30Min", "1Hour", "1Day"}
 REPORT_SLOTS = {4, 6}
+SCAN_BATCH = 100
 
 
 @dataclass
@@ -136,7 +137,7 @@ class Toolbox:
         """Return live and pending orders, including bracket legs."""
         return self._active_orders()
 
-    def get_movers(self, top=25):
+    def get_movers(self, top=50):
         """Return market movers at or above the minimum price."""
         data = self.client.movers(min(int(top), 50))
         floor = self.params.min_price
@@ -144,6 +145,45 @@ class Toolbox:
             side: [m for m in data.get(side, []) if (m.get("price") or 0) >= floor]
             for side in ("gainers", "losers")
         }
+
+    def scan_universe(self, min_change_pct=1.0, top=25):
+        """Scan the private universe for price change versus the prior close."""
+        universe = self.store.get_json("config/universe.json", None, absolute=True)
+        symbols = (universe or {}).get("symbols") or []
+        if not symbols:
+            return {"error": "no universe configured"}
+        rows, scanned, feed = [], 0, "delayed_sip"
+        for i in range(0, len(symbols), SCAN_BATCH):
+            batch = ",".join(symbols[i:][:SCAN_BATCH])
+            try:
+                snaps = self.client.snapshots(batch, "delayed_sip")
+            except AlpacaError:
+                snaps, feed = self.client.snapshots(batch, "iex"), "iex"
+            for sym, snap in snaps.items():
+                scanned += 1
+                price = (snap.get("latestTrade") or {}).get("p") or (
+                    snap.get("dailyBar") or {}
+                ).get("c")
+                prev_bar = snap.get("prevDailyBar") or {}
+                prev = prev_bar.get("c")
+                if not price or not prev or price < self.params.min_price:
+                    continue
+                change = (price / prev - 1) * 100
+                if change < float(min_change_pct):
+                    continue
+                rows.append(
+                    {
+                        "symbol": sym,
+                        "price": price,
+                        "prev_close": prev,
+                        "change_pct": round(change, 2),
+                        "prev_day_dollar_volume": round(
+                            (prev_bar.get("v") or 0) * prev
+                        ),
+                    }
+                )
+        rows.sort(key=lambda r: r["change_pct"], reverse=True)
+        return {"feed": feed, "scanned": scanned, "candidates": rows[: int(top)]}
 
     def get_most_actives(self, top=30):
         """Return the most active symbols by volume."""
@@ -423,6 +463,12 @@ class Toolbox:
                 {"top": {"type": "integer"}},
             ),
             _spec(
+                "scan_universe",
+                "Scan the private universe for names whose price change versus the "
+                "prior close is at least a threshold, sorted descending.",
+                {"min_change_pct": {"type": "number"}, "top": {"type": "integer"}},
+            ),
+            _spec(
                 "get_most_actives",
                 "Most active symbols by volume.",
                 {"top": {"type": "integer"}},
@@ -507,6 +553,7 @@ class Toolbox:
             "get_positions": self.get_positions,
             "get_open_orders": self.get_open_orders,
             "get_movers": self.get_movers,
+            "scan_universe": self.scan_universe,
             "get_most_actives": self.get_most_actives,
             "get_snapshots": self.get_snapshots,
             "get_bars": self.get_bars,

@@ -75,6 +75,9 @@ sync_config() {
   aws_cli s3 cp "$dir/STRATEGY.md" "s3://$BUCKET/config/STRATEGY.md"
   aws_cli s3 cp "$dir/GUARDRAILS.md" "s3://$BUCKET/config/GUARDRAILS.md"
   aws_cli s3 cp "$dir/config/guardrails.json" "s3://$BUCKET/config/guardrails.json"
+  if [[ -f "$dir/config/universe.json" ]]; then
+    aws_cli s3 cp "$dir/config/universe.json" "s3://$BUCKET/config/universe.json"
+  fi
   aws_cli s3 sync "$dir/prompts" "s3://$BUCKET/config/prompts" --delete
 }
 

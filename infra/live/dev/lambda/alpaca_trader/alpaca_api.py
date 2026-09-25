@@ -138,9 +138,9 @@ class AlpacaClient:
 
     # Market data -----------------------------------------------------------
 
-    def snapshots(self, symbols):
-        """Return snapshots for a comma-separated symbol list (IEX feed)."""
-        return self._data("/v2/stocks/snapshots", {"symbols": symbols, "feed": "iex"})
+    def snapshots(self, symbols, feed="iex"):
+        """Return snapshots for a comma-separated symbol list."""
+        return self._data("/v2/stocks/snapshots", {"symbols": symbols, "feed": feed})
 
     def bars(self, symbols, timeframe, start, end, limit, feed):
         """Return historical bars."""
