@@ -49,3 +49,4 @@ Each ADR follows a lightweight format:
 | [032](032-dcv-desktop-al2-with-browser-ide.md) | DCV desktop on AL2 with browser IDE | Accepted | E13 |
 | [033](033-ollama-gpu-dormant-byo-key.md) | Ollama GPU dormant — BYO Claude key | Accepted | E13 |
 | [034](034-shared-mempalace-server.md) | Shared MemPalace server, portable module | Accepted | TBD |
+| [035](035-paper-trading-runner.md) | Scheduled paper trading runner | Accepted | TBD |

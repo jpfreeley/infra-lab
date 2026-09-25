@@ -8,6 +8,8 @@
 #   alpaca_trading.sh enable START END         Allow scheduled runs (YYYY-MM-DD dates)
 #   alpaca_trading.sh disable                  Stop scheduled runs immediately
 #   alpaca_trading.sh status                   Show control flag and config presence
+#   alpaca_trading.sh journal [YYYY-MM-DD]     Print a day's journal (default: today)
+#   alpaca_trading.sh handoff                  Print the current handoff record
 #   alpaca_trading.sh invoke SLOT [--dry-run]  Invoke one slot now (dry run simulates writes)
 #
 # The ntfy topic is shared by all strategies. Alpaca credentials, config, state
@@ -61,7 +63,7 @@ verify_account() {
 }
 
 usage() {
-  sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -129,6 +131,17 @@ show_status() {
   aws_cli s3 ls "s3://$BUCKET/${ROOT}journal/" || true
 }
 
+show_journal() {
+  local day="${1:-$(date +%Y-%m-%d)}"
+  aws_cli s3 cp "s3://$BUCKET/${ROOT}journal/$day.jsonl" - 2>/dev/null ||
+    echo "no journal for $day"
+}
+
+show_handoff() {
+  aws_cli s3 cp "s3://$BUCKET/${ROOT}state/progress.json" - 2>/dev/null ||
+    echo "no handoff record"
+}
+
 invoke_slot() {
   local slot="${1:-}" payload out
   [[ "$slot" =~ ^[1-6]$ ]] || usage
@@ -151,7 +164,8 @@ invoke_slot() {
 cmd="${1:-}"
 shift || true
 case "$cmd" in
-  set-secret | sync-config | enable | disable | status | invoke) verify_account ;;
+  set-secret | sync-config | enable | disable | status | journal | handoff | invoke)
+    verify_account ;;
 esac
 case "$cmd" in
   set-secret) set_secret "$@" ;;
@@ -159,6 +173,8 @@ case "$cmd" in
   enable) enable_runs "$@" ;;
   disable) disable_runs ;;
   status) show_status ;;
+  journal) show_journal "$@" ;;
+  handoff) show_handoff ;;
   invoke) invoke_slot "$@" ;;
   *) usage ;;
 esac
