@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # Control script for the scheduled paper trading runner.
 #
+#   alpaca_trading.sh [--strategy ID] COMMAND ...   (ID defaults to a)
+#
 #   alpaca_trading.sh set-secret alpaca|ntfy   Prompt silently, store in Secrets Manager
 #   alpaca_trading.sh sync-config DIR          Upload private config from DIR to S3
 #   alpaca_trading.sh enable START END         Allow scheduled runs (YYYY-MM-DD dates)
 #   alpaca_trading.sh disable                  Stop scheduled runs immediately
 #   alpaca_trading.sh status                   Show control flag and config presence
 #   alpaca_trading.sh invoke SLOT [--dry-run]  Invoke one slot now (dry run simulates writes)
+#
+# The ntfy topic is shared by all strategies. Alpaca credentials, config, state
+# and the control flag are per strategy.
 #
 # Nothing sensitive is stored in this repo. Strategy text, prompts and limits
 # live in DIR (kept outside git) and are uploaded to the private state bucket.
@@ -21,8 +26,25 @@ EXPECTED_ACCOUNT="551452024305"
 unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 BUCKET="infra-lab-dev-alpaca-trading"
 FUNCTION="infra-lab-dev-alpaca-trader"
-ALPACA_SECRET="infra-lab/alpaca-trading/alpaca-paper-keys"
 NTFY_SECRET="infra-lab/alpaca-trading/ntfy-topic"
+
+STRATEGY="a"
+if [[ "${1:-}" == "--strategy" ]]; then
+  STRATEGY="${2:-}"
+  shift 2 || true
+fi
+if [[ ! "$STRATEGY" =~ ^[a-z][a-z0-9]{0,15}$ ]]; then
+  echo "invalid strategy id" >&2
+  exit 1
+fi
+# The default strategy keeps the original layout; others live under strategies/ID/.
+if [[ "$STRATEGY" == "a" ]]; then
+  ROOT=""
+  ALPACA_SECRET="infra-lab/alpaca-trading/alpaca-paper-keys"
+else
+  ROOT="strategies/$STRATEGY/"
+  ALPACA_SECRET="infra-lab/alpaca-trading/alpaca-paper-keys-$STRATEGY"
+fi
 
 aws_cli() {
   aws --profile "$PROFILE" --region "$REGION" "$@"
@@ -39,13 +61,14 @@ verify_account() {
 }
 
 usage() {
-  sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
 set_secret() {
   case "${1:-}" in
     alpaca)
+      echo "Strategy: $STRATEGY"
       read -r -p "Alpaca PAPER key id: " key_id
       read -r -s -p "Alpaca PAPER secret key (hidden): " secret_key
       echo
@@ -72,13 +95,13 @@ sync_config() {
   for f in STRATEGY.md GUARDRAILS.md config/guardrails.json; do
     [[ -f "$dir/$f" ]] || { echo "missing $dir/$f" >&2; exit 1; }
   done
-  aws_cli s3 cp "$dir/STRATEGY.md" "s3://$BUCKET/config/STRATEGY.md"
-  aws_cli s3 cp "$dir/GUARDRAILS.md" "s3://$BUCKET/config/GUARDRAILS.md"
-  aws_cli s3 cp "$dir/config/guardrails.json" "s3://$BUCKET/config/guardrails.json"
+  aws_cli s3 cp "$dir/STRATEGY.md" "s3://$BUCKET/${ROOT}config/STRATEGY.md"
+  aws_cli s3 cp "$dir/GUARDRAILS.md" "s3://$BUCKET/${ROOT}config/GUARDRAILS.md"
+  aws_cli s3 cp "$dir/config/guardrails.json" "s3://$BUCKET/${ROOT}config/guardrails.json"
   if [[ -f "$dir/config/universe.json" ]]; then
-    aws_cli s3 cp "$dir/config/universe.json" "s3://$BUCKET/config/universe.json"
+    aws_cli s3 cp "$dir/config/universe.json" "s3://$BUCKET/${ROOT}config/universe.json"
   fi
-  aws_cli s3 sync "$dir/prompts" "s3://$BUCKET/config/prompts" --delete
+  aws_cli s3 sync "$dir/prompts" "s3://$BUCKET/${ROOT}config/prompts" --delete
 }
 
 enable_runs() {
@@ -86,33 +109,34 @@ enable_runs() {
   [[ "$start" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ && "$end" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] ||
     { echo "usage: enable YYYY-MM-DD YYYY-MM-DD" >&2; exit 1; }
   printf '{"enabled": true, "start_date": "%s", "end_date": "%s"}' "$start" "$end" |
-    aws_cli s3 cp - "s3://$BUCKET/control/enabled.json"
+    aws_cli s3 cp - "s3://$BUCKET/${ROOT}control/enabled.json"
   echo "Enabled from $start through $end."
 }
 
 disable_runs() {
-  aws_cli s3 rm "s3://$BUCKET/control/enabled.json" || true
+  aws_cli s3 rm "s3://$BUCKET/${ROOT}control/enabled.json" || true
   echo "Disabled."
 }
 
 show_status() {
   echo "control flag:"
-  aws_cli s3 cp "s3://$BUCKET/control/enabled.json" - 2>/dev/null || echo "  (absent: runs are disabled)"
+  aws_cli s3 cp "s3://$BUCKET/${ROOT}control/enabled.json" - 2>/dev/null || echo "  (absent: runs are disabled)"
   echo
   echo "private config objects:"
-  aws_cli s3 ls "s3://$BUCKET/config/" --recursive || true
+  aws_cli s3 ls "s3://$BUCKET/${ROOT}config/" --recursive || true
   echo
   echo "journals:"
-  aws_cli s3 ls "s3://$BUCKET/journal/" || true
+  aws_cli s3 ls "s3://$BUCKET/${ROOT}journal/" || true
 }
 
 invoke_slot() {
   local slot="${1:-}" payload out
   [[ "$slot" =~ ^[1-6]$ ]] || usage
-  payload="{\"slot\": $slot}"
+  payload="{\"slot\": $slot, \"strategy\": \"$STRATEGY\""
   if [[ "${2:-}" == "--dry-run" ]]; then
-    payload="{\"slot\": $slot, \"dry_run\": true}"
+    payload="$payload, \"dry_run\": true"
   fi
+  payload="$payload}"
   out="$(mktemp)"
   # A run can take minutes. The CLI's default 60s read timeout would retry the
   # invocation, so allow the full Lambda timeout and never retry.

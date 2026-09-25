@@ -30,6 +30,13 @@ class RunContext:
     ntfy_topic: str
     orders_run: int = 0
     report_sent: bool = False
+    strategy: str = "a"
+    config_root: str = "config/"
+
+    @property
+    def label(self):
+        """Return the strategy label used in notification titles."""
+        return self.strategy.upper()
 
     def now_et(self):
         """Return the current time in New York."""
@@ -148,7 +155,9 @@ class Toolbox:
 
     def scan_universe(self, min_change_pct=1.0, top=25):
         """Scan the private universe for price change versus the prior close."""
-        universe = self.store.get_json("config/universe.json", None, absolute=True)
+        universe = self.store.get_json(
+            f"{self.ctx.config_root}universe.json", None, absolute=True
+        )
         symbols = (universe or {}).get("symbols") or []
         if not symbols:
             return {"error": "no universe configured"}
@@ -442,7 +451,12 @@ class Toolbox:
         if self.ctx.slot not in REPORT_SLOTS:
             return {"ok": False, "error": "reports are only sent in the report slots"}
         prefix = "[DRY RUN] " if self.ctx.dry_run else ""
-        sent = notify.send(self.ctx.ntfy_topic, prefix + title, message, tags="chart")
+        sent = notify.send(
+            self.ctx.ntfy_topic,
+            f"{prefix}[{self.ctx.label}] {title}",
+            message,
+            tags="chart",
+        )
         self.ctx.report_sent = self.ctx.report_sent or sent
         return {"ok": sent}
 

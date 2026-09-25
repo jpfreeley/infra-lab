@@ -26,6 +26,12 @@ variable "alpaca_trading_schedule" {
   default = {}
 }
 
+variable "alpaca_trading_extra_strategies" {
+  description = "Additional strategy ids run by the same Lambda, each with its own credentials secret and schedules. Supplied by a gitignored tfvars file. The default strategy needs no entry."
+  type        = set(string)
+  default     = []
+}
+
 variable "alpaca_trading_model_id" {
   description = "Bedrock inference profile ID the runner invokes"
   type        = string
@@ -77,6 +83,19 @@ module "alpaca_trading_alpaca_keys" {
 
   tags = merge(local.common_tags, {
     "Name" = "infra-lab-alpaca-trading-alpaca-paper-keys"
+  })
+}
+
+module "alpaca_trading_extra_keys" {
+  source   = "../../modules/secrets_manager"
+  for_each = var.alpaca_trading_extra_strategies
+
+  secret_name   = "infra-lab/alpaca-trading/alpaca-paper-keys-${each.key}"
+  description   = "JSON {key_id, secret_key} for the Alpaca PAPER account of strategy ${each.key}. Value set out-of-band, never via Terraform."
+  secret_string = null
+
+  tags = merge(local.common_tags, {
+    "Name" = "infra-lab-alpaca-trading-alpaca-paper-keys-${each.key}"
   })
 }
 
@@ -144,6 +163,7 @@ resource "aws_lambda_function" "alpaca_trader" {
     variables = {
       STATE_BUCKET              = module.alpaca_trading_bucket.bucket_id
       ALPACA_SECRET_ARN         = module.alpaca_trading_alpaca_keys.secret_arn
+      ALPACA_SECRET_ARNS        = jsonencode({ for k, m in module.alpaca_trading_extra_keys : k => m.secret_arn })
       NTFY_SECRET_ARN           = module.alpaca_trading_ntfy_topic.secret_arn
       MODEL_ID                  = var.alpaca_trading_model_id
       MODEL_INPUT_USD_PER_MTOK  = tostring(var.alpaca_trading_input_usd_per_mtok)
@@ -219,10 +239,13 @@ resource "aws_iam_role_policy" "alpaca_trader" {
         Sid    = "ReadTradingSecrets"
         Effect = "Allow"
         Action = "secretsmanager:GetSecretValue"
-        Resource = [
-          module.alpaca_trading_alpaca_keys.secret_arn,
-          module.alpaca_trading_ntfy_topic.secret_arn
-        ]
+        Resource = concat(
+          [
+            module.alpaca_trading_alpaca_keys.secret_arn,
+            module.alpaca_trading_ntfy_topic.secret_arn
+          ],
+          [for m in module.alpaca_trading_extra_keys : m.secret_arn]
+        )
       },
       {
         Sid    = "InvokeClaudeOnBedrock"
@@ -271,6 +294,37 @@ resource "aws_scheduler_schedule" "alpaca_trader" {
     arn      = aws_lambda_function.alpaca_trader.arn
     role_arn = aws_iam_role.alpaca_trader_scheduler.arn
     input    = jsonencode({ slot = tonumber(each.key) })
+
+    # No retries: a retried run could act twice. The handler alerts on failure.
+    retry_policy {
+      maximum_retry_attempts       = 0
+      maximum_event_age_in_seconds = 60
+    }
+  }
+}
+
+# One schedule per (extra strategy, slot), same times as the default strategy.
+resource "aws_scheduler_schedule" "alpaca_trader_extra" {
+  # checkov:skip=CKV_AWS_297: "AWS-managed key is proportionate: the schedule payload is just a slot number and strategy id, nothing sensitive"
+  for_each = {
+    for pair in setproduct(var.alpaca_trading_extra_strategies, keys(var.alpaca_trading_schedule)) :
+    "${pair[0]}-${pair[1]}" => { strategy = pair[0], slot = pair[1] }
+  }
+
+  name       = "${local.name_prefix}-alpaca-trader-${each.value.strategy}-slot-${each.value.slot}"
+  group_name = "default"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  schedule_expression          = "cron(${var.alpaca_trading_schedule[each.value.slot].minute} ${var.alpaca_trading_schedule[each.value.slot].hour} ? * MON-FRI *)"
+  schedule_expression_timezone = "America/New_York"
+
+  target {
+    arn      = aws_lambda_function.alpaca_trader.arn
+    role_arn = aws_iam_role.alpaca_trader_scheduler.arn
+    input    = jsonencode({ slot = tonumber(each.value.slot), strategy = each.value.strategy })
 
     # No retries: a retried run could act twice. The handler alerts on failure.
     retry_policy {
