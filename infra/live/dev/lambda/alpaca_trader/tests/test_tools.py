@@ -36,6 +36,9 @@ class FakeStore:
     def get_json(self, key, default=None, absolute=False):
         return self.files.get(key, default)
 
+    def put_text(self, key, text, absolute=False):
+        self.files[key] = text
+
 
 class FakeClient:
     """Minimal Alpaca client fake."""
@@ -244,6 +247,46 @@ def test_unknown_tool_and_bad_args():
     tools, _, _ = make()
     assert "unknown tool" in tools.call("nope", {})
     assert "bad arguments" in tools.call("check_symbol", {})
+
+
+def test_save_evidence_writes_a_dated_key():
+    tools, _, store = make()
+    result = json.loads(
+        tools.call("save_evidence", {"filename": "fills.txt", "content": "a,b,c"})
+    )
+    assert result["ok"] and result["key"] == "state/evidence/2026-09-28-fills.txt"
+
+
+def test_save_evidence_rejects_path_traversal():
+    tools, _, _ = make()
+    result = json.loads(
+        tools.call("save_evidence", {"filename": "../secrets.txt", "content": "x"})
+    )
+    assert not result["ok"]
+
+
+def test_save_evidence_rejects_a_slash_in_the_name():
+    tools, _, _ = make()
+    result = json.loads(
+        tools.call("save_evidence", {"filename": "a/b.txt", "content": "x"})
+    )
+    assert not result["ok"]
+
+
+def test_save_evidence_rejects_oversized_content():
+    tools, _, _ = make()
+    result = json.loads(
+        tools.call("save_evidence", {"filename": "big.txt", "content": "x" * 20001})
+    )
+    assert not result["ok"]
+
+
+def test_save_evidence_dry_run_does_not_write():
+    tools, _, store = make(dry_run=True)
+    result = json.loads(
+        tools.call("save_evidence", {"filename": "fills.txt", "content": "a"})
+    )
+    assert result["simulated"]
 
 
 def test_reports_only_in_report_slots():

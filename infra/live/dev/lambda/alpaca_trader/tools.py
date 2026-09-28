@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from statistics import mean
@@ -15,6 +16,8 @@ from store import now_iso
 logger = logging.getLogger()
 ET = ZoneInfo("America/New_York")
 MAX_RESULT_CHARS = 24000
+EVIDENCE_MAX_CHARS = 20000
+EVIDENCE_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 TIMEFRAMES = {"1Min", "5Min", "15Min", "30Min", "1Hour", "1Day"}
 REPORT_SLOTS = {4, 6}
 SCAN_BATCH = 100
@@ -437,6 +440,21 @@ class Toolbox:
         )
         return {"ok": True}
 
+    def save_evidence(self, filename, content):
+        """Save a small evidence file for today under state/evidence/, dated."""
+        if not EVIDENCE_NAME.match(filename) or ".." in filename:
+            return {"ok": False, "error": "filename must be a plain name, no path"}
+        if len(content) > EVIDENCE_MAX_CHARS:
+            return {"ok": False, "error": "content too large"}
+        key = f"state/evidence/{self.ctx.day}-{filename}"
+        self.journal("intent", action="save_evidence", filename=filename)
+        if self.ctx.dry_run:
+            self.journal("result", action="save_evidence", simulated=True)
+            return {"ok": True, "simulated": True, "key": key}
+        self.store.put_text(key, content)
+        self.journal("result", action="save_evidence", key=key)
+        return {"ok": True, "key": key}
+
     def save_handoff(self, handoff):
         """Overwrite the handoff record for the next run."""
         if not isinstance(handoff, dict):
@@ -547,6 +565,16 @@ class Toolbox:
                 ["kind", "text"],
             ),
             _spec(
+                "save_evidence",
+                "Save a small text file (for example a fill list or a day's "
+                "notes) under this day's evidence. Plain filename, no path.",
+                {
+                    "filename": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                ["filename", "content"],
+            ),
+            _spec(
                 "save_handoff",
                 "Overwrite the handoff record (the whole progress object).",
                 {"handoff": {"type": "object"}},
@@ -577,6 +605,7 @@ class Toolbox:
             "move_stop_to": self.move_stop_to,
             "close_position": self.close_position,
             "journal_note": self.journal_note,
+            "save_evidence": self.save_evidence,
             "save_handoff": self.save_handoff,
             "send_report": self.send_report,
         }
