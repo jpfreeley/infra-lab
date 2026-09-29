@@ -43,10 +43,11 @@ class FakeStore:
 class FakeClient:
     """Minimal Alpaca client fake."""
 
-    def __init__(self, market_open=True, orders=None):
+    def __init__(self, market_open=True, orders=None, trade_day="2026-09-28"):
         """Configure market state and pre-existing orders."""
         self.market_open = market_open
         self.order_list = orders or []
+        self.trade_day = trade_day
         self.scan_prices = {
             "UP": (103.0, 100.0),
             "FLAT": (100.5, 100.0),
@@ -76,23 +77,28 @@ class FakeClient:
         }
 
     def bars(self, symbols, timeframe, start, end, limit, feed):
-        bar = {
-            "t": "2026-09-25T04:00:00Z",
-            "o": 99,
-            "h": 101,
-            "l": 98,
-            "c": 100,
-            "v": 2e6,
-        }
-        return {"bars": {symbols: [bar] * 20}}
+        result = {}
+        for sym in symbols.split(","):
+            prev_close = self.scan_prices.get(sym, (100.0, 100.0))[1]
+            bar = {
+                "t": "2026-09-25T04:00:00Z",
+                "o": prev_close,
+                "h": prev_close,
+                "l": prev_close,
+                "c": prev_close,
+                "v": 1000000,
+            }
+            result[sym] = [bar]
+        return {"bars": result}
 
     def snapshots(self, symbols, feed="iex"):
+        trade_ts = f"{self.trade_day}T14:35:00Z"
         if "," not in symbols:
-            return {symbols: {"latestTrade": {"p": 100.0}}}
+            return {symbols: {"latestTrade": {"p": 100.0, "t": trade_ts}}}
         snaps = {}
         for sym, (price, prev) in self.scan_prices.items():
             snaps[sym] = {
-                "latestTrade": {"p": price},
+                "latestTrade": {"p": price, "t": trade_ts},
                 "prevDailyBar": {"c": prev, "v": 1000000},
             }
         return snaps
@@ -215,6 +221,39 @@ def test_scan_universe_filters_and_sorts():
 def test_scan_universe_without_config_is_an_error():
     tools, _, _ = make()
     assert "error" in json.loads(tools.call("scan_universe", {}))
+
+
+def test_scan_universe_ignores_a_stale_pre_open_trade():
+    """Reject a trade printed before today (the pre-9:30 snapshot lag).
+
+    However large the apparent move, a stale print must not be mistaken
+    for a live pre-market price.
+    """
+    tools, client, store = make()
+    store.put_json("config/universe.json", {"symbols": ["UP"]})
+    client.snapshots = lambda symbols, feed="iex": {
+        "UP": {"latestTrade": {"p": 500.0, "t": "2026-09-25T20:00:00Z"}}
+    }
+    result = json.loads(tools.call("scan_universe", {"min_change_pct": 1.0}))
+    assert result["candidates"] == []
+
+
+def test_scan_universe_uses_the_real_prior_close_not_the_snapshot_one():
+    """Ignore the snapshot's prevDailyBar even when present and wrong.
+
+    The true prior close must come from daily bars, not the (possibly
+    stale) snapshot field.
+    """
+    tools, client, store = make()
+    store.put_json("config/universe.json", {"symbols": ["UP"]})
+    client.snapshots = lambda symbols, feed="iex": {
+        "UP": {
+            "latestTrade": {"p": 103.0, "t": "2026-09-28T14:35:00Z"},
+            "prevDailyBar": {"c": 50.0, "v": 1},  # wrong on purpose
+        }
+    }
+    result = json.loads(tools.call("scan_universe", {"min_change_pct": 1.0}))
+    assert result["candidates"][0]["prev_close"] == 100.0  # from bars(), not 50.0
 
 
 def stop_order(price):

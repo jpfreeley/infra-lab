@@ -46,6 +46,21 @@ class RunContext:
         return datetime.now(ET)
 
 
+def _is_fresh_trade(ts, day):
+    """Return True only if a trade timestamp falls on the given ET calendar day.
+
+    Guards against a stale latestTrade (last real print before the session
+    opened) being mistaken for a live pre-market price.
+    """
+    if not ts:
+        return False
+    try:
+        traded_on = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return traded_on.astimezone(ET).date().isoformat() == day
+
+
 def _f(value):
     try:
         return float(value)
@@ -156,14 +171,38 @@ class Toolbox:
             for side in ("gainers", "losers")
         }
 
+    def _prior_daily_bars(self, symbols):
+        """Return {symbol: last completed daily bar} from real historical bars.
+
+        Never trust the snapshot endpoint's dailyBar/prevDailyBar before the
+        regular session opens: Alpaca only emits a daily bar once a
+        regular-session trade occurs (extended-hours trades update volume but
+        never open/high/low/close), so before 9:30 ET those fields still point
+        one full session further back than expected. A bounded historical
+        query, capped at yesterday, is immune to this and is what check_symbol
+        already relies on.
+        """
+        today = date.fromisoformat(self.ctx.day)
+        end = f"{(today - timedelta(days=1)).isoformat()}T23:59:59Z"
+        start = f"{(today - timedelta(days=7)).isoformat()}T00:00:00Z"
+        prior = {}
+        for i in range(0, len(symbols), SCAN_BATCH):
+            batch = ",".join(symbols[i:][:SCAN_BATCH])
+            raw = self.client.bars(batch, "1Day", start, end, 10000, "sip")
+            for sym, bars in (raw.get("bars") or {}).items():
+                if bars:
+                    prior[sym] = bars[-1]
+        return prior
+
     def scan_universe(self, min_change_pct=1.0, top=25):
-        """Scan the private universe for price change versus the prior close."""
+        """Scan the private universe for price change versus the last close."""
         universe = self.store.get_json(
             f"{self.ctx.config_root}universe.json", None, absolute=True
         )
         symbols = (universe or {}).get("symbols") or []
         if not symbols:
             return {"error": "no universe configured"}
+        prior = self._prior_daily_bars(symbols)
         rows, scanned, feed = [], 0, "delayed_sip"
         for i in range(0, len(symbols), SCAN_BATCH):
             batch = ",".join(symbols[i:][:SCAN_BATCH])
@@ -173,11 +212,13 @@ class Toolbox:
                 snaps, feed = self.client.snapshots(batch, "iex"), "iex"
             for sym, snap in snaps.items():
                 scanned += 1
-                price = (snap.get("latestTrade") or {}).get("p") or (
-                    snap.get("dailyBar") or {}
-                ).get("c")
-                prev_bar = snap.get("prevDailyBar") or {}
-                prev = prev_bar.get("c")
+                prior_bar = prior.get(sym)
+                if not prior_bar:
+                    continue
+                trade = snap.get("latestTrade") or {}
+                if not _is_fresh_trade(trade.get("t"), self.ctx.day):
+                    continue
+                price, prev = trade.get("p"), prior_bar["c"]
                 if not price or not prev or price < self.params.min_price:
                     continue
                 change = (price / prev - 1) * 100
@@ -189,9 +230,7 @@ class Toolbox:
                         "price": price,
                         "prev_close": prev,
                         "change_pct": round(change, 2),
-                        "prev_day_dollar_volume": round(
-                            (prev_bar.get("v") or 0) * prev
-                        ),
+                        "prev_day_dollar_volume": round(prior_bar["v"] * prev),
                     }
                 )
         rows.sort(key=lambda r: r["change_pct"], reverse=True)
