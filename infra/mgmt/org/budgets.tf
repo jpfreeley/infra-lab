@@ -42,6 +42,44 @@ resource "aws_sns_topic" "anomaly_alerts" {
   kms_master_key_id = "alias/aws/sns" # AWS-managed SNS key
 }
 
+# Found 2026-10-01 via a real AWS "SNS topic misconfiguration" notice: this
+# topic never had a resource policy granting Cost Anomaly Detection's
+# service principal permission to publish to it. A plain aws_sns_topic has
+# no policy beyond the topic owner (this account) being able to publish —
+# an AWS service like costalerts.amazonaws.com needs to be explicitly
+# granted sns:Publish, same as any cross-principal SNS publish. Every
+# anomaly alert since aws_ce_anomaly_subscription.sns_subscription below
+# was created has presumably been silently failing to deliver.
+#
+# aws:SourceAccount is a standard confused-deputy guard for service-
+# principal policies (restricts which account's resource can invoke this
+# permission) — AWS's own docs example for this specific policy omits it,
+# but there's no reason to grant a strictly broader policy than needed
+# when the account is already known and static.
+data "aws_caller_identity" "current" {}
+
+resource "aws_sns_topic_policy" "anomaly_alerts" {
+  arn = aws_sns_topic.anomaly_alerts.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AWSAnomalyDetectionSNSPublishingPermissions"
+        Effect    = "Allow"
+        Principal = { Service = "costalerts.amazonaws.com" }
+        Action    = "SNS:Publish"
+        Resource  = aws_sns_topic.anomaly_alerts.arn
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      }
+    ]
+  })
+}
+
 # 2. Subscribe your email to the SNS Topic
 resource "aws_sns_topic_subscription" "email_subscription" {
   topic_arn = aws_sns_topic.anomaly_alerts.arn
