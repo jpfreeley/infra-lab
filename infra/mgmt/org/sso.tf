@@ -17,10 +17,17 @@ locals {
 
 # --- AdministratorAccess ---
 resource "aws_ssoadmin_permission_set" "admin_access" {
-  name             = "AdministratorAccess"
-  description      = "Full administrative access - break-glass and org management only"
-  instance_arn     = local.sso_instance_arn
-  session_duration = "PT4H"
+  name         = "AdministratorAccess"
+  description  = "Full administrative access - break-glass and org management only"
+  instance_arn = local.sso_instance_arn
+  # Raised from PT4H to PT12H 2026-10-01 — JP's day-to-day infra-lab/
+  # infra-lab-mempalace CLI work uses this permission set, not just true
+  # break-glass, and PT4H meant re-authenticating via browser SSO login
+  # multiple times within a single working session. PT12H is AWS's hard
+  # ceiling for a permission set's session duration (can't go higher).
+  # Still fully temporary/rotating STS credentials, same as before — just
+  # a longer rotation window, not a static credential.
+  session_duration = "PT12H"
 }
 
 resource "aws_ssoadmin_managed_policy_attachment" "admin_attach" {
