@@ -35,19 +35,37 @@ variable "alpaca_trading_extra_strategies" {
 variable "alpaca_trading_model_id" {
   description = "Bedrock inference profile ID the runner invokes"
   type        = string
-  default     = "global.anthropic.claude-opus-5-5"
+  # Dropped from Opus to Sonnet 2026-10-01 (same global.anthropic.claude-*-5-5
+  # generation, one tier down) — found via a real Bedrock bill that this
+  # structured tool-calling decision task doesn't need Opus-tier pricing.
+  # See agent.py's prompt-caching change, landed the same day, for the
+  # other half of the cost fix.
+  default = "global.anthropic.claude-sonnet-5-5"
 }
 
+# Sonnet 5.5 pricing isn't in AWS's own Price List API yet (checked
+# 2026-10-01: `aws pricing get-attribute-values` for AmazonBedrock only
+# lists Claude 2/3-era models) — these are ESTIMATES, derived from the one
+# number that IS verified: Opus 5.5's real billed Bedrock rate, confirmed
+# directly from a real invoice at exactly $4/$20 per Mtok in/out (both
+# matched the implied price from actual UnblendedCost/UsageQuantity to the
+# dollar). Anthropic's Sonnet-vs-Opus list price has held at a consistent
+# 5x gap across every prior generation (Claude 3, Claude 4) on both the
+# direct API and Bedrock, applied here the same way. Re-derive these for
+# real from the Bedrock console pricing page, or from the first real
+# invoice with Sonnet usage on it, and don't just trust the 5x assumption
+# indefinitely — the cost cap in guardrails.Params only means what it says
+# if these track the real billed rate.
 variable "alpaca_trading_input_usd_per_mtok" {
   description = "Input token price (USD per million) used for the per-run cost cap"
   type        = number
-  default     = 4
+  default     = 0.8
 }
 
 variable "alpaca_trading_output_usd_per_mtok" {
   description = "Output token price (USD per million) used for the per-run cost cap"
   type        = number
-  default     = 20
+  default     = 4
 }
 
 ###############################################################################
