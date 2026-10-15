@@ -109,6 +109,25 @@ data "aws_iam_policy_document" "alb_access_logs" {
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.alb_access_logs.arn}/alb/AWSLogs/${var.mempalace_account_id}/*"]
   }
+
+  # Requires HTTPS for every request. ALB access log delivery already
+  # uses HTTPS, so this does not change how logs get written — it just
+  # removes the possibility of a plain-HTTP request succeeding.
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [aws_s3_bucket.alb_access_logs.arn, "${aws_s3_bucket.alb_access_logs.arn}/*"]
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
 }
 
 resource "aws_s3_bucket_policy" "alb_access_logs" {

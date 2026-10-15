@@ -105,6 +105,39 @@ resource "aws_s3_bucket_notification" "this" {
   }
 }
 
+# Requires HTTPS for every request. S3 encrypts in transit on any HTTPS
+# request already, so this does not add encryption that was missing — it
+# removes the possibility of a client falling back to plain HTTP, which
+# S3 allows unless a bucket policy explicitly blocks it. Safe for every
+# consumer of this module: every real client here (Terraform, the AWS
+# CLI, the AWS SDKs, Synology Hyper Backup, AWS service log delivery)
+# already uses HTTPS by default, so this denies a request pattern nothing
+# legitimate was actually sending.
+resource "aws_s3_bucket_policy" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.this.arn,
+          "${aws_s3_bucket.this.arn}/*"
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      }
+    ]
+  })
+}
+
 resource "aws_s3_bucket_replication_configuration" "this" {
   count  = var.enable_replication ? 1 : 0
   bucket = aws_s3_bucket.this.id

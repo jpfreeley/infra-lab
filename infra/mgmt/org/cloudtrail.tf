@@ -162,6 +162,24 @@ resource "aws_s3_bucket_policy" "cloudtrail_logs" {
             "aws:SourceArn" = aws_cloudtrail.org_trail.arn
           }
         }
+      },
+      # Requires HTTPS for every request. CloudTrail log delivery already
+      # uses HTTPS, so this does not change how logs get written — it
+      # just removes the possibility of a plain-HTTP request succeeding.
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          data.aws_s3_bucket.cloudtrail_logs.arn,
+          "${data.aws_s3_bucket.cloudtrail_logs.arn}/*"
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
       }
     ]
   })
