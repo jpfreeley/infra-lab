@@ -50,3 +50,4 @@ Each ADR follows a lightweight format:
 | [033](033-ollama-gpu-dormant-byo-key.md) | Ollama GPU dormant — BYO Claude key | Accepted | E13 |
 | [034](034-shared-mempalace-server.md) | Shared MemPalace server, portable module | Accepted | TBD |
 | [035](035-paper-trading-runner.md) | Scheduled paper trading runner | Accepted | TBD |
+| [036](036-s3-tls-enforcement.md) | Require HTTPS on every managed S3 bucket | Accepted | TBD |
