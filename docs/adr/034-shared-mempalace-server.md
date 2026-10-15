@@ -1236,3 +1236,63 @@ correctly returned `mempalace.lintwiselabs.com`=2,
 `magnetlegal.mempalace.lintwiselabs.com`=2, `-`=3 (raw-IP bot-scan
 traffic with no SNI match) — matching exactly the real curl requests
 generated during testing.
+
+## Image-Version Drift Incident, Both Instances (2026-09-18)
+
+Both task definitions were floating on `:latest` for the mempalace and
+qdrant images. An unpinned service recreation (a normal `mempalace-toggle`
+up, no image-upgrade intent at all) pulled whatever `:latest` currently
+resolved to upstream — a genuinely different build than what had been
+running. That build computed a different per-tenant qdrant collection name
+than the prior one, found nothing there, and silently auto-created a fresh
+empty collection, while the real data sat untouched under the old
+collection name on EFS the whole time (confirmed via qdrant boot logs
+showing the old collection still present and fully recovered — "Recovered
+collection ...: 1/1 (100%)"). Not data loss, but indistinguishable from it
+until diagnosed. Confirmed the wrong hash was **identical** across both the
+personal and MagNet Legal instances, proving it's tied to the image build
+itself, not per-tenant state.
+
+Fix, two parts:
+
+1. **Pin both images to a digest**, not `:latest` (`infra/modules/mempalace_server/variables.tf`).
+   Deliberately pinned the digest that was *already* live and producing the
+   wrong hash — not an older, previously-correct one — because part 2 below
+   makes whatever hash a pinned build computes resolve correctly regardless
+   of which one it is. This pin doesn't fix the underlying hash-mismatch bug;
+   it only stops the next recreation from silently drifting to a third,
+   different hash.
+2. **A qdrant collection alias**, on both instances: deleted the wrongly
+   auto-created empty collection (verified its contents first — harmless),
+   then created an alias so requests for the wrong hash transparently serve
+   the real collection. Durable: since the image is now pinned, the wrong
+   hash is now a *stable* wrong hash, and the alias resolves it correctly on
+   every future restart.
+
+The root cause (why this build's hash computation differs from the prior
+one) is an upstream mempalace behavior, not an infra-lab config issue, and
+was not tracked down further. The digest pin only buys time against this
+exact failure mode recurring on a future unintentional version bump; it
+doesn't fix the underlying bug.
+
+## Spin-Up No Longer Starts the MagNet Legal Instance (2026-09-24)
+
+Michael and Laura stopped using their instance. `mempalace-toggle.yml`'s
+"up" action target list now explicitly excludes
+`module.mempalace_magnetlegal.aws_ecs_service.this` — the magnetlegal
+Fargate task, the actual standing cost, since everything else about that
+instance is either already-persistent outside the toggle's scope (task
+def, IAM, log group) or effectively free (target group, listener rule,
+cert attachment). Shared infra (ALB, WAF, listener) still comes up as
+before, since the personal instance needs it regardless; magnetlegal's
+target group/listener rule/cert stay targeted too, so routing stays
+consistent if that service is ever started by hand later.
+
+Deliberately not a redesign: no new instance-selector input, no branching
+logic added to `workflow_dispatch`/`workflow_call` — just changed which
+resources the existing "Spin Up" step targets. "down" is unchanged, still
+tears both instances down together, matching the existing dual-idle-gate
+design. Verified live: a real `mempalace.sh up` cycle from cold brought the
+personal instance up healthy while `magnetlegal.mempalace.lintwiselabs.com/healthz`
+returned 503 (ALB/listener reachable, target group empty) — confirming the
+magnetlegal service genuinely did not start.

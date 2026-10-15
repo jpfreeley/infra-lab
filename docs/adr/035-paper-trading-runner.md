@@ -73,3 +73,34 @@ id before acting.
   second.
 - The runner is intentionally paper-only. Pointing it at a live account would
   need a deliberate design change to the account check and the guardrails.
+
+## Prompt Caching, and Keeping Opus Over Cost (2026-10-02)
+
+A real $26.56 AWS Marketplace bill (Bedrock, both strategies combined for
+September) traced exactly — to the penny, against the runner's own per-run
+cost journal in S3 — to the tool-use loop resending the full system prompt,
+tool specs, and accumulated message history on every turn with no Bedrock
+prompt caching. A first fix dropped the model from Opus to Sonnet for cost;
+JP's actual call once reviewed: keep Opus, he wants that model's quality for
+real trading decisions and the cost isn't the deciding factor. Only the
+caching mechanism shipped.
+
+The first caching implementation had a real bug, caught against the live
+Bedrock Converse API rather than unit tests alone: it added a new cache
+breakpoint to every tool-result message without removing earlier ones, so
+the breakpoint count grew unbounded across a run's turns. Bedrock hard-caps
+at 4 `cache_control` blocks per request and rejects the call past that —
+since slot 1 alone typically runs 7-13 turns, most real runs would have
+failed outright. Fixed to a fixed 3-breakpoint budget that never grows (one
+on the system prompt, one on the tools, one rolling breakpoint that moves to
+the newest message each turn instead of trailing behind it), with a test
+pinning that invariant. Verified live: a forced 5-turn run, zero errors,
+cache reads climbing turn-over-turn while fresh input stayed flat at 2-4
+tokens. Post-fix dry runs landed noticeably cheaper than comparable
+historical runs on the same model.
+
+Lesson for this runner specifically: anything with a per-turn-growing
+structure (breakpoints, accumulated context, retry counters) needs a check
+against the live API, not just mocked unit tests, before it's trusted in the
+production loop — a mock can't surface a real service-side limit like
+Bedrock's 4-breakpoint cap.
