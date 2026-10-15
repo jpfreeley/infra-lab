@@ -1038,20 +1038,55 @@ resource "aws_dynamodb_table" "terraform_state_locks" {
 ###############################################################################
 
 locals {
+  # Split by region, not just one map: aws_s3_bucket_policy's PutBucketPolicy
+  # call goes to the bucket's own region (unlike aws_s3_bucket itself, whose
+  # name is global) — found live on first apply: the four replica buckets
+  # live in us-west-2, and applying them with the default (us-east-1)
+  # provider failed with "AuthorizationHeaderMalformed ... expecting
+  # 'us-west-2'". Primary-region buckets use the default provider; replica
+  # buckets need provider = aws.replica, same as their own aws_s3_bucket
+  # resources do.
   tls_enforced_buckets = {
-    terraform_state                     = aws_s3_bucket.terraform_state
+    terraform_state             = aws_s3_bucket.terraform_state
+    log_bucket                  = aws_s3_bucket.log_bucket
+    log_bucket_logs             = aws_s3_bucket.log_bucket_logs
+    log_bucket_logs_access_logs = aws_s3_bucket.log_bucket_logs_access_logs
+  }
+
+  tls_enforced_replica_buckets = {
     terraform_state_replica             = aws_s3_bucket.terraform_state_replica
-    log_bucket                          = aws_s3_bucket.log_bucket
     log_bucket_replica                  = aws_s3_bucket.log_bucket_replica
-    log_bucket_logs                     = aws_s3_bucket.log_bucket_logs
     log_bucket_logs_replica             = aws_s3_bucket.log_bucket_logs_replica
-    log_bucket_logs_access_logs         = aws_s3_bucket.log_bucket_logs_access_logs
     log_bucket_logs_access_logs_replica = aws_s3_bucket.log_bucket_logs_access_logs_replica
   }
 }
 
 resource "aws_s3_bucket_policy" "require_tls" {
   for_each = local.tls_enforced_buckets
+  bucket   = each.value.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource  = [each.value.arn, "${each.value.arn}/*"]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_policy" "require_tls_replica" {
+  provider = aws.replica
+  for_each = local.tls_enforced_replica_buckets
   bucket   = each.value.id
 
   policy = jsonencode({
