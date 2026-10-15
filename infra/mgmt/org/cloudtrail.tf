@@ -162,25 +162,18 @@ resource "aws_s3_bucket_policy" "cloudtrail_logs" {
             "aws:SourceArn" = aws_cloudtrail.org_trail.arn
           }
         }
-      },
-      # Requires HTTPS for every request. CloudTrail log delivery already
-      # uses HTTPS, so this does not change how logs get written — it
-      # just removes the possibility of a plain-HTTP request succeeding.
-      {
-        Sid       = "DenyInsecureTransport"
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "s3:*"
-        Resource = [
-          data.aws_s3_bucket.cloudtrail_logs.arn,
-          "${data.aws_s3_bucket.cloudtrail_logs.arn}/*"
-        ]
-        Condition = {
-          Bool = {
-            "aws:SecureTransport" = "false"
-          }
-        }
       }
+      # A DenyInsecureTransport statement was tried here 2026-10-15 (part
+      # of the broader TLS-enforcement pass across this repo's buckets)
+      # and reverted the same day: a Control Tower-managed Service
+      # Control Policy explicitly denies s3:PutBucketPolicy on this
+      # bucket to every principal, admin included (confirmed live:
+      # AccessDenied citing SCP arn:aws:organizations::551452024305:
+      # policy/o-hrzezrr7b1/service_control_policy/p-rfhbth3m). This
+      # bucket's policy is Control-Tower-owned; it is not meant to be
+      # hand-edited, even via Terraform. Don't retry this without first
+      # understanding why that SCP exists and whether Control Tower's own
+      # baseline already covers transport security some other way.
     ]
   })
 }
