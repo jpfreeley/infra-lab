@@ -1027,3 +1027,48 @@ resource "aws_dynamodb_table" "terraform_state_locks" {
     enabled = true
   }
 }
+
+###############################################################################
+# TLS enforcement on every bucket this file creates
+#
+# Denies any request that is not HTTPS. Terraform, the AWS CLI, and S3
+# cross-region replication all use HTTPS already, so this does not change
+# how any of these buckets actually get used — it just removes the
+# possibility of a plain-HTTP request succeeding.
+###############################################################################
+
+locals {
+  tls_enforced_buckets = {
+    terraform_state                     = aws_s3_bucket.terraform_state
+    terraform_state_replica             = aws_s3_bucket.terraform_state_replica
+    log_bucket                          = aws_s3_bucket.log_bucket
+    log_bucket_replica                  = aws_s3_bucket.log_bucket_replica
+    log_bucket_logs                     = aws_s3_bucket.log_bucket_logs
+    log_bucket_logs_replica             = aws_s3_bucket.log_bucket_logs_replica
+    log_bucket_logs_access_logs         = aws_s3_bucket.log_bucket_logs_access_logs
+    log_bucket_logs_access_logs_replica = aws_s3_bucket.log_bucket_logs_access_logs_replica
+  }
+}
+
+resource "aws_s3_bucket_policy" "require_tls" {
+  for_each = local.tls_enforced_buckets
+  bucket   = each.value.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource  = [each.value.arn, "${each.value.arn}/*"]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      }
+    ]
+  })
+}
