@@ -39,7 +39,7 @@ resource "aws_budgets_budget" "org_monthly_budget" {
 # 1. Create an SNS Topic for Anomaly Alerts
 resource "aws_sns_topic" "anomaly_alerts" {
   name              = "cost-anomaly-alerts-topic"
-  kms_master_key_id = "alias/aws/sns" # AWS-managed SNS key
+  kms_master_key_id = aws_kms_key.cost_anomaly_sns.arn
 }
 
 # Found 2026-10-01 via a real AWS "SNS topic misconfiguration" notice: this
@@ -57,6 +57,70 @@ resource "aws_sns_topic" "anomaly_alerts" {
 # but there's no reason to grant a strictly broader policy than needed
 # when the account is already known and static.
 data "aws_caller_identity" "current" {}
+
+# Found 2026-10-21: the SNS topic policy fix above was necessary but not
+# sufficient. This topic was still encrypted with the AWS-managed
+# alias/aws/sns key, and real anomalies (2026-10-16, 2026-10-20, both over
+# the $10 threshold) kept failing to deliver even after that fix. Per AWS's
+# own docs (docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/ad-SNS.html,
+# "Protecting your Amazon SNS anomaly detection alerts data with SSE and AWS
+# KMS"), an SSE-encrypted topic used for Cost Anomaly Detection needs the
+# KMS key's own policy to separately grant costalerts.amazonaws.com
+# kms:GenerateDataKey*/kms:Decrypt — CAD can publish per the topic policy,
+# but can't encrypt the message without that KMS grant. AWS-managed keys
+# (alias/aws/sns) have a fixed policy nobody can edit, so a customer-managed
+# key is required to add this grant at all.
+data "aws_iam_policy_document" "cost_anomaly_sns_kms" {
+  statement {
+    # checkov:skip=CKV_AWS_111:Root principal requires full access to prevent lockout
+    # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
+    # checkov:skip=CKV_AWS_109:Root principal requires management permissions
+    sid    = "Enable IAM User Permissions"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    # checkov:skip=CKV_AWS_356:KMS policies require wildcard resource for the key itself
+    sid    = "Allow Cost Anomaly Detection to use the key"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["costalerts.amazonaws.com"]
+    }
+    actions = [
+      "kms:GenerateDataKey*",
+      "kms:Decrypt"
+    ]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
+resource "aws_kms_key" "cost_anomaly_sns" {
+  description             = "KMS key for the Cost Anomaly Detection SNS alerts topic"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.cost_anomaly_sns_kms.json
+
+  tags = {
+    Name = "infra-lab-cost-anomaly-sns-key"
+  }
+}
+
+resource "aws_kms_alias" "cost_anomaly_sns" {
+  name          = "alias/cost-anomaly-sns"
+  target_key_id = aws_kms_key.cost_anomaly_sns.key_id
+}
 
 resource "aws_sns_topic_policy" "anomaly_alerts" {
   arn = aws_sns_topic.anomaly_alerts.arn
