@@ -50,9 +50,9 @@
 
 ```json
 {
-    "UserId": "AROAYAZI2DXYQE6O3PTRO:jpf321@gmail.com",
+    "UserId": "<role-id>:<sso-user>",
     "Account": "551452024305",
-    "Arn": "arn:aws:sts::551452024305:assumed-role/AWSReservedSSO_AWSAdministratorAccess_eea6c19cac23d161/jpf321@gmail.com"
+    "Arn": "arn:aws:sts::551452024305:assumed-role/AWSReservedSSO_AWSAdministratorAccess_<hash>/<sso-user>"
 }
 ```
 

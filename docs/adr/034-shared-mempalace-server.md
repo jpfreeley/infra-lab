@@ -291,7 +291,7 @@ sync setup, not assumed:
   understanding Qdrant's concurrency model vs. Chroma's single-writer
   behavior), not an assumption that moving to a "real" server backend
   makes it disappear for free.
-- Only one machine (`jpf321-new-machine`) is actually live in mp_sync today
+- Only one machine (`<new-machine>`) is actually live in mp_sync today
   — the multi-machine convergence problem this ADR's central server solves
   is currently a 1-machine problem in practice, which is worth keeping in
   mind for how urgently this needs to ship vs. how it's prioritized.
@@ -644,7 +644,7 @@ The 2026-08-15 migration moved data, but not the cutover itself: per
 this ADR's own Decision section, `mempalace-remote` was added
 "alongside the existing local entry, not replacing it." The local
 server (`~/.mempalace/palace`, launchd job
-`com.freeleyj.mempalace-serve`, port 8765) kept running and kept
+`com.<user>.mempalace-serve`, port 8765) kept running and kept
 receiving real writes for five more days. Confirmed 2026-08-20: a
 drawer filed 2026-08-19 existed only in local, proving the
 "migration" hadn't actually stopped local from being a live write
