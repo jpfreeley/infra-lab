@@ -21,7 +21,7 @@ Account Factory is managed by Control Tower and provisions accounts with:
 | Field | Convention |
 | ----- | ---------- |
 | Account Name | `{purpose}` (e.g., `prod`, `staging`, `shared-services`) |
-| Email | `jpf.{purpose}@gmail.com` (dot-separated variant) |
+| Email | a mailbox alias per account, for example `<owner>+{purpose}@<mail-domain>` or a dot-separated variant |
 | OU | Based on purpose: Workloads, Infrastructure, Sandbox |
 | SSO User | Not provisioned (use group-based access) |
 
