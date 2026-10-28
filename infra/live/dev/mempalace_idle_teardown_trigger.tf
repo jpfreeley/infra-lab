@@ -119,10 +119,21 @@ resource "aws_iam_role_policy" "mempalace_idle_teardown_trigger" {
         ]
       },
       {
-        Sid    = "CloudWatchLogs"
+        # CreateLogGroup is a log-group-level action; per AWS's 2027-04-26
+        # CloudWatch Logs IAM change, it needs a real log-group ARN (no
+        # trailing :*) rather than relying on the log-stream-shaped ARN
+        # below, which will stop granting group-level actions after that.
+        Sid    = "CloudWatchLogsGroup"
         Effect = "Allow"
         Action = [
-          "logs:CreateLogGroup",
+          "logs:CreateLogGroup"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/${local.name_prefix}-mempalace-idle-teardown-trigger"
+      },
+      {
+        Sid    = "CloudWatchLogsStream"
+        Effect = "Allow"
+        Action = [
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
