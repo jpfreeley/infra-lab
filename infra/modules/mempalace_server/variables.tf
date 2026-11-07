@@ -141,7 +141,7 @@ variable "qdrant_image" {
 variable "mempalace_image" {
   description = "MemPalace server container image, pinned to a digest — see the comment above this variable block for why."
   type        = string
-  default     = "ghcr.io/mempalace/mempalace@sha256:db5761316990215fc6f2db332e63db50f1e35b86fa8c5b3ae6bbf4ab1e61f902"
+  default     = "ghcr.io/mempalace/mempalace@sha256:feee4ba49a76b94e897efef4b3b12450b1199e14b40262676e027ef9555afc22" # 3.11.0
 }
 
 variable "mempalace_port" {
