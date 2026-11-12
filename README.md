@@ -12,8 +12,13 @@ Monorepo with clear boundaries:
 
 | Account | ID | Purpose |
 | --- | --- | --- |
-| Management | `551452024305` | Organizations, Control Tower, state backend |
+| Management | `551452024305` | Organizations, Control Tower, state backend, dev / staging / prod VPCs |
+| MemPalace | `310697203282` | Shared MemPalace MCP server (ECS Fargate + Qdrant) |
 | Workspaces | `815802018602` | Remote dev desktops (EC2 + NICE DCV) |
+
+![infra-lab architecture](docs/diagrams/infra-lab-architecture.svg)
+
+Full-size PDF: [docs/diagrams/infra-lab-architecture.pdf](docs/diagrams/infra-lab-architecture.pdf).
 
 ## Quick Start — Dev Desktop
 
@@ -42,4 +47,4 @@ See [docs/runbooks/workspaces-operations.md](docs/runbooks/workspaces-operations
 - [ADRs](docs/adr/)
 - [Runbooks](docs/runbooks/)
 
-More information: [http://ypgmedia.com/infra-lab/](http://ypgmedia.com/infra-lab/)
+Architecture notes and the agile backlog: [lintwiselabs.com/infra_lab/](https://lintwiselabs.com/infra_lab/platform_architecture.html)

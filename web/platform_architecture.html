@@ -347,6 +347,7 @@
   <div class="toc-section">Foundation</div>
   <a class="toc-link" href="#top">Back to Top</a>
   <a class="toc-link" href="#background">Background</a>
+  <a class="toc-link" href="#as-built">As Built (Nov 2026)</a>
   <a class="toc-link" href="#backlog">Agile Plan</a>
   <a class="toc-link" href="#assumptions">Locked Assumptions</a>
   <a class="toc-link" href="#org">AWS Org + Control Tower</a>
@@ -379,10 +380,11 @@
 
   <div class="toc-section">Agile Backlog</div>
   <a class="toc-link" href="#agile_backlog">Agile Backlog Links</a>
-  <a class="toc-link sub" href="http://ypgmedia.com/infra_lab/agile_master_epics.html">Master Epics (generated)</a>
+  <a class="toc-link sub" href="agile_master_epics.html">Master Epics (generated)</a>
 
   <div class="toc-section">Reference</div>
-  <a class="toc-link" href="#diagram">Architecture Diagram</a>
+  <a class="toc-link" href="#as-built">As-Built Diagram</a>
+  <a class="toc-link" href="#diagram">Target Diagram (Mar 2026)</a>
   <a class="toc-link" href="#scorecard">Technical Maturity Model Scorecard</a>
   <a class="toc-link" href="#checklist">Day 1–90 Execution Checklist</a>
 </nav>
@@ -411,13 +413,42 @@
       <p>Enterprise-grade, secure, and scalable AWS platform architecture for autonomous AI execution with strict multi-tenant isolation and robust CI/CD.
 </p>
 <P>
-The Infra Lab project is a comprehensive, enterprise-grade AWS platform architecture designed to build a secure, scalable, and multi-tenant infrastructure for an autonomous AI execution system. It features a multi-account AWS Organization with Control Tower, dual VPC architecture for strict environment isolation, Aurora Serverless with row-level security, internal PKI with mTLS for secure service communication, and a robust CI/CD pipeline with Terraform and CloudFormation. The project includes detailed agile backlogs with 236 stories across 12 epics covering everything from repo standards and Terraform foundations to observability, compliance, and cost management, aiming for a SOC2-ready, highly reliable, and scalable platform within a 90-day build timeline.
+The Infra Lab project is a comprehensive, enterprise-grade AWS platform architecture designed to build a secure, scalable, and multi-tenant infrastructure for an autonomous AI execution system. It features a multi-account AWS Organization with Control Tower, dual VPC architecture for strict environment isolation, Aurora Serverless with row-level security, internal PKI with mTLS for secure service communication, and a robust CI/CD pipeline with Terraform and CloudFormation. The project includes detailed agile backlogs with 250 stories across 13 epics covering everything from repo standards and Terraform foundations to observability, compliance, and cost management, aiming for a SOC2-ready, highly reliable, and scalable platform within a 90-day build timeline.
 </p>
       <ul>
-        <li><a class="toc-link" style="display:inline;padding:0" href="http://github.com/jpfreeley/infra-lab">Open: Project Github</a></li>
-        <li><a class="toc-link" style="display:inline;padding:0" href="http://github.com/jpfreeley/infra-lab/blob/main/docs/adr/README.md">Open: Architecture Decision Records</a></li>
+        <li><a class="toc-link" style="display:inline;padding:0" href="https://github.com/jpfreeley/infra-lab">Open: Project Github</a></li>
+        <li><a class="toc-link" style="display:inline;padding:0" href="https://github.com/jpfreeley/infra-lab/blob/main/docs/adr/README.md">Open: Architecture Decision Records</a></li>
       </ul>
     </div>
+  </section>
+
+  <!-- ==== -->
+  <!-- AS BUILT -->
+  <!-- ==== -->
+  <section class="section" id="as-built">
+    <h2><span class="num"></span> As Built (November 2026)</h2>
+    <p>The rest of this page is the original target design from March 2026. This section shows what the Terraform in the repository defines today, and where it differs from that design.</p>
+
+    <div class="mermaid-wrap">
+      <a href="infra-lab-architecture.pdf"><img src="infra-lab-architecture.svg" alt="infra-lab architecture as built: delivery and access, the management account with org governance and the dev, staging and prod VPC pairs, the Security OU, and the MemPalace and Workspaces accounts in the Workloads OU" style="width:100%;height:auto;display:block"></a>
+    </div>
+    <p><a class="toc-link" style="display:inline;padding:0" href="infra-lab-architecture.pdf">Open the diagram as a PDF (17 x 11 in)</a></p>
+
+    <h3>Design vs. code</h3>
+    <table>
+      <tr><th>Area</th><th>Target design (March 2026)</th><th>As built (November 2026)</th></tr>
+      <tr><td>Accounts</td><td>Separate dev, staging and prod accounts, plus a shared-services account</td><td>The management account hosts the dev, staging and prod VPCs (a cost choice for a lab). Dedicated accounts exist for the MemPalace server and for Workspaces, plus the Control Tower Log Archive and Audit accounts.</td></tr>
+      <tr><td>Network</td><td>10.10.0.0/16 control plane, 10.20.0.0/16 execution plane</td><td>One /20 per VPC from a single plan: dev 10.0.0.0/20 and 10.0.16.0/20, staging 10.0.32.0/20 and 10.0.48.0/20, prod 10.0.64.0/20 and 10.0.80.0/20.</td></tr>
+      <tr><td>Execution to control plane</td><td>PrivateLink to the Results API with mTLS from AWS Private CA</td><td>VPC peering. The execution-plane NACL denies egress to RFC 1918 ranges except HTTPS to the control-plane VPC. Private CA is deferred for cost (ADR-024).</td></tr>
+      <tr><td>Egress and endpoints</td><td>NAT gateway with a static IP; interface endpoints for S3, SQS, ECR, CloudWatch, Secrets Manager</td><td>No NAT gateway in the environment VPCs. S3 gateway endpoints only; the interface endpoints are written but commented out for cost.</td></tr>
+      <tr><td>API edge</td><td>WAF, ALB, blue/green API</td><td>ALB with blue/green target groups and CodeDeploy, off by default in dev (ADR-030). WAF is used on the MemPalace ALB.</td></tr>
+      <tr><td>Data</td><td>Aurora Serverless v2 behind RDS Proxy, Postgres RLS</td><td>Two Aurora Serverless v2 clusters (Postgres 15) are defined in dev but not deployed, with an auto-stop Lambda. An <code>rds_proxy</code> module exists but is not wired in. There is no application schema or RLS yet.</td></tr>
+      <tr><td>Workers</td><td>nano / medium / xlarge tiers, SQS, Step Functions, SSM version gate, canary tenants</td><td>The three tiers (scale from zero), one SQS queue per tier plus a FIFO queue, and the Step Functions orchestrator are written in Terraform for dev but not deployed. The SSM version gate, ECR repositories and canary tenants are not built.</td></tr>
+      <tr><td>IaC</td><td>Terraform plus CloudFormation for CodeDeploy wiring</td><td>Terraform only (CodeDeploy is defined in Terraform). CI runs fmt, validate, plan, tflint, checkov, terraform-compliance and gitleaks, and deploys through GitHub OIDC.</td></tr>
+      <tr><td>Observability</td><td>OpenTelemetry, Prometheus and Grafana, ELK</td><td>CloudWatch native (ADR-025): dashboard, alarms to SNS, VPC flow logs, X-Ray on Step Functions.</td></tr>
+      <tr><td>Environments</td><td>dev, staging and prod running</td><td>Checked against Terraform state on 2026-11-12: in dev only scheduled Lambdas, their schedules, an S3 bucket and secrets are deployed; the VPC pair and workloads are code only. staging and prod have the network layer in code, not deployed. The organization, the MemPalace account and the Workspaces self-service API are deployed.</td></tr>
+      <tr><td>Added since the design</td><td>None</td><td>Org-wide GuardDuty, Security Hub (CIS and FSBP), Config conformance pack and Access Analyzer; Cost Anomaly Detection; the MemPalace MCP server account with idle teardown; the Workspaces dev-desktop account.</td></tr>
+    </table>
   </section>
 
   <!-- ==== -->
@@ -428,12 +459,12 @@ The Infra Lab project is a comprehensive, enterprise-grade AWS platform architec
 
     <div class="card">
       <div class="card-title">Jira-ready backlog generated from this architecture</div>
-      <p>Jira-ready backlog with <strong>236</strong> stories across <strong>12</strong>
- epics (target range 150200+; we landed at 236). Use the master index
+      <p>Jira-ready backlog with <strong>250</strong> stories across <strong>13</strong>
+ epics (target range 150200+; we landed at 250). Use the master index
 to browse and then open each epic for detailed stories, acceptance
 criteria, and subtasks.</p>
       <ul>
-        <li><a class="toc-link" style="display:inline;padding:0" href="http://ypgmedia.com/infra_lab/agile_master_epics.html">Open: Agile Master Epics</a></li>
+        <li><a class="toc-link" style="display:inline;padding:0" href="agile_master_epics.html">Open: Agile Master Epics</a></li>
       </ul>
     </div>
   </section>
@@ -1031,8 +1062,8 @@ or being logged? (Nitro Enclaves?)"</p>
   <!-- 14. ARCHITECTURE DIAGRAM (Mermaid rendered in-page) -->
   <!-- ======================================================== -->
   <section class="section" id="diagram">
-    <h2><span class="num">14</span> Full Architecture Diagram</h2>
-    <p>Rendered live via Mermaid JS. Scroll horizontally if needed.</p>
+    <h2><span class="num">14</span> Target Architecture Diagram (March 2026)</h2>
+    <p>The original target design, rendered with Mermaid. Scroll horizontally if needed. For what the code defines today, see <a class="toc-link" style="display:inline;padding:0" href="#as-built">As Built</a>.</p>
 
     <div class="mermaid-wrap">
       <div class="mermaid" data-processed="true"><svg aria-roledescription="flowchart-v2" role="graphics-document document" viewBox="-8 -8 7586.712890625 1904.199951171875" style="max-width: 7586.712890625px;" xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="100%" id="mermaid-1772746921845"><style>#mermaid-1772746921845{font-
