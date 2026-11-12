@@ -11,6 +11,7 @@ infra/
 │   ├── staging/       # Staging application environment
 │   ├── prod/          # Production application environment
 │   ├── shared/        # Shared/cross-env resources
+│   ├── mempalace/     # Shared MemPalace MCP server (account 310697203282)
 │   └── workspaces/   # Remote dev desktop (EC2 + DCV, account 815802018602)
 ├── mgmt/              # Management account resources
 │   ├── backend/       # Terraform state S3 + DynamoDB
@@ -28,6 +29,7 @@ infra/
 | `live/staging` | 551452024305 | Staging application workloads |
 | `live/prod` | 551452024305 | Production application workloads |
 | `live/shared` | 551452024305 | Cross-environment shared resources |
+| `live/mempalace` | 310697203282 | Shared MemPalace MCP server (ECS Fargate + Qdrant, ALB + WAF) |
 | `live/workspaces` | 815802018602 | Remote dev desktops (EC2 Spot + NICE DCV) |
 
 ## Boundaries
