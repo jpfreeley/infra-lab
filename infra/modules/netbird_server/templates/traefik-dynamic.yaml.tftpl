@@ -1,0 +1,51 @@
+# Traefik dynamic configuration, rendered by Terraform
+# (infra/modules/netbird_server). Same routers and priorities as the
+# upstream installer's option-0 Docker labels, expressed for the file
+# provider because there is no Docker socket on Fargate. All backends are
+# reached over localhost inside the task's shared network namespace.
+# /management.ProxyService/ is deliberately not routed: the NetBird Proxy
+# feature is not deployed.
+
+http:
+  routers:
+    netbird-grpc:
+      rule: "Host(`${domain}`) && (PathPrefix(`/signalexchange.SignalExchange/`) || PathPrefix(`/management.ManagementService/`))"
+      entryPoints: ["netbird"]
+      service: netbird-server-h2c
+      priority: 100
+%{ if tls_mode == "traefik" ~}
+      tls:
+        certResolver: letsencrypt
+%{ endif ~}
+    netbird-backend:
+      rule: "Host(`${domain}`) && (PathPrefix(`/relay`) || PathPrefix(`/ws-proxy/`) || PathPrefix(`/api`) || PathPrefix(`/oauth2`))"
+      entryPoints: ["netbird"]
+      service: netbird-server
+      priority: 100
+%{ if tls_mode == "traefik" ~}
+      tls:
+        certResolver: letsencrypt
+%{ endif ~}
+    netbird-dashboard:
+      rule: "Host(`${domain}`)"
+      entryPoints: ["netbird"]
+      service: dashboard
+      priority: 1
+%{ if tls_mode == "traefik" ~}
+      tls:
+        certResolver: letsencrypt
+%{ endif ~}
+
+  services:
+    netbird-server:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:${server_port}"
+    netbird-server-h2c:
+      loadBalancer:
+        servers:
+          - url: "h2c://127.0.0.1:${server_port}"
+    dashboard:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:80"
