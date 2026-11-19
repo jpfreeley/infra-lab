@@ -73,20 +73,21 @@ default and the fallback.
 ## Secrets
 
 The module takes ARNs only and never reads, writes, or generates values.
-Write each value out of band:
+Write each value out of band. `openssl` ends its output with a newline and
+`file:///dev/stdin` stores it verbatim, so every command strips it:
 
 ```bash
 # Relay auth secret (padding stripped, as upstream does)
-openssl rand -base64 32 | tr -d '=' | aws secretsmanager put-secret-value \
+openssl rand -base64 32 | tr -d '=\n' | aws secretsmanager put-secret-value \
   --secret-id <auth-secret> --secret-string file:///dev/stdin
 
 # Datastore encryption key (keep the padding). Losing it makes the
 # database unreadable, so never delete or rotate this secret casually.
-openssl rand -base64 32 | aws secretsmanager put-secret-value \
+openssl rand -base64 32 | tr -d '\n' | aws secretsmanager put-secret-value \
   --secret-id <store-key-secret> --secret-string file:///dev/stdin
 
 # Embedded IdP session cookie key
-openssl rand -base64 32 | aws secretsmanager put-secret-value \
+openssl rand -base64 32 | tr -d '\n' | aws secretsmanager put-secret-value \
   --secret-id <cookie-key-secret> --secret-string file:///dev/stdin
 ```
 
@@ -98,17 +99,34 @@ state.
 ### Initial owner (recommended)
 
 Without an owner, the first person to reach `/setup` claims the instance.
-`owner_secret_arn` closes that window by creating the owner at first start
-(upstream `auth.owner`). The secret is JSON with `email` and `password`.
-Use a hex password so it needs no YAML escaping:
+`owner_secret_arn` closes that window by creating the owner (upstream
+`auth.owner`).
+
+**`auth.owner.password` must be a bcrypt hash, not a password.** NetBird
+v0.83.1 passes it to Dex as the stored hash without hashing it, so a
+plaintext value makes every login return HTTP 500. NetBird re-applies the
+owner on every start, so fixing the hash fixes an existing owner at the next
+task start.
+
+The secret is JSON with `email` and `password_hash` (bcrypt). It can also
+carry the plaintext `password` so the owner can read it back; the module
+never reads that key. Generate both without the password ever appearing on
+a command line (`htpasswd` ships with macOS and Apache; `$2y$` and `$2a$`
+are the same algorithm):
 
 ```bash
-python3 -c 'import json,secrets,sys; print(json.dumps({"email": sys.argv[1], "password": secrets.token_hex(24)}))' \
-  "<owner-email>" | aws secretsmanager put-secret-value \
+python3 - "<owner-email>" <<'PY' | aws secretsmanager put-secret-value \
   --secret-id <owner-secret> --secret-string file:///dev/stdin
+import json, secrets, subprocess, sys
+pw = secrets.token_hex(24)
+out = subprocess.run(["htpasswd", "-niBC", "10", "owner"], input=pw,
+                     capture_output=True, text=True, check=True).stdout.strip()
+h = out.split(":", 1)[1].replace("$2y$", "$2a$", 1)
+sys.stdout.write(json.dumps({"email": sys.argv[1], "password": pw, "password_hash": h}))
+PY
 ```
 
-This is the one secret written to a file: `config-init` appends it to
+Only the hash is written to a file: `config-init` appends it to
 `config.yaml` on the task's ephemeral storage (encrypted by Fargate,
 discarded when the task stops). It is never written to EFS.
 
