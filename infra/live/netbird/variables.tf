@@ -44,9 +44,9 @@ variable "acme_email" {
 }
 
 variable "stun_servers" {
-  description = "Passed to netbird_server. Empty (default) runs embedded STUN and creates the NLB UDP listener and target group. Non-empty (e.g. [\"stun:stun.cloudflare.com:3478\"]) disables embedded STUN and creates no UDP path."
+  description = "Passed to netbird_server. Non-empty disables embedded STUN and creates no UDP path; empty runs embedded STUN with an NLB UDP listener and target group. Defaults to Cloudflare's public STUN (ADR-037 spike, 2026-11-19): STUN through the NLB got no reply while the same probe straight to the task worked, most likely because NLB UDP preserves the client IP and the public-subnet task replies via the IGW from its own address. Fixing that in AWS would need private subnets plus a NAT Gateway (about $32 a month). Cloudflare only learns peer public IPs."
   type        = list(string)
-  default     = []
+  default     = ["stun:stun.cloudflare.com:3478"]
 }
 
 variable "netbird_cpu" {
