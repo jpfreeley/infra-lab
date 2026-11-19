@@ -44,9 +44,9 @@ variable "acme_email" {
 }
 
 variable "stun_servers" {
-  description = "Passed to netbird_server. Non-empty disables embedded STUN and creates no UDP path; empty runs embedded STUN with an NLB UDP listener and target group. Defaults to Cloudflare's public STUN (ADR-037 spike, 2026-11-19): STUN through the NLB got no reply while the same probe straight to the task worked, most likely because NLB UDP preserves the client IP and the public-subnet task replies via the IGW from its own address. Fixing that in AWS would need private subnets plus a NAT Gateway (about $32 a month). Cloudflare only learns peer public IPs."
+  description = "Passed to netbird_server. Non-empty disables embedded STUN and creates no UDP path; empty runs embedded STUN with an NLB UDP listener and target group. Defaults to Cloudflare's public STUN (ADR-037 spike, 2026-11-19): STUN through the NLB got no reply while the same probe straight to the task worked, most likely because NLB UDP preserves the client IP and the public-subnet task replies via the IGW from its own address. Fixing that in AWS would need private subnets plus a NAT Gateway (about $32 a month). Cloudflare only learns peer public IPs. Google's public STUN is listed second so one provider's outage doesn't leave peers without STUN (they would otherwise fall back to the relay over 443)."
   type        = list(string)
-  default     = ["stun:stun.cloudflare.com:3478"]
+  default     = ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"]
 }
 
 variable "netbird_cpu" {
