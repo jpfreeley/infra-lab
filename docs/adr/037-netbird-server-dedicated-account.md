@@ -230,15 +230,48 @@ Components, mirroring MemPalace:
 - `.github/workflows/netbird-toggle.yml`: targeted apply/destroy, OIDC
   into the management account, then the second hop into the NetBird
   account through Terraform's `assume_role`.
-- `.github/workflows/netbird-lease-teardown.yml`: every 15 minutes,
-  tears down if the lease has expired. Triggered by both GitHub cron and
-  the existing EventBridge Scheduler Lambda pattern in `infra/live/dev`
-  (ADR-034, 2026-09-03), since GitHub cron alone was measured drifting
-  up to four hours.
+- `.github/workflows/netbird-lease-teardown.yml`: compares `now` against
+  the lease and calls the toggle with `action: down` once it has
+  expired. Idempotent: a run that finds the lease expired and the NLB
+  already gone does nothing, so overlapping triggers are harmless.
 - A local wrapper script (`netbird.sh {status|up [duration]|down}`)
   outside this repo, same role as the MemPalace wrapper: switch to the
   right `gh` account, set the lease variables, dispatch the toggle,
   poll for health.
+
+#### Lease-check triggers: EventBridge primary, GitHub cron fallback
+
+MemPalace's teardown started on GitHub cron and gained an EventBridge
+Scheduler trigger later as a backup (ADR-034, 2026-09-03), after GitHub
+cron was measured drifting by up to four hours. NetBird inverts those
+roles from the start:
+
+- **Primary: EventBridge Scheduler**, `rate(15 minutes)`, in the
+  management account (`infra/live/dev`). It invokes a second instance of
+  the existing `idle_teardown_trigger` Lambda with
+  `WORKFLOW_FILE=netbird-lease-teardown.yml`. The handler already takes
+  the workflow from that environment variable, so this is new
+  configuration, not new code. It reuses the existing GitHub token
+  secret (`actions:write` on this repo only). It lives in the management
+  account because the NetBird account's SCP denies `lambda` and `events`
+  by design.
+- **Fallback: GitHub Actions cron**, `*/15 * * * *`, in the workflow
+  itself. It does not depend on the GitHub token, so it still fires,
+  late but eventually, if that token expires or is revoked and every
+  Lambda dispatch starts failing.
+- **Alarm on the trigger Lambda's `Errors` metric**, so a broken token
+  shows up as an alert instead of only as a slower teardown.
+
+EventBridge is the clock only. The check and the teardown stay in the
+GitHub workflow, because teardown is a targeted `terraform destroy`
+that needs Terraform, the state backend and a runner. Deleting the NLB
+and scaling ECS to zero directly from a Lambda would leave Terraform
+state out of step with AWS, and the next `up` would have to reconcile
+it.
+
+Failure mode if both triggers fail: the stack stays up and bills about
+$0.06 an hour until a check runs. It does not stay up indefinitely
+unless both triggers stay broken.
 
 A health check that means "ready" is a 200 from
 `/oauth2/.well-known/openid-configuration` through the NLB, which is the
