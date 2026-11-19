@@ -1,0 +1,195 @@
+name: NetBird Lease Teardown
+
+# Keeps the NetBird server (ADR-037) up only while an uptime lease is
+# active. The lease is two repo variables, plain ISO 8601 UTC timestamps:
+#
+#   NETBIRD_KEEP_UP_FROM   (optional; empty means "from now")
+#   NETBIRD_KEEP_UP_UNTIL
+#
+# set by the local wrapper (netbird.sh up <duration>) or by hand:
+#   gh variable set NETBIRD_KEEP_UP_UNTIL --repo jpfreeley/infra-lab --body 2026-11-20T03:00:00Z
+#
+# Every run:
+#   NLB present, lease active        -> stay up
+#   NLB present, lease over or unset -> tear down (via netbird-toggle.yml),
+#                                       except a lease-less NLB younger than
+#                                       60 minutes, so a manual
+#                                       `terraform apply` isn't destroyed
+#                                       out from under whoever ran it
+#   NLB absent,  lease active        -> bring up (self-healing, same idea as
+#                                       the MemPalace protected-uptime window)
+#   NLB absent,  no active lease     -> nothing to do
+#
+# Why a lease and not traffic (ADR-037): every enrolled peer holds a
+# long-lived management stream open, so the server never looks idle, and
+# the remote-control traffic itself is peer to peer and never touches the
+# server.
+#
+# Triggers (ADR-037): EventBridge Scheduler every 15 minutes is the primary
+# clock (infra/live/dev/netbird_lease_teardown_trigger.tf dispatches this
+# workflow through the GitHub API). GitHub's own cron below is the
+# fallback: it is best effort (gaps of hours measured in ADR-034), but it
+# does not depend on the GitHub token the Lambda uses, so an expired or
+# revoked token still gets a late teardown instead of none. A run that
+# finds nothing to do is harmless, so overlapping triggers are fine.
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write # required for OIDC
+  contents: read
+
+concurrency:
+  group: netbird-lease-check
+  cancel-in-progress: false
+
+jobs:
+  check-lease:
+    name: Check lease
+    runs-on: ubuntu-latest
+    outputs:
+      should-teardown: ${{ steps.check.outputs.should_teardown }}
+      should-bringup: ${{ steps.check.outputs.should_bringup }}
+    steps:
+      # Direct STS calls instead of aws-actions/configure-aws-credentials,
+      # same reason as mempalace-idle-teardown.yml: a frequently scheduled
+      # workflow that downloads the action from codeload on every run was
+      # intermittently 429'd, skipping checks entirely.
+      - name: Configure AWS credentials (management account)
+        run: |
+          ID_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r '.value')
+
+          CREDS=$(aws sts assume-role-with-web-identity \
+            --role-arn arn:aws:iam::551452024305:role/infra-lab-github-actions-deploy \
+            --role-session-name gha-netbird-lease-check \
+            --web-identity-token "$ID_TOKEN" \
+            --region us-east-1 \
+            --query 'Credentials' --output json)
+
+          AKID=$(echo "$CREDS" | jq -r .AccessKeyId)
+          SECRET=$(echo "$CREDS" | jq -r .SecretAccessKey)
+          TOKEN=$(echo "$CREDS" | jq -r .SessionToken)
+          echo "::add-mask::$AKID"
+          echo "::add-mask::$SECRET"
+          echo "::add-mask::$TOKEN"
+          {
+            echo "AWS_ACCESS_KEY_ID=$AKID"
+            echo "AWS_SECRET_ACCESS_KEY=$SECRET"
+            echo "AWS_SESSION_TOKEN=$TOKEN"
+          } >> "$GITHUB_ENV"
+
+      # Second hop into the NetBird account, mirroring the assume_role in
+      # infra/live/netbird/providers.tf. Without it the NLB lookup would run
+      # in the management account and always find nothing (the exact bug
+      # mempalace-idle-teardown.yml hit on 2026-08-15).
+      - name: Configure AWS credentials (NetBird account)
+        run: |
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::300077301490:role/OrganizationAccountAccessRole \
+            --role-session-name gha-netbird-lease-chain \
+            --region us-east-1 \
+            --query 'Credentials' --output json)
+
+          AKID=$(echo "$CREDS" | jq -r .AccessKeyId)
+          SECRET=$(echo "$CREDS" | jq -r .SecretAccessKey)
+          TOKEN=$(echo "$CREDS" | jq -r .SessionToken)
+          echo "::add-mask::$AKID"
+          echo "::add-mask::$SECRET"
+          echo "::add-mask::$TOKEN"
+          {
+            echo "AWS_ACCESS_KEY_ID=$AKID"
+            echo "AWS_SECRET_ACCESS_KEY=$SECRET"
+            echo "AWS_SESSION_TOKEN=$TOKEN"
+          } >> "$GITHUB_ENV"
+
+      - name: Compare the lease with the stack
+        id: check
+        env:
+          KEEP_UP_FROM: ${{ vars.NETBIRD_KEEP_UP_FROM }}
+          KEEP_UP_UNTIL: ${{ vars.NETBIRD_KEEP_UP_UNTIL }}
+        run: |
+          NOW_S=$(date -u +%s)
+
+          # Lease state. A malformed timestamp counts as unset, never as an
+          # error, so a typo can't wedge the stack up or down.
+          LEASE=none
+          UNTIL_S=""
+          if [ -n "$KEEP_UP_UNTIL" ]; then
+            UNTIL_S=$(date -u -d "$KEEP_UP_UNTIL" +%s 2>/dev/null || echo "")
+          fi
+          FROM_S=0
+          if [ -n "$KEEP_UP_FROM" ]; then
+            FROM_S=$(date -u -d "$KEEP_UP_FROM" +%s 2>/dev/null || echo 0)
+          fi
+          if [ -n "$UNTIL_S" ]; then
+            if [ "$NOW_S" -ge "$FROM_S" ] && [ "$NOW_S" -lt "$UNTIL_S" ]; then
+              LEASE=active
+            else
+              LEASE=expired
+            fi
+          fi
+          echo "Lease: $LEASE (from='${KEEP_UP_FROM:-}', until='${KEEP_UP_UNTIL:-}')"
+
+          NLB_CREATED=$(aws elbv2 describe-load-balancers \
+            --names infra-lab-netbird-nlb \
+            --region us-east-1 \
+            --query 'LoadBalancers[0].CreatedTime' \
+            --output text 2>/dev/null || echo "None")
+
+          if [ "$NLB_CREATED" = "None" ] || [ -z "$NLB_CREATED" ]; then
+            echo "should_teardown=false" >> "$GITHUB_OUTPUT"
+            if [ "$LEASE" = "active" ]; then
+              echo "NLB absent but the lease is active: bringing the stack up."
+              echo "should_bringup=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "NLB absent and no active lease: already down, nothing to do."
+              echo "should_bringup=false" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          echo "should_bringup=false" >> "$GITHUB_OUTPUT"
+
+          if [ "$LEASE" = "active" ]; then
+            echo "Lease active: staying up."
+            echo "should_teardown=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$LEASE" = "none" ]; then
+            AGE_S=$(( NOW_S - $(date -u -d "$NLB_CREATED" +%s) ))
+            if [ "$AGE_S" -lt 3600 ]; then
+              echo "No lease, but the NLB is only ${AGE_S}s old (manual apply?): staying up for now."
+              echo "should_teardown=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          echo "NLB present and the lease is $LEASE: tearing down."
+          echo "should_teardown=true" >> "$GITHUB_OUTPUT"
+
+  teardown:
+    name: Tear down (lease over)
+    needs: check-lease
+    if: needs.check-lease.outputs.should-teardown == 'true'
+    uses: ./.github/workflows/netbird-toggle.yml
+    with:
+      action: down
+    permissions:
+      id-token: write
+      contents: read
+
+  bring-up:
+    name: Bring up (lease active)
+    needs: check-lease
+    if: needs.check-lease.outputs.should-bringup == 'true'
+    uses: ./.github/workflows/netbird-toggle.yml
+    with:
+      action: up
+    permissions:
+      id-token: write
+      contents: read
