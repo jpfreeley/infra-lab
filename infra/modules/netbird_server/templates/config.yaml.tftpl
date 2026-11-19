@@ -1,0 +1,49 @@
+# NetBird combined server configuration, rendered by Terraform
+# (infra/modules/netbird_server). Shape follows the upstream installer's
+# render_combined_yaml (infrastructure_files/getting-started.sh), with the
+# listen address moved off :80 (the dashboard owns :80 in the shared task
+# network namespace) and no secrets in this file: authSecret, the store
+# encryption key and the session cookie key arrive as NB_AUTH_SECRET,
+# NB_STORE_ENCRYPTION_KEY and NB_IDP_SESSION_COOKIE_ENCRYPTION_KEY from
+# Secrets Manager. The optional owner block is appended at task start by
+# the init container, which is why `auth:` must stay the LAST block.
+
+server:
+  listenAddress: ":${server_port}"
+  exposedAddress: "https://${domain}:443"
+%{ if length(stun_servers) == 0 ~}
+  stunPorts:
+    - ${stun_port}
+%{ else ~}
+  stuns:
+%{ for uri in stun_servers ~}
+    - uri: "${uri}"
+      proto: "udp"
+%{ endfor ~}
+%{ endif ~}
+  metricsPort: ${metrics_port}
+  healthcheckAddress: ":${health_port}"
+  logLevel: "${log_level}"
+  logFile: "console"
+
+  dataDir: "/var/lib/netbird"
+
+  disableAnonymousMetrics: ${disable_anonymous_metrics}
+
+  reverseProxy:
+    trustedHTTPProxies:
+      - "127.0.0.1/32"
+    trustedPeers:
+      - "127.0.0.1/32"
+
+  store:
+    engine: "sqlite"
+
+  auth:
+    issuer: "https://${domain}/oauth2"
+    signKeyRefreshEnabled: true
+    dashboardRedirectURIs:
+      - "https://${domain}/nb-auth"
+      - "https://${domain}/nb-silent-auth"
+    cliRedirectURIs:
+      - "http://localhost:53000/"
