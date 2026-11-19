@@ -27,3 +27,8 @@ output "mempalace_account_id" {
   description = "The AWS Account ID of the dedicated MemPalace account. Needed to fill in infra/live/mempalace/providers.tf's assume_role ARN after this account is created."
   value       = aws_organizations_account.mempalace.id
 }
+
+output "netbird_account_id" {
+  description = "The AWS Account ID of the dedicated NetBird account (ADR-037). Needed for infra/live/netbird/providers.tf's assume_role ARN after this account is created."
+  value       = aws_organizations_account.netbird.id
+}
