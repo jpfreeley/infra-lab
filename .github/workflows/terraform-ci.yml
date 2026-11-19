@@ -38,6 +38,13 @@ jobs:
           tflint_version: v0.50.0
 
       - name: Init TFLint
+        # tflint --init downloads the AWS ruleset through the GitHub API.
+        # Unauthenticated, that shares the runner IP's 60 requests/hour and
+        # failed with "403 API rate limit exceeded" on 2026-11-19 (main at
+        # c57d76e, and PR #166). tflint uses GITHUB_TOKEN when set; the
+        # job's token is read-only (permissions: contents: read above).
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: tflint --init
 
       - name: Run TFLint
