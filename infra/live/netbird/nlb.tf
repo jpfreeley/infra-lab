@@ -91,13 +91,19 @@ resource "aws_lb_target_group" "stun" {
   vpc_id      = module.netbird_vpc.vpc_id
   target_type = "ip"
 
-  # UDP target groups need a TCP/HTTP health check; the server's own
-  # /health endpoint is the honest signal for the process serving STUN.
+  # UDP target groups need a TCP/HTTP health check. NOT the server's
+  # /health on :9000: found in the 2026-11-19 spike that it includes the
+  # relay self-check, which dials the server's own public name through this
+  # NLB. A newly registered target receives no NLB traffic until it passes
+  # health checks, so /health could never go green, the target was marked
+  # unhealthy, and ECS replaced the task in a loop. TCP on Traefik's port
+  # (the same check the HTTPS target group passes) breaks the cycle;
+  # netbird-server is an essential container, so if it dies the whole task
+  # is replaced anyway.
   health_check {
     enabled             = true
-    protocol            = "HTTP"
-    port                = tostring(module.netbird.health_check_port)
-    path                = module.netbird.health_check_path
+    protocol            = "TCP"
+    port                = tostring(module.netbird.https_port)
     healthy_threshold   = 3
     unhealthy_threshold = 3
     interval            = 30
