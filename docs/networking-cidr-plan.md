@@ -18,6 +18,7 @@ tenant workloads with restricted egress.
 | prod | Execution | 10.0.80.0/20 | 4,094 |
 | workspaces | WorkSpaces | 10.0.96.0/20 | 4,094 |
 | mempalace | MemPalace | 10.0.112.0/20 | 4,094 |
+| netbird | NetBird | 10.0.128.0/20 | 4,094 |
 
 ## Subnet Layout (per VPC, 3 AZs)
 
@@ -158,6 +159,7 @@ Control VPCs get Interface endpoints for private AWS API access:
 | prod | 3 (per AZ) | High availability |
 | workspaces | 1 (single AZ) | Cost optimization |
 | mempalace | 0 | No private subnets to serve — public-only topology |
+| netbird | 0 | No private subnets to serve, public-only topology (ADR-037) |
 
 ## VPC Peering
 
