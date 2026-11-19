@@ -392,6 +392,7 @@ resource "aws_cloudwatch_log_group" "this" {
 ###############################################################################
 
 resource "aws_ecs_task_definition" "this" {
+  # checkov:skip=CKV_AWS_336: "config-init runs with a read-only root. The others stay writable: the dashboard image rewrites its own nginx config and JS env at startup, and netbird-server and Traefik are untested read-only. Revisit after the ADR-037 spike."
   family                   = local.name_prefix
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
@@ -436,11 +437,12 @@ resource "aws_ecs_task_definition" "this" {
 
   container_definitions = jsonencode([
     {
-      name       = "config-init"
-      image      = var.traefik_image
-      essential  = false
-      entryPoint = ["/bin/sh", "-c"]
-      command    = [local.init_script]
+      name                   = "config-init"
+      image                  = var.traefik_image
+      essential              = false
+      readonlyRootFilesystem = true # writes only to the /config volume
+      entryPoint             = ["/bin/sh", "-c"]
+      command                = [local.init_script]
       environment = [
         { name = "NB_CONFIG_YAML", value = local.netbird_config },
         { name = "TRAEFIK_DYNAMIC_YAML", value = local.traefik_dynamic },
