@@ -89,12 +89,22 @@ locals {
 
   # Writes both rendered files onto the shared task-local volume. The owner
   # block is appended under `auth:` (the template keeps auth last) only when
-  # an owner secret is wired in. Hex passwords need no YAML escaping.
+  # an owner secret is wired in.
+  #
+  # auth.owner.password is NOT a password: NetBird v0.83.1 copies it straight
+  # into Dex as the bcrypt hash (combined/cmd/config.go buildEmbeddedIdPConfig
+  # maps it to OwnerConfig.Hash, documented as "the bcrypt hash of the user's
+  # password"; nothing hashes it). A plaintext value there makes every login
+  # POST return 500 (found in the ADR-037 spike, 2026-11-19). So the secret
+  # carries `password_hash`, and only that reaches the config. NetBird
+  # re-applies the owner hash on every start (ensureStaticPasswords), so a
+  # corrected hash takes effect at the next task start. Bcrypt output uses
+  # only [A-Za-z0-9./$], so it needs no YAML escaping.
   init_script = <<-EOT
     set -eu
     printf '%s\n' "$NB_CONFIG_YAML" > /config/config.yaml
     if [ -n "$${NB_OWNER_EMAIL:-}" ]; then
-      printf '    owner:\n      email: "%s"\n      password: "%s"\n' "$NB_OWNER_EMAIL" "$NB_OWNER_PASSWORD" >> /config/config.yaml
+      printf '    owner:\n      email: "%s"\n      password: "%s"\n' "$NB_OWNER_EMAIL" "$NB_OWNER_PASSWORD_HASH" >> /config/config.yaml
     fi
     printf '%s\n' "$TRAEFIK_DYNAMIC_YAML" > /config/traefik-dynamic.yaml
     echo "netbird config rendered"
@@ -449,7 +459,7 @@ resource "aws_ecs_task_definition" "this" {
       ]
       secrets = local.seed_owner ? [
         { name = "NB_OWNER_EMAIL", valueFrom = "${var.owner_secret_arn}:email::" },
-        { name = "NB_OWNER_PASSWORD", valueFrom = "${var.owner_secret_arn}:password::" },
+        { name = "NB_OWNER_PASSWORD_HASH", valueFrom = "${var.owner_secret_arn}:password_hash::" },
       ] : []
       mountPoints = [
         { sourceVolume = "config", containerPath = "/config", readOnly = false }

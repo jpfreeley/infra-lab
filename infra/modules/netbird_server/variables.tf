@@ -131,7 +131,7 @@ variable "session_cookie_key_secret_arn" {
 }
 
 variable "owner_secret_arn" {
-  description = "Optional Secrets Manager ARN of a JSON secret {\"email\": ..., \"password\": ...} used to create the initial owner account at first start (upstream auth.owner), which closes the window where anyone reaching /setup first could claim the instance. Use a hex password (`openssl rand -hex 24`) so it needs no YAML escaping. Null leaves first-user creation to the /setup page."
+  description = "Optional Secrets Manager ARN of a JSON secret {\"email\": ..., \"password_hash\": ...} that creates the initial owner account (upstream auth.owner), closing the window where anyone reaching /setup first could claim the instance. password_hash must be a bcrypt hash: NetBird passes auth.owner.password to Dex as the hash without hashing it. The secret may also hold the plaintext \"password\" for the owner's own retrieval; the module never reads that key. Null leaves first-user creation to the /setup page."
   type        = string
   default     = null
 }

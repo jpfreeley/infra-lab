@@ -5,22 +5,27 @@
 # first starts, or the task fails to launch. Assume into the NetBird
 # account first (OrganizationAccountAccessRole), then:
 #
+#   # openssl output ends in a newline that file:///dev/stdin would store
+#   # verbatim, so every command strips it.
+#
 #   # Relay auth secret (padding stripped, as upstream does)
-#   openssl rand -base64 32 | tr -d '=' | aws secretsmanager put-secret-value \
+#   openssl rand -base64 32 | tr -d '=\n' | aws secretsmanager put-secret-value \
 #     --secret-id infra-lab-netbird/netbird/auth-secret --secret-string file:///dev/stdin
 #
 #   # Datastore encryption key (keep the padding)
-#   openssl rand -base64 32 | aws secretsmanager put-secret-value \
+#   openssl rand -base64 32 | tr -d '\n' | aws secretsmanager put-secret-value \
 #     --secret-id infra-lab-netbird/netbird/store-encryption-key --secret-string file:///dev/stdin
 #
 #   # Embedded IdP session cookie key
-#   openssl rand -base64 32 | aws secretsmanager put-secret-value \
+#   openssl rand -base64 32 | tr -d '\n' | aws secretsmanager put-secret-value \
 #     --secret-id infra-lab-netbird/netbird/session-cookie-key --secret-string file:///dev/stdin
 #
-#   # Initial owner, JSON, hex password (no YAML escaping needed)
-#   python3 -c 'import json,secrets,sys; print(json.dumps({"email": sys.argv[1], "password": secrets.token_hex(24)}))' \
-#     "<owner-email>" | aws secretsmanager put-secret-value \
-#     --secret-id infra-lab-netbird/netbird/owner --secret-string file:///dev/stdin
+#   # Initial owner: JSON {email, password, password_hash}. password_hash
+#   # MUST be bcrypt (NetBird hands auth.owner.password to Dex as the hash;
+#   # plaintext there makes every login return 500). The plaintext password
+#   # is kept only so the owner can read it back. Full command, which never
+#   # puts the password on a command line: infra/modules/netbird_server/README.md,
+#   # "Initial owner".
 #
 # Never put any of these values in a .tfvars file, a variable default, or
 # this repo.
