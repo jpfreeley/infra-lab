@@ -37,8 +37,8 @@ the upstream `infrastructure_files/getting-started.sh`:
 - The vendor default puts Traefik in front of both, publishes TCP 443 and
   UDP 3478, and gets certificates from Let's Encrypt via TLS-ALPN-01.
 - Identity is an embedded Dex server. The first owner account is created
-  through a one-time `/setup` page (or the setup API). No external IdP is
-  required.
+  through a one-time `/setup` page, the setup API, or an `auth.owner`
+  block in `config.yaml`. No external IdP is required.
 - State lives in one directory, `/var/lib/netbird`: the SQLite management
   store, the Dex store (`idp.db`), activity events, and keys. Postgres is
   optional and only recommended for multiple management instances.
@@ -70,9 +70,9 @@ NetBird break that shape:
 1. **STUN needs UDP 3478 reachable from the internet.** The docs state
    it "cannot be proxied through your reverse proxy." An ALB cannot carry
    UDP at all. NetBird can point clients at an external STUN server
-   (`server.stuns`) instead, but the docs do not say the embedded
-   listener can be turned off, and do not describe peer behavior with no
-   reachable STUN.
+   (`server.stuns`) instead. The upstream `config.yaml.example` states
+   that setting `stuns` "disables local STUN server", so that path needs
+   no inbound UDP at all; it only needs a STUN server the peers can reach.
 2. **gRPC must reach the backend as h2c.** The NetBird docs require
    "HTTP/2 (h2c) upstream support" for the gRPC routes. NetBird's docs say
    nothing about AWS load balancers, and whether an ALB gRPC target group
@@ -146,7 +146,16 @@ group accepts ingress from the NLB only.
 A Network Load Balancer with security groups:
 
 - **TCP 443** to Traefik in the task.
-- **UDP 3478** to `netbird-server` STUN in the task.
+- **UDP 3478** to `netbird-server` STUN in the task, only while the
+  embedded STUN listener is in use.
+
+The module exposes both STUN choices (`stun_servers`). Embedded STUN keeps
+every component self-hosted at the cost of a UDP listener and target
+group. A public STUN server (for example `stun:stun.cloudflare.com:3478`)
+turns the embedded listener off and leaves the NLB with TCP 443 only; the
+STUN operator learns peer public IP addresses and nothing more, because
+STUN only reflects a client's mapped address. Which one the live stack
+uses is settled in the spike.
 
 This is the vendor's own supported topology (Traefik in front of the
 combined server), with an NLB added in front only to give a stable DNS
@@ -176,9 +185,12 @@ TLS termination, to settle in the implementation spike:
 - NetBird's installer supports CrowdSec (`NETBIRD_ENABLE_CROWDSEC`) as
   an in-stack alternative if exposure becomes a concern.
 - Admin accounts use long random passwords. The `/setup` page works only
-  while no user exists, so anyone who reaches it first can claim the
-  instance. The owner account is created immediately after the first
-  bring-up, in the same session, before the instance is left running.
+  while no user exists, so anyone who reaches it first could claim the
+  instance. That window is closed rather than raced: upstream supports an
+  initial owner in `config.yaml` (`server.auth.owner`), and the module
+  seeds it at first start from a Secrets Manager secret
+  (`owner_secret_arn`), so a user exists before the endpoint is ever
+  reachable.
 
 ### Persistence and secrets
 
@@ -320,13 +332,15 @@ device configuration, not infrastructure, and is out of scope here.
 ## Implementation Order
 
 1. This ADR (this PR).
-2. `infra/modules/netbird_server` and `infra/live/netbird`, plan only.
+2. `infra/modules/netbird_server` (#162), verified with offline plans.
 3. `infra/mgmt/org` account and SCP, separate PR, applied only on
    explicit approval.
-4. Spike: apply, settle Option A vs B, create the owner account, enroll
-   the Mac and the tablet, measure the reconnect delay after a down/up.
-5. Toggle and lease-teardown workflows, wrapper script.
-6. Update this ADR with what the spike found, then move it to Accepted.
+4. `infra/live/netbird`, once the account exists.
+5. Spike: apply, settle Option A vs B and embedded vs external STUN,
+   confirm the seeded owner can log in, enroll the Mac and the tablet,
+   measure the reconnect delay after a down/up.
+6. Toggle and lease-teardown workflows, wrapper script.
+7. Update this ADR with what the spike found, then move it to Accepted.
 
 ## References
 
