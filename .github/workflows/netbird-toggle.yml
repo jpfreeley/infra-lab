@@ -7,6 +7,9 @@ name: NetBird Server Toggle
 # nothing and is never touched here, up or down. EFS holds all NetBird
 # state, so peers keep their identity and IPs across a down/up cycle.
 #
+# Also starts the tablet monitor instance after "up" and stops it before
+# "down" (ADR-038); the lease workflow repairs any drift every 15 minutes.
+#
 # Usually not run by hand. netbird-lease-teardown.yml calls it with
 # action=down when the uptime lease expires, and with action=up when a lease
 # is active but the stack is down. The local wrapper (netbird.sh) sets the
@@ -97,6 +100,64 @@ jobs:
           done
           echo "::error::Not ready after 15 minutes (last HTTP $code)."
           exit 1
+
+      - name: Start the tablet monitor
+        if: inputs.action == 'up'
+        # The tablet monitor (ADR-038) runs only while the stack is up. Its
+        # NetBird identity is on its root volume, so stop/start keeps it.
+        # Credentials for the NetBird account are scoped to this step: the
+        # job's own credentials must stay in the management account for
+        # Terraform's provider assume_role.
+        run: |
+          C=$(aws sts assume-role --region us-east-1 \
+            --role-arn arn:aws:iam::300077301490:role/OrganizationAccountAccessRole \
+            --role-session-name gha-netbird-monitor-up --query Credentials --output json)
+          echo "::add-mask::$(jq -r .AccessKeyId <<<"$C")"
+          echo "::add-mask::$(jq -r .SecretAccessKey <<<"$C")"
+          echo "::add-mask::$(jq -r .SessionToken <<<"$C")"
+          AWS_ACCESS_KEY_ID=$(jq -r .AccessKeyId <<<"$C")
+          AWS_SECRET_ACCESS_KEY=$(jq -r .SecretAccessKey <<<"$C")
+          AWS_SESSION_TOKEN=$(jq -r .SessionToken <<<"$C")
+          export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+          ID=$(aws ec2 describe-instances --region us-east-1 \
+            --filters Name=tag:Name,Values=infra-lab-netbird-tablet-monitor \
+                      Name=instance-state-name,Values=pending,running,stopping,stopped \
+            --query 'Reservations[].Instances[].InstanceId | [0]' --output text)
+          if [ -z "$ID" ] || [ "$ID" = "None" ]; then
+            echo "No tablet monitor instance found; nothing to do."
+            exit 0
+          fi
+          aws ec2 start-instances --region us-east-1 --instance-ids "$ID" >/dev/null
+          echo "Started the tablet monitor ($ID)."
+
+      - name: Stop the tablet monitor
+        if: inputs.action == 'down'
+        # The tablet monitor (ADR-038) runs only while the stack is up. Its
+        # NetBird identity is on its root volume, so stop/start keeps it.
+        # Credentials for the NetBird account are scoped to this step: the
+        # job's own credentials must stay in the management account for
+        # Terraform's provider assume_role.
+        run: |
+          C=$(aws sts assume-role --region us-east-1 \
+            --role-arn arn:aws:iam::300077301490:role/OrganizationAccountAccessRole \
+            --role-session-name gha-netbird-monitor-down --query Credentials --output json)
+          echo "::add-mask::$(jq -r .AccessKeyId <<<"$C")"
+          echo "::add-mask::$(jq -r .SecretAccessKey <<<"$C")"
+          echo "::add-mask::$(jq -r .SessionToken <<<"$C")"
+          AWS_ACCESS_KEY_ID=$(jq -r .AccessKeyId <<<"$C")
+          AWS_SECRET_ACCESS_KEY=$(jq -r .SecretAccessKey <<<"$C")
+          AWS_SESSION_TOKEN=$(jq -r .SessionToken <<<"$C")
+          export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+          ID=$(aws ec2 describe-instances --region us-east-1 \
+            --filters Name=tag:Name,Values=infra-lab-netbird-tablet-monitor \
+                      Name=instance-state-name,Values=pending,running,stopping,stopped \
+            --query 'Reservations[].Instances[].InstanceId | [0]' --output text)
+          if [ -z "$ID" ] || [ "$ID" = "None" ]; then
+            echo "No tablet monitor instance found; nothing to do."
+            exit 0
+          fi
+          aws ec2 stop-instances --region us-east-1 --instance-ids "$ID" >/dev/null
+          echo "Stopped the tablet monitor ($ID)."
 
       - name: Tear Down
         if: inputs.action == 'down'
