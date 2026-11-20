@@ -22,6 +22,7 @@ import json
 import os
 import re
 import secrets
+import signal
 import subprocess
 import sys
 import threading
@@ -61,6 +62,14 @@ CHECK_LABELS = {
 }
 
 STARTED = time.time()
+
+
+def system_uptime_s():
+    try:
+        with open("/proc/uptime") as f:
+            return float(f.read().split()[0])
+    except (OSError, ValueError, IndexError):
+        return 1e9  # unknown (for example macOS): treat as not a fresh boot
 
 
 def log(msg):
@@ -540,8 +549,53 @@ class Monitor:
                 return since_open >= WINDOW_BEFORE_MIN - SCHEDULE_LEAD_MIN
         return None  # not in any window
 
+    def last_checkin_text(self):
+        with self.lock:
+            h = self.history[0] if self.history else None
+        if not h:
+            return "No check-in finished while it was up."
+        at = datetime.datetime.fromtimestamp(h["at"], self.tz).strftime("%H:%M")
+        if not h["red"]:
+            return "Last check-in %s: all %d green." % (at, h["tablets"])
+        return "Last check-in %s: %d of %d red (%s)." % (at, len(h["red"]), h["tablets"], ", ".join(h["red"]))
+
+    def next_checkin_label(self):
+        nxt = self.next_scheduled_run()
+        if nxt is None:
+            return "no check-in scheduled"
+        t = datetime.datetime.fromtimestamp(nxt, self.tz) + datetime.timedelta(minutes=SCHEDULE_LEAD_MIN)
+        return "the %s check-in" % t.strftime("%H:%M")
+
+    def announce_up(self, late):
+        """Low-priority "up" message, only for a real boot (not a service
+        restart after a crash or a code update), so a restart loop cannot
+        flood the topic. Its absence near a check-in means the stack did
+        not come up."""
+        if system_uptime_s() > 600:
+            return
+        for _ in range(24):  # wait up to 2 min for the NetBird address
+            if self.netbird_ip:
+                break
+            time.sleep(5)
+        if late is None:
+            why = "Manual lease: running a check-in now."
+        elif late:
+            why = "Scheduled check-in (started late): checking now."
+        else:
+            why = "Up for %s." % self.next_checkin_label()
+        self.ntfy("Tablet monitor up", why, priority="low", tags="arrow_up")
+
+    def announce_down(self):
+        """Low-priority "down" message when the system is shutting down (the
+        instance is being stopped), with the last check-in result."""
+        rc, state = run(["systemctl", "is-system-running"], timeout=5)
+        if state.strip() != "stopping":
+            return
+        self.ntfy("Tablet monitor down", self.last_checkin_text(), priority="low", tags="arrow_down")
+
     def scheduler(self):
         late = self.in_window_late()
+        threading.Thread(target=self.announce_up, args=(late,), daemon=True).start()
         if late is None:
             self.start_checkin("on start")  # manual lease (ADR-038 section 5)
         elif late:
@@ -757,6 +811,13 @@ def main():
         mon.run_once()
         print(json.dumps(mon.snapshot(), indent=2, default=str))
         return
+    def on_term(signum, frame):
+        try:
+            mon.announce_down()
+        finally:
+            sys.exit(0)
+
+    signal.signal(signal.SIGTERM, on_term)
     threading.Thread(target=mon.scheduler, daemon=True).start()
     serve(mon)
 
