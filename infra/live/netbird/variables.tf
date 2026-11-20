@@ -66,3 +66,9 @@ variable "log_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "monitor_checkins" {
+  description = "Tablet monitor check-in times and IANA zone (ADR-038). Keep equal to the NETBIRD_CHECKINS repo variable, which drives the lease workflow."
+  type        = string
+  default     = "06:00,12:00,18:00,00:00 America/New_York"
+}

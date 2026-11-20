@@ -119,10 +119,13 @@ the all-clear that the red-only ntfy reports deliberately leave out.
 
 ### 2. Monitor host: one EC2 instance in the NetBird account
 
-- `t4g.nano` (2 vCPU burstable, 0.5 GiB, ARM), Amazon Linux 2023, in one of
+- `t3.nano` (2 vCPU burstable, 0.5 GiB, x86_64), Amazon Linux 2023, in one of
   the existing public subnets of the NetBird VPC (`10.0.128.0/20`). A
   public IPv4 address is needed for outbound access (NetBird management,
-  ntfy, AWS APIs), because the VPC has no NAT gateway (ADR-037).
+  ntfy, AWS APIs), because the VPC has no NAT gateway (ADR-037). x86_64,
+  not Graviton: Google publishes the Linux `adb` (platform-tools) for x86_64
+  only. (Changed from `t4g.nano` during implementation; about $0.10 a month
+  more at 4 hours a day.)
 - **No inbound security group rules at all.** NetBird is outbound-initiated,
   and the stateful security group admits the return traffic of the
   WireGuard hole punch. When a direct path fails, traffic goes through the
@@ -186,8 +189,10 @@ At each check-in the monitor runs the checks twice, 10 minutes apart, for
 each tablet in the inventory. There are three kinds of check-in, and all
 three report the same way (section 6):
 
-- **Scheduled**: 10 minutes before the stated time and at it (systemd
-  timers with `OnCalendar=` in the check-in time zone).
+- **Scheduled**: 10 minutes before the stated time and at it. The monitor
+  process keeps its own clock in the check-in time zone, instead of the
+  systemd timers first planned, so that scheduled, on-start and on-request
+  check-ins share one state and never overlap.
 - **On start**: whenever the monitor boots, which happens at each scheduled
   window and at each manual lease. The first run starts when every tablet in
   the inventory is connected on NetBird, or 15 minutes after boot at the
@@ -411,7 +416,7 @@ hour each):
 | Item | Monthly |
 | --- | --- |
 | NetBird server (NLB + Fargate), about $30/month at 24/7 | about $5 |
-| Monitor: t4g.nano, 4 h/day | about $0.50 |
+| Monitor: t3.nano, 4 h/day | about $0.60 |
 | Monitor: public IPv4, 4 h/day | about $0.60 |
 | Monitor: 8 GiB gp3 | about $0.65 |
 | Secrets Manager: 4 new secrets (setup key, ADB key, ntfy topic, inventory) | about $1.60 |

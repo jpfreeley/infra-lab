@@ -1,0 +1,91 @@
+#!/bin/bash
+# Tablet monitor bootstrap (ADR-038). Runs once, on the instance's first
+# boot (cloud-init per-instance). Later boots (the start/stop around each
+# check-in) only start the systemd services this script installs: NetBird
+# keeps its peer identity in /var/lib/netbird on the root volume.
+set -euo pipefail
+exec > >(tee -a /var/log/tablet-monitor-bootstrap.log) 2>&1
+echo "bootstrap start $(date -u +%FT%TZ)"
+
+REGION="${region}"
+secret() {
+  aws secretsmanager get-secret-value --region "$REGION" --secret-id "$1" \
+    --query SecretString --output text
+}
+
+dnf install -y -q unzip jq
+
+# NetBird client, pinned and checksum-verified.
+curl -fsSL -o /tmp/netbird.tgz \
+  "https://github.com/netbirdio/netbird/releases/download/v${netbird_version}/netbird_${netbird_version}_linux_amd64.tar.gz"
+echo "${netbird_sha256}  /tmp/netbird.tgz" | sha256sum -c -
+tar -xzf /tmp/netbird.tgz -C /usr/local/bin netbird
+rm -f /tmp/netbird.tgz
+
+# adb (Android platform-tools), pinned and checksum-verified.
+curl -fsSL -o /tmp/platform-tools.zip \
+  "https://dl.google.com/android/repository/platform-tools_r${platform_tools_version}-linux.zip"
+echo "${platform_tools_sha256}  /tmp/platform-tools.zip" | sha256sum -c -
+rm -rf /opt/platform-tools
+unzip -q /tmp/platform-tools.zip -d /opt
+ln -sf /opt/platform-tools/adb /usr/local/bin/adb
+rm -f /tmp/platform-tools.zip
+
+# ADB key pair the tablets already trust (ADR-038 section 4).
+install -d -m 700 /root/.android
+secret "${adb_key_secret_arn}" | jq -r .private > /root/.android/adbkey
+secret "${adb_key_secret_arn}" | jq -r .public > /root/.android/adbkey.pub
+chmod 600 /root/.android/adbkey /root/.android/adbkey.pub
+
+# Monitor program and its service.
+install -d -m 755 /opt/tablet-monitor
+# Inserted as plain text (gzip compresses it well; base64 did not fit the
+# 16 KB user data limit). Terraform does not re-parse inserted text, and the
+# quoted heredoc stops the shell from expanding anything in it.
+cat > /opt/tablet-monitor/monitor.py <<'MONITOR_PY_EOF'
+${monitor_py}
+MONITOR_PY_EOF
+install -d -m 700 /etc/tablet-monitor
+cat > /etc/tablet-monitor/env <<'ENV'
+AWS_REGION=${region}
+INVENTORY_SECRET=${inventory_secret_arn}
+NTFY_SECRET=${ntfy_topic_secret_arn}
+CHECKINS=${checkins}
+HOME=/root
+ENV
+cat > /etc/systemd/system/tablet-monitor.service <<'UNIT'
+[Unit]
+Description=Tablet monitor (ADR-038)
+After=network-online.target netbird.service
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/tablet-monitor/env
+ExecStart=/usr/bin/python3 /opt/tablet-monitor/monitor.py
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+# NetBird: install the daemon, then enroll with the one-use setup key. The
+# server may be down (outside a check-in window), so keep trying for up to
+# two hours; the monitor service starts anyway and waits for an address.
+/usr/local/bin/netbird service install
+/usr/local/bin/netbird service start
+systemctl daemon-reload
+systemctl enable --now tablet-monitor.service
+
+for i in $(seq 1 240); do
+  # NB_SETUP_KEY keeps the key off the command line (and out of ps).
+  if NB_SETUP_KEY="$(secret "${setup_key_secret_arn}")" /usr/local/bin/netbird up \
+      --management-url "${management_url}" \
+      --hostname "${netbird_hostname}"; then
+    echo "enrolled after try $i"
+    break
+  fi
+  sleep 30
+done
+/usr/local/bin/netbird status | head -5 || true
+echo "bootstrap done $(date -u +%FT%TZ)"
