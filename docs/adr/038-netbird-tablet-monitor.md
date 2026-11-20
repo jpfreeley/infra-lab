@@ -215,6 +215,21 @@ shows the gap matters.
   with each check's result, the last check time, and the last few
   transitions. It reloads itself every 60 seconds; the data refreshes every
   5 minutes.
+- **Each tablet that is online on NetBird gets a copy button** for the
+  command that opens it in `scrcpy` from the operator's Mac:
+
+  ```text
+  TABLET_HOST=<netbird-ip> tablet-adb.sh scrcpy
+  ```
+
+  The wrapper is used instead of a bare `scrcpy -s <ip>:5555` because it
+  first recovers ADB on 5555 when the tablet has just rebooted. The bare
+  form is shown under it for machines that do not have the wrapper. The
+  button copies with a hidden text area and `document.execCommand("copy")`,
+  because the page is served over plain HTTP on the overlay address, and
+  browsers expose `navigator.clipboard` only on HTTPS or `localhost`. When
+  NetBird reports a tablet offline, the button is disabled, since the
+  command could not connect.
 - There is no login, because NetBird membership is the access control. A
   public URL was considered and rejected: it would add an internet-facing
   endpoint that shows device names, account names and network addresses.
