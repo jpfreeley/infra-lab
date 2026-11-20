@@ -66,6 +66,7 @@ jobs:
     name: Check lease
     runs-on: ubuntu-latest
     outputs:
+      wanted: ${{ steps.check.outputs.wanted }}
       should-teardown: ${{ steps.check.outputs.should_teardown }}
       should-bringup: ${{ steps.check.outputs.should_bringup }}
     steps:
@@ -187,6 +188,7 @@ jobs:
           if [ "$LEASE" = "active" ] || [ "$WINDOW" = "open" ]; then
             WANTED=true
           fi
+          echo "wanted=$WANTED" >> "$GITHUB_OUTPUT"
 
           NLB_CREATED=$(aws elbv2 describe-load-balancers \
             --names infra-lab-netbird-nlb \
@@ -225,6 +227,35 @@ jobs:
 
           echo "NLB present, lease $LEASE, window $WINDOW: tearing down."
           echo "should_teardown=true" >> "$GITHUB_OUTPUT"
+
+      # The tablet monitor (ADR-038) follows the same decision: running while
+      # the stack is wanted up, stopped otherwise. The toggle workflow also
+      # starts and stops it with the server; this step repairs any drift
+      # (for example a stack left up by the young-NLB guard, or a monitor
+      # someone started by hand). Found by Name tag, so a replaced instance
+      # needs no workflow change. Stopping a stopped instance, or starting a
+      # running one, is a no-op.
+      - name: Sync the tablet monitor with the decision
+        env:
+          WANTED: ${{ steps.check.outputs.wanted }}
+        run: |
+          read -r ID STATE < <(aws ec2 describe-instances --region us-east-1 \
+            --filters Name=tag:Name,Values=infra-lab-netbird-tablet-monitor \
+                      Name=instance-state-name,Values=pending,running,stopping,stopped \
+            --query 'Reservations[].Instances[].[InstanceId,State.Name] | [0]' \
+            --output text) || true
+          if [ -z "${ID:-}" ] || [ "$ID" = "None" ]; then
+            echo "No tablet monitor instance found; nothing to do."
+            exit 0
+          fi
+          echo "Monitor $ID is $STATE; wanted up: $WANTED"
+          if [ "$WANTED" = "true" ] && [ "$STATE" = "stopped" ]; then
+            aws ec2 start-instances --region us-east-1 --instance-ids "$ID" >/dev/null
+            echo "Started the monitor."
+          elif [ "$WANTED" != "true" ] && { [ "$STATE" = "running" ] || [ "$STATE" = "pending" ]; }; then
+            aws ec2 stop-instances --region us-east-1 --instance-ids "$ID" >/dev/null
+            echo "Stopped the monitor."
+          fi
 
   teardown:
     name: Tear down (lease over)
