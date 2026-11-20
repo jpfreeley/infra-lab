@@ -2,7 +2,15 @@
 
 ## Status
 
-Proposed. Nothing is applied yet. The account creation (`infra/mgmt/org`)
+Superseded 2026-11-20. The stack moved to a separate, portable template
+repository (server, monitor, lease automation and docs, deployable into any
+AWS account) and passed two from-zero test deployments there. The infra-lab
+deployment was then torn down: `infra/live/netbird`, the modules, the lease
+trigger and the workflows were destroyed and removed. The dedicated account
+and its SCP (`infra/mgmt/org/netbird_account.tf`) remain, empty. This record
+stays as the history of the design.
+
+Original status: Proposed. Nothing is applied yet. The account creation (`infra/mgmt/org`)
 ships as its own, later PR, after the module and live wiring have been
 reviewed, because closing an AWS account is manual and slow (90-day
 suspension) and so is the one step here that is hard to undo.

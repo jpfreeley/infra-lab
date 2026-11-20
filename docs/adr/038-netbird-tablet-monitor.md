@@ -2,7 +2,15 @@
 
 ## Status
 
-Proposed. Builds on ADR-037 (self-hosted NetBird server). Nothing is
+Superseded 2026-11-20. The stack moved to a separate, portable template
+repository (server, monitor, lease automation and docs, deployable into any
+AWS account) and passed two from-zero test deployments there. The infra-lab
+deployment was then torn down: `infra/live/netbird`, the modules, the lease
+trigger and the workflows were destroyed and removed. The dedicated account
+and its SCP (`infra/mgmt/org/netbird_account.tf`) remain, empty. This record
+stays as the history of the design.
+
+Original status: Proposed. Builds on ADR-037 (self-hosted NetBird server). Nothing is
 applied yet.
 
 Amended 2026-11-20, before any implementation: the first version kept the

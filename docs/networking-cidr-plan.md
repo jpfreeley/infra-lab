@@ -18,7 +18,7 @@ tenant workloads with restricted egress.
 | prod | Execution | 10.0.80.0/20 | 4,094 |
 | workspaces | WorkSpaces | 10.0.96.0/20 | 4,094 |
 | mempalace | MemPalace | 10.0.112.0/20 | 4,094 |
-| netbird | NetBird | 10.0.128.0/20 | 4,094 |
+| netbird | NetBird (reserved; stack removed 2026-11-20, ADR-037) | 10.0.128.0/20 | 4,094 |
 
 ## Subnet Layout (per VPC, 3 AZs)
 
