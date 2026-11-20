@@ -37,6 +37,8 @@ broken until someone at the site notices. The operator wants:
 - The page to also show the app's active order count and the last order
   seen, for information.
 - A way to reboot a tablet remotely.
+- A way to bring everything up by hand, at any time, and have a check-in
+  happen.
 - The checks to run without the operator's Mac (it sleeps, travels, and is
   off at night).
 - The stack torn down to zero most of the day, coming up four times a day
@@ -105,9 +107,15 @@ The workflow also starts and stops the monitor instance (section 2) on the
 same decision, after the server is up and before it is torn down.
 
 `netbird.sh status` shows the check-in times and whether a window is open.
-`netbird.sh up` still works between check-ins as a one-off lease, but it
-does not start the monitor: ad hoc use is operator work, not something to
-report on.
+
+**Manual bring-up.** Any active one-off lease also starts the monitor, not
+only the server. So the operator can bring everything up at any time with
+`netbird.sh up <duration>`, and the monitor runs an on-demand check-in when
+it starts (section 5). A shortcut, `netbird.sh checkin`, sets a one-hour
+lease, waits for the on-demand check-in to finish, then reads the result
+from the monitor over NetBird (`status.json`, section 7) and prints every
+tablet's state in the terminal, green ones included. The terminal output is
+the all-clear that the red-only ntfy reports deliberately leave out.
 
 ### 2. Monitor host: one EC2 instance in the NetBird account
 
@@ -174,9 +182,22 @@ blast radius ever matters more than setup effort.
 
 ### 5. Checks
 
-At each check-in the monitor runs the checks twice, 10 minutes before the
-stated time and at it (systemd timers with `OnCalendar=` in the check-in
-time zone), for each tablet in the inventory:
+At each check-in the monitor runs the checks twice, 10 minutes apart, for
+each tablet in the inventory. There are three kinds of check-in, and all
+three report the same way (section 6):
+
+- **Scheduled**: 10 minutes before the stated time and at it (systemd
+  timers with `OnCalendar=` in the check-in time zone).
+- **On start**: whenever the monitor boots, which happens at each scheduled
+  window and at each manual lease. The first run starts when every tablet in
+  the inventory is connected on NetBird, or 15 minutes after boot at the
+  latest; the second follows 10 minutes later. When the boot belongs to a
+  scheduled window, the on-start check-in is skipped, because the scheduled
+  one follows within minutes.
+- **On request**: the status page's "Check now" button (section 7), while
+  the monitor is up.
+
+The checks:
 
 | Check | Red when | How |
 | --- | --- | --- |
@@ -299,9 +320,13 @@ shows the gap matters.
   browsers expose `navigator.clipboard` only on HTTPS or `localhost`. When
   NetBird reports a tablet offline, the button is disabled, since the
   command could not connect.
-- **Each tablet with a working ADB session gets a Reboot button.** It is
-  the page's only state-changing action, and the only reason the HTTP
-  server is more than a static file server. The command it runs is fixed
+- **A "Check now" button** starts an on-request check-in (two runs, 10
+  minutes apart). While one is running the button is disabled and the page
+  shows its progress. It uses the same protections as the Reboot button
+  below.
+- **Each tablet with a working ADB session gets a Reboot button.** It and
+  "Check now" are the page's only state-changing actions, and the only
+  reason the HTTP server is more than a static file server. The command it runs is fixed
   (`adb -s <ip>:5555 reboot` for a tablet in the inventory); the request
   carries only the tablet's inventory name, never a command or an address.
   The equivalent command is shown for copying too, for use from the Mac.
@@ -364,10 +389,11 @@ tablet is a secret update plus a monitor restart, not a code change.
   reported for up to about 6 hours.
 - A green check-in sends nothing, so a broken monitor is silent (section 6).
 - The status page, the copy buttons and remote reboot are available only
-  during a check-in window, or after the operator starts a one-off lease.
+  during a check-in window, or after the operator starts a manual lease
+  (which also runs a check-in).
 - The operator's ADB key is now on two hosts.
-- The page is no longer read-only: the reboot endpoint is a state-changing
-  action without a login, protected by a page token, an `Origin` check and
+- The page is no longer read-only: the reboot and "Check now" endpoints are
+  state-changing actions without a login, protected by a page token, an `Origin` check and
   a `Host` check instead.
 - Two checks are weaker than their names suggest: the Google check sees
   presence, not authentication health, and the printer check cannot prove a
@@ -407,7 +433,8 @@ hour each):
    Apply, then verify each red condition by causing it on purpose (stop the
    kiosk app, bring another app to the front, disconnect NetBird on a
    tablet, unpair a printer).
-6. Lease workflow starts and stops the instance with the check-in windows.
+6. Lease workflow starts and stops the instance with the check-in windows
+   and with any manual lease. `netbird.sh checkin` on the Mac.
 
 ## References
 
