@@ -2,8 +2,19 @@
 
 ## Status
 
-Proposed. Builds on ADR-037 (self-hosted NetBird server). Nothing is
-applied yet.
+Accepted. Builds on ADR-037 (self-hosted NetBird server). Deployed on
+2026-11-20: the monitor instance enrolled on NetBird, checked the first
+tablet with every check green, served the status page over NetBird,
+delivered ntfy messages, and has followed the four daily check-in windows
+and manual leases since. Operator runbooks: `docs/runbooks/netbird/`.
+
+Changes made during implementation, each described in its section below:
+x86_64 `t3.nano` instead of Graviton (section 2), monitor code delivered
+through S3 instead of user data (section 2), a bootstrap without `dnf`
+plus a 1 GiB swap file (the package manager was killed for lack of memory
+on 0.5 GiB), the page learning its own NetBird address before serving (it
+answered 421 until the first run), waking lazy NetBird peers before
+judging them, and low-priority "up" and "down" ntfy messages (section 6).
 
 Amended 2026-11-20, before any implementation: the first version kept the
 server and monitor up during business hours (10:00 to 23:00) with alerts
@@ -302,6 +313,15 @@ shows the gap matters.
   GitHub Actions failure when a window passes with no report recorded) is a
   follow-up if a silent failure ever happens. The operator chose fewer
   messages over this coverage.
+- **Up and down messages (added 2026-11-20).** The monitor sends a
+  low-priority "Tablet monitor up" message when the instance boots (naming
+  the check-in it is up for, or "manual lease") and "Tablet monitor down"
+  with the last check-in result when the instance stops. Only a real boot
+  or shutdown sends them, not a service restart, so a restart loop cannot
+  flood the topic. This narrows the gap above: a check-in time that passes
+  with no "up" message means the stack did not come up, and the "down"
+  message carries the all-green result. It does not close it, because
+  noticing a missing message still depends on a person.
 
 ### 7. Status page
 

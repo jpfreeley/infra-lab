@@ -9,5 +9,6 @@ Architecture docs, ADRs, runbooks, and onboarding docs live here.
 - [adr/](adr/) — Architecture Decision Records (031 total)
 - [runbooks/](runbooks/) — Operational runbooks
   - [workspaces-operations.md](runbooks/workspaces-operations.md) — DCV dev desktop operations
+  - [netbird/](runbooks/netbird/README.md) — NetBird tablet remote access: tablet setup, adding people, deploying, GitHub setup, monitoring, operations
 - [onboarding-dev-desktop.md](onboarding-dev-desktop.md) — New developer onboarding guide (beginner-friendly)
 - [build_journal/](build_journal/) — Build progress notes

@@ -2,10 +2,47 @@
 
 ## Status
 
-Proposed. Nothing is applied yet. The account creation (`infra/mgmt/org`)
-ships as its own, later PR, after the module and live wiring have been
-reviewed, because closing an AWS account is manual and slow (90-day
-suspension) and so is the one step here that is hard to undo.
+Accepted. The account (`infra-lab-netbird`) was created and the stack
+deployed on 2026-11-19. The spike settled the open questions below, and the
+stack has run with lease teardown and daily check-ins (ADR-038) since
+2026-11-20. Operator runbooks: `docs/runbooks/netbird/`.
+
+### Spike Findings (2026-11-19 and 2026-11-20)
+
+- **TLS: Option A works.** The NLB terminates TLS with the ACM certificate
+  (ALPN `HTTP2Preferred`) and Traefik accepts h2c with prior knowledge on a
+  plain entrypoint. gRPC, WebSocket relay and the dashboard all work through
+  it. `tls_mode = "nlb"` is the live setting; Option B stays as a fallback.
+- **STUN: external.** STUN through the NLB's UDP listener got no reply,
+  while the same probe sent straight to the task worked. The likely cause is
+  that NLB UDP preserves the client IP, so the public-subnet task replies
+  from its own address through the IGW. Fixing that in AWS would need
+  private subnets and a NAT Gateway (about $32 a month). The live stack uses
+  Cloudflare's public STUN with Google's as a second, and has no UDP
+  listener.
+- **Owner seeding needs a bcrypt hash.** NetBird v0.83.1 hands
+  `auth.owner.password` to Dex as the stored hash, so a plaintext value made
+  every login return HTTP 500. The owner secret now carries
+  `password_hash` (bcrypt), documented in the module README.
+- **Health checks.** The server's `/health` includes a relay self-check that
+  dials its own public name through the NLB, which a new target cannot pass
+  before it is healthy. Target groups use a TCP check on Traefik's port.
+- **Cold start: 2.5 to 6.5 minutes** from dispatch to a 200 on the readiness
+  probe.
+- **Client reconnect after a cold start: up to about 8 minutes.** A tablet
+  rejoined about 8 minutes after the server was ready, from client backoff.
+  Acceptable for scheduled windows that open 40 minutes early (ADR-038); a
+  standing lease was not needed.
+- **Peer settings the tablets need:** login expiration off (otherwise an
+  unattended tablet drops off when its login expires), Always-on VPN, and
+  Force relay off. NetBird's lazy connections show peers as `Idle` until
+  traffic flows; the first packet opens the tunnel.
+- **macOS DNS negative cache.** After a down/up cycle a Mac can keep a
+  cached "no such name" from while the Route53 record was deleted. The
+  wrapper falls back to a public resolver and prints the flush command.
+- **Not built:** the alarm on the trigger Lambda's `Errors` metric, because
+  the dev stack has no alarm topic with a subscriber. Tracked as a known gap
+  in the runbooks.
 
 ## Context
 
@@ -246,10 +283,11 @@ Components, mirroring MemPalace:
   the lease and calls the toggle with `action: down` once it has
   expired. Idempotent: a run that finds the lease expired and the NLB
   already gone does nothing, so overlapping triggers are harmless.
-- A local wrapper script (`netbird.sh {status|up [duration]|down}`)
-  outside this repo, same role as the MemPalace wrapper: switch to the
-  right `gh` account, set the lease variables, dispatch the toggle,
-  poll for health.
+- A local wrapper script (`netbird.sh {status|up [duration]|down}`),
+  same role as the MemPalace wrapper: switch to the right `gh` account,
+  set the lease variables, dispatch the toggle, poll for health. It lived
+  outside this repo during the spike and is now in `scripts/netbird/`,
+  so other operators can use it.
 
 #### Lease-check triggers: EventBridge primary, GitHub cron fallback
 
