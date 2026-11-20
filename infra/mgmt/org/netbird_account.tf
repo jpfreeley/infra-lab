@@ -38,7 +38,9 @@ resource "aws_organizations_account" "netbird" {
 # than the MemPalace SCP: no wafv2 (NLB front end, no WAF) and no events
 # (the lease-check schedule lives in the management account, ADR-037).
 # acm is listed because tls_mode "nlb" issues the certificate in this
-# account.
+# account. ssm, ssmmessages and ec2messages are for SSM Session Manager on
+# the tablet monitor instance (ADR-038), which has no SSH key and no
+# inbound rules.
 ###############################################################################
 
 data "aws_iam_policy_document" "scp_netbird_service_boundary" {
@@ -48,10 +50,15 @@ data "aws_iam_policy_document" "scp_netbird_service_boundary" {
     not_actions = [
       # Compute and networking for the app itself
       "ecs:*",
-      "ec2:*", # Fargate ENIs (awsvpc mode), EFS mount target ENIs, security groups, VPC
+      "ec2:*", # Fargate ENIs (awsvpc mode), EFS mount target ENIs, security groups, VPC, tablet monitor instance (ADR-038)
       "elasticfilesystem:*",
       "elasticloadbalancing:*",
       "acm:*",
+
+      # Shell access to the tablet monitor (ADR-038): SSM Session Manager
+      "ssm:*",
+      "ssmmessages:*",
+      "ec2messages:*",
 
       # Encryption and secrets
       "kms:*",
@@ -102,7 +109,7 @@ data "aws_iam_policy_document" "scp_netbird_service_boundary" {
 
 resource "aws_organizations_policy" "netbird_service_boundary" {
   name        = "${local.project_name}-netbird-service-boundary"
-  description = "Restrict the NetBird account to only the services its ECS Fargate + NLB deployment uses."
+  description = "Restrict the NetBird account to the services its ECS Fargate + NLB server and EC2 tablet monitor use."
   content     = data.aws_iam_policy_document.scp_netbird_service_boundary.json
   type        = "SERVICE_CONTROL_POLICY"
   tags        = local.common_tags
