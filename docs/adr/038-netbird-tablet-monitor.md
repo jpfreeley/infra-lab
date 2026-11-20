@@ -140,11 +140,15 @@ the all-clear that the red-only ntfy reports deliberately leave out.
   identity and its NetBird IP. A stopped instance costs only its EBS volume,
   and an auto-assigned public IPv4 is released while stopped, so it is not
   billed then.
-- Code and configuration go in through `user_data` (a templated cloud-init
-  script with the monitor's Python embedded), with
-  `user_data_replace_on_change = true`. A code change replaces the instance.
-  That is acceptable because enrollment is automatic (section 3) and there
-  is no other state to keep.
+- The bootstrap (packages, NetBird enrollment, the systemd unit) goes in
+  through `user_data`, with `user_data_replace_on_change = true`. The
+  monitor's code does not: Terraform uploads it to a KMS-encrypted S3
+  bucket in the account, and the service downloads it at every start. The
+  instance boots at every check-in, so a code change reaches it at the next
+  one without replacing the instance. (Changed during implementation: with
+  the code embedded in user data, every code change replaced the instance
+  and needed a new one-use setup key and a dashboard cleanup, and the
+  gzipped user data was already at 13.5 KB of the 16 KB limit.)
 
 Module: `infra/modules/tablet_monitor`. Live wiring:
 `infra/live/netbird/monitor.tf`.
@@ -403,10 +407,10 @@ tablet is a secret update plus a monitor restart, not a code change.
 - Two checks are weaker than their names suggest: the Google check sees
   presence, not authentication health, and the printer check cannot prove a
   Wi-Fi printer is reachable.
-- Code changes replace the instance (user data), and the replacement
-  enrolls as a new NetBird peer with a new IP. The old peer must be removed
-  from the dashboard by hand. A one-use setup key per instance generation
-  keeps this explicit, at the cost of one manual step per code change.
+- Bootstrap changes (not code changes) replace the instance, and the
+  replacement enrolls as a new NetBird peer. The old peer must be removed
+  from the dashboard and a new one-use setup key stored first. Code changes
+  avoid this (S3 delivery, section 2).
 
 ### Cost
 

@@ -62,7 +62,7 @@ variable "inventory_secret_arn" {
 }
 
 variable "secrets_kms_key_arn" {
-  description = "KMS key that encrypts the four secrets above."
+  description = "KMS key that encrypts the four secrets above and the code bucket."
   type        = string
 }
 

@@ -12,3 +12,8 @@ output "role_name" {
   description = "Monitor instance role."
   value       = aws_iam_role.this.name
 }
+
+output "code_bucket" {
+  description = "Bucket that holds monitor.py (downloaded at every service start)."
+  value       = module.code_bucket.bucket_id
+}

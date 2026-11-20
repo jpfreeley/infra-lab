@@ -12,11 +12,23 @@
 # Stopped between check-ins, never terminated by the schedule: NetBird's
 # peer identity lives on the root volume. A user_data change replaces the
 # instance, and the replacement needs a fresh one-use setup key (README).
+#
+# monitor.py is NOT in the user data. Terraform uploads it to S3, and the
+# service downloads it every time it starts (every boot, so every check-in).
+# A code change is an S3 upload that takes effect at the next check-in,
+# with no instance replacement and no new setup key.
 
 locals {
   common_tags = merge(var.tags, {
     Component = "tablet-monitor"
   })
+
+  code_key = "monitor.py"
+  # Built from plan-time values (not the bucket resource's id), so the user
+  # data that carries it is known at plan time and a change shows up as an
+  # instance replacement, never as an in-place user data update that the
+  # per-instance bootstrap would not run.
+  code_bucket = "${var.name}-tablet-monitor-${data.aws_caller_identity.current.account_id}"
 
   secret_arns = [
     var.setup_key_secret_arn,
@@ -27,6 +39,29 @@ locals {
 }
 
 data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
+###############################################################################
+# Code delivery: monitor.py in S3
+###############################################################################
+
+module "code_bucket" {
+  source = "../s3_secure_bucket"
+
+  name        = local.code_bucket
+  kms_key_arn = var.secrets_kms_key_arn
+}
+
+resource "aws_s3_object" "monitor_py" {
+  bucket      = module.code_bucket.bucket_id
+  key         = local.code_key
+  source      = "${path.module}/files/monitor.py"
+  source_hash = filebase64sha256("${path.module}/files/monitor.py")
+  kms_key_id  = var.secrets_kms_key_arn
+
+  content_type = "text/x-python"
+  tags         = local.common_tags
+}
 
 # Latest Amazon Linux 2023 at the time of each apply. ignore_changes on the
 # instance keeps a newer AMI from replacing a running monitor; a replacement
@@ -73,12 +108,23 @@ resource "aws_iam_role_policy" "secrets" {
         Resource = local.secret_arns
       },
       {
-        Sid      = "DecryptMonitorSecrets"
+        Sid      = "ReadMonitorCode"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = ["${module.code_bucket.bucket_arn}/${local.code_key}"]
+      },
+      {
+        Sid      = "DecryptMonitorSecretsAndCode"
         Effect   = "Allow"
         Action   = ["kms:Decrypt"]
         Resource = [var.secrets_kms_key_arn]
         Condition = {
-          StringEquals = { "kms:ViaService" = "secretsmanager.${data.aws_region.current.name}.amazonaws.com" }
+          StringEquals = {
+            "kms:ViaService" = [
+              "secretsmanager.${data.aws_region.current.name}.amazonaws.com",
+              "s3.${data.aws_region.current.name}.amazonaws.com",
+            ]
+          }
         }
       },
     ]
@@ -157,9 +203,13 @@ resource "aws_instance" "this" {
     netbird_sha256         = var.netbird_sha256
     platform_tools_version = var.platform_tools_version
     platform_tools_sha256  = var.platform_tools_sha256
-    monitor_py             = file("${path.module}/files/monitor.py")
+    code_uri               = "s3://${local.code_bucket}/${local.code_key}"
   }))
   user_data_replace_on_change = true
+
+  # The service downloads monitor.py at start and reads secrets; have both
+  # in place before the first boot (it would retry every 15 s otherwise).
+  depends_on = [aws_s3_object.monitor_py, aws_iam_role_policy.secrets]
 
   lifecycle {
     ignore_changes = [ami]
