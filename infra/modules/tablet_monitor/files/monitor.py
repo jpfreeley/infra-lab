@@ -130,9 +130,14 @@ def netbird_status():
     rc, out = run(["netbird", "status", "--json"], timeout=15)
     if rc != 0:
         return {}, "", ""
-    d = json.loads(out)
-    peers = {p.get("netbirdIp", "").split("/")[0]: p.get("status", "") for p in d.get("peers", {}).get("details", [])}
-    return peers, d.get("netbirdIp", "").split("/")[0], d.get("fqdn", "")
+    try:
+        d = json.loads(out) or {}
+    except ValueError:
+        return {}, "", ""
+    # Before login (LoginFailed, NeedsLogin) peers and details are null.
+    details = (d.get("peers") or {}).get("details") or []
+    peers = {(p.get("netbirdIp") or "").split("/")[0]: p.get("status", "") for p in details}
+    return peers, (d.get("netbirdIp") or "").split("/")[0], d.get("fqdn") or ""
 
 
 def adb(serial, *args, timeout=20):
@@ -358,7 +363,9 @@ class Monitor:
             return self._token
 
     def run_once(self):
-        peers, self.netbird_ip, self.fqdn = netbird_status()
+        peers, ip, fqdn = netbird_status()
+        if ip:  # keep the last known address if the daemon blips
+            self.netbird_ip, self.fqdn = ip, fqdn
         for t in self.tablets:
             try:
                 checks, info = check_tablet(t, peers)
@@ -701,9 +708,14 @@ def make_handler(mon):
 
 def serve(mon):
     while True:
-        bind = CONFIG["bind"]
-        if not bind:
-            _, bind, _ = netbird_status()
+        # Learn our own NetBird address and name before serving: the Host
+        # and Origin checks compare against them. (Before this, they were
+        # only set by the first check run, so the page answered 421 until
+        # then; found on the first deploy, 2026-11-20.)
+        _, ip, fqdn = netbird_status()
+        if ip:
+            mon.netbird_ip, mon.fqdn = ip, fqdn
+        bind = CONFIG["bind"] or ip
         if bind:
             try:
                 srv = http.server.ThreadingHTTPServer((bind, CONFIG["port"]), make_handler(mon))

@@ -11,7 +11,11 @@ when a tablet is red and serves a status page on its NetBird address only.
 - **adb** from Android platform-tools (pinned, SHA-256 verified), using the
   ADB key pair the tablets already trust (Secrets Manager).
 - **`files/monitor.py`** as the `tablet-monitor` systemd service. Standard
-  library only. It runs the check-ins on its own clock (scheduled times, a
+  library only. Terraform uploads it to a KMS-encrypted S3 bucket; the
+  service downloads it at every start (`ExecStartPre`, checked with
+  `py_compile`, last good copy kept on failure). The instance boots at every
+  check-in, so a code change reaches it at the next check-in. To deploy at
+  once: `systemctl restart tablet-monitor` over SSM. It runs the check-ins on its own clock (scheduled times, a
   check-in at start-up when the boot is not part of a scheduled window, and
   "Check now" from the page), and serves the status page on port 8080 of the
   NetBird interface.
@@ -53,17 +57,22 @@ Inventory format:
 Only `name` and `host` are required. Inventory changes apply on the next
 service restart (`systemctl restart tablet-monitor`) or the next start.
 
+## Updating the code
+
+Change `files/monitor.py` and apply. Only the S3 object changes; the
+instance is not replaced. The new code runs from the next service start.
+
 ## Replacing the instance
 
-Any change to `files/monitor.py`, the bootstrap template or the pinned
-versions changes the user data, which replaces the instance. The new
+Changes to the bootstrap template, the pinned versions or the instance
+settings change the user data, which replaces the instance. The new
 instance needs a new one-use setup key:
 
-1. In the NetBird dashboard, create a new setup key (one use, not ephemeral,
-   auto-group `monitors`) and store it in the setup-key secret.
-2. Apply.
-3. Delete the old `tablet-monitor` peer in the dashboard. The new peer gets a
-   new NetBird IP, so use the DNS name for the page.
+1. In the NetBird dashboard, delete the old `tablet-monitor` peer, so the new
+   one gets the same DNS name.
+2. Create a new setup key (one use, not ephemeral, auto-group `monitors`)
+   and store it in the setup-key secret.
+3. Apply.
 
 ## Testing monitor.py locally
 
@@ -76,7 +85,4 @@ INVENTORY_FILE=inventory.json NTFY_TOPIC=test DRY_RUN=1 BIND=127.0.0.1 \
 
 ## Limits
 
-- User data is limited to 16 KB after decoding. The gzipped bootstrap with
-  `monitor.py` inside is about 13.5 KB; a much larger `monitor.py` would need
-  another delivery path (for example S3).
 - x86_64 only (the Linux adb is not published for ARM).

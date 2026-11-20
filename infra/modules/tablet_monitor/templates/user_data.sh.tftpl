@@ -47,19 +47,28 @@ install -d -m 700 /root/.android
 secret "${adb_key_secret_arn}" | python3 -c 'import json,sys; d=json.load(sys.stdin); open("/root/.android/adbkey","w").write(d["private"]); open("/root/.android/adbkey.pub","w").write(d["public"])'
 chmod 600 /root/.android/adbkey /root/.android/adbkey.pub
 
-# Monitor program and its service.
+# Monitor program: downloaded from S3 at every service start (ExecStartPre),
+# so a code change is an S3 upload, not an instance replacement. The
+# download is checked with py_compile before it replaces the running copy;
+# if it fails, the last good copy keeps running.
 install -d -m 755 /opt/tablet-monitor
-# Inserted as plain text (gzip compresses it well; base64 did not fit the
-# 16 KB user data limit). Terraform does not re-parse inserted text, and the
-# quoted heredoc stops the shell from expanding anything in it.
-cat > /opt/tablet-monitor/monitor.py <<'MONITOR_PY_EOF'
-${monitor_py}
-MONITOR_PY_EOF
+cat > /usr/local/bin/tablet-monitor-fetch <<'FETCH'
+#!/bin/bash
+set -euo pipefail
+tmp=$(mktemp --suffix=.py)
+trap 'rm -f "$tmp"' EXIT
+aws s3 cp --region "$AWS_REGION" --only-show-errors "$CODE_URI" "$tmp"
+python3 -m py_compile "$tmp"
+install -m 755 "$tmp" /opt/tablet-monitor/monitor.py
+echo "monitor.py updated from $CODE_URI ($(sha256sum /opt/tablet-monitor/monitor.py | cut -c1-12))"
+FETCH
+chmod 755 /usr/local/bin/tablet-monitor-fetch
 install -d -m 700 /etc/tablet-monitor
 cat > /etc/tablet-monitor/env <<'ENV'
 AWS_REGION=${region}
 INVENTORY_SECRET=${inventory_secret_arn}
 NTFY_SECRET=${ntfy_topic_secret_arn}
+CODE_URI=${code_uri}
 CHECKINS=${checkins}
 HOME=/root
 ENV
@@ -71,6 +80,8 @@ Wants=network-online.target
 
 [Service]
 EnvironmentFile=/etc/tablet-monitor/env
+# Leading "-": a failed download keeps the last good copy running.
+ExecStartPre=-/usr/local/bin/tablet-monitor-fetch
 ExecStart=/usr/bin/python3 /opt/tablet-monitor/monitor.py
 Restart=always
 RestartSec=15
