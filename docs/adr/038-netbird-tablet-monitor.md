@@ -29,6 +29,7 @@ broken until someone at the site notices. The operator wants:
   the app's "Live" status label is gone.
 - The page to also show the app's active order count and the last order
   seen, for information.
+- A way to reboot a tablet remotely.
 - The checks to run without the operator's Mac (it sleeps, travels, and is
   off at night).
 - Coverage during business hours only: 10:00 to 23:00 America/New_York,
@@ -278,6 +279,39 @@ shows the gap matters.
   browsers expose `navigator.clipboard` only on HTTPS or `localhost`. When
   NetBird reports a tablet offline, the button is disabled, since the
   command could not connect.
+- **Each tablet with a working ADB session gets a Reboot button.** It is
+  the page's only state-changing action, and the only reason the HTTP
+  server is more than a static file server. The command it runs is fixed
+  (`adb -s <ip>:5555 reboot` for a tablet in the inventory); the request
+  carries only the tablet's inventory name, never a command or an address.
+  The equivalent command is shown for copying too, for use from the Mac.
+
+  The page has no login, so the endpoint is protected against requests the
+  operator did not mean to send:
+
+  - **Cross-site requests.** Any website the operator's browser loads can
+    send requests to the monitor's overlay address while the Mac is on
+    NetBird. The reboot endpoint accepts only `POST`, requires a random
+    token that the monitor puts into the page it serves (generated at
+    start, rotated daily), and rejects any request whose `Origin` is not
+    the monitor's own address. Other origins cannot read the page, so they
+    cannot learn the token.
+  - **DNS rebinding.** The server rejects any request whose `Host` header
+    is not the monitor's NetBird IP or NetBird DNS name.
+  - **Mistakes.** The button asks for confirmation, naming the tablet. Each
+    tablet can be rebooted at most once every 10 minutes.
+  - **Expected red.** A reboot pauses that tablet's alerts for 10 minutes
+    (a reboot and ADB recovery took about 3 minutes in testing). It sends
+    an ntfy message when the reboot is requested, so every reboot leaves
+    a record, and the usual recovery message follows when the tablet is
+    green again.
+
+  **The limit.** A remote reboot needs a working ADB session. A tablet whose
+  ADB is unreachable, or that is offline on NetBird, cannot be rebooted from
+  here, and those are the cases where a reboot would help most. An
+  unrooted tablet without a device-management (MDM) enrollment offers no
+  other remote reboot path; NetBird has none. For those cases the alert is
+  the signal to call the site.
 - There is no login, because NetBird membership is the access control. A
   public URL was considered and rejected: it would add an internet-facing
   endpoint that shows device names, account names and network addresses.
@@ -300,12 +334,17 @@ tablet is a secret update plus a monitor restart, not a code change.
 - No new tablet-side setup: the monitor reuses the existing ADB trust and
   the existing on-device recovery.
 - The page is private by construction (overlay only, operator's group only).
+- A tablet that is up but misbehaving can be rebooted from the page, from
+  any device on the operator's NetBird group.
 
 ### Negative
 
 - A new always-running component (during business hours) that can break
   silently. The daily "monitor up" message only partly covers that.
 - The operator's ADB key is now on two hosts.
+- The page is no longer read-only: the reboot endpoint is a state-changing
+  action without a login, protected by a page token, an `Origin` check and
+  a `Host` check instead.
 - Two checks are weaker than their names suggest: the Google check sees
   presence, not authentication health, and the printer check cannot prove a
   Wi-Fi printer is reachable.
