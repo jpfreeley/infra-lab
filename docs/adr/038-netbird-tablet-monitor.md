@@ -22,10 +22,13 @@ broken until someone at the site notices. The operator wants:
 - A small status page ("network map") that shows every tablet and refreshes
   on its own.
 - A push notification (ntfy) when a tablet goes red.
-- Red to cover six conditions: the tablet is offline on NetBird, ADB is
+- Red to cover eight conditions: the tablet is offline on NetBird, ADB is
   unreachable, the kiosk app is not running, the kiosk app is not in the
-  foreground, the tablet's printer is not available, or the tablet's Google
-  account is signed out.
+  foreground, the tablet's printer is not available, the tablet's Google
+  account is signed out, the kiosk app has lost its backend connection, or
+  the app's "Live" status label is gone.
+- The page to also show the app's active order count and the last order
+  seen, for information.
 - The checks to run without the operator's Mac (it sleeps, travels, and is
   off at night).
 - Coverage during business hours only: 10:00 to 23:00 America/New_York,
@@ -163,6 +166,51 @@ Every 5 minutes (systemd timer), for each tablet in the inventory:
 | App in front | kiosk app is not the top resumed activity | `dumpsys activity activities` |
 | Printer | the tablet's expected printer is not seen | per-tablet rule (below) |
 | Google | no `com.google` account on the device | `dumpsys account` |
+| Backend connection | the kiosk app has no established TCP connection on 443 | `/proc/net/tcp` and `/proc/net/tcp6`, filtered by the app's UID |
+| Live label | the app's "Live" status label is not on screen | `uiautomator dump` text (only when the app is in front) |
+
+Two more values are shown on the page as information only. They never turn
+a tablet red:
+
+| Value | How |
+| --- | --- |
+| Active order count | the order count text in the same `uiautomator dump` |
+| Last order seen | the monitor's own record of the last time the count rose |
+
+**What the kiosk app exposes, and what it does not.** Checked on the first
+tablet on 2026-11-20 (app version 2.0.0, React Native, release build):
+
+- The app logs its order-server connection to logcat under the
+  `ReactNativeJS` tag (`[VenueSocket] Connected`, `Transport upgraded`).
+  The monitor records the time of the last such line as information. The
+  log alone cannot say the connection is up now (it is a ring buffer, and no
+  disconnect line has been observed yet), so the red check uses the live
+  socket table instead.
+- The app holds long-lived TLS connections to its backend (Google Cloud
+  addresses). An established socket owned by the app's UID is the
+  "connected" signal. The check does not pin backend IP addresses, because
+  those can change behind a load balancer.
+- The screen text, read with `uiautomator dump`, includes the venue name, a
+  "Live" status label, the active order count, and the order list. This is
+  the only source for order data on the device: the app's private storage
+  cannot be read, because the build is not debuggable (`run-as` fails) and
+  the tablets are not rooted. The app posts no notifications and logs no
+  order events.
+- The expected label text ("Live") and the order-count pattern are set per
+  tablet in the inventory, with those values as defaults, so an app update
+  that renames them is a secret update, not a code change.
+
+**Limits of the screen-based values.** They need the app in front, so they
+are unknown whenever the "App in front" check fails. An app update that
+changes the layout can break them, which is one reason only the "Live"
+label is allowed to turn a tablet red. "Last order seen" misses any order
+that arrives and is closed between two 5-minute runs. The reliable source
+for last order time and ID is the app's backend, if an API to it becomes
+available; that would replace the screen-based values.
+
+**Privacy.** The screen text contains venue and customer data. The monitor
+keeps only the label's presence, the count, and timestamps. It never stores
+or sends order details, customer names, or the raw dump.
 
 Checks short-circuit: if NetBird is offline, the ADB-based checks are
 reported as unknown, not as five extra failures.
