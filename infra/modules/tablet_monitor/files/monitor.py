@@ -140,6 +140,25 @@ def netbird_status():
     return peers, (d.get("netbirdIp") or "").split("/")[0], d.get("fqdn") or ""
 
 
+def wake_peer(host, port=5555, wait_s=15):
+    """With NetBird lazy connections a peer stays "Idle" until traffic flows
+    to it. Open a TCP connection to start the tunnel, then wait for the peer
+    to show as Connected. Returns the last status seen."""
+    import socket
+    try:
+        socket.create_connection((host, port), timeout=5).close()
+    except OSError:
+        pass  # the attempt alone starts the tunnel; the status below decides
+    status = ""
+    deadline = time.time() + wait_s
+    while time.time() < deadline:
+        status = netbird_status()[0].get(host, "")
+        if status == "Connected":
+            break
+        time.sleep(2)
+    return status
+
+
 def adb(serial, *args, timeout=20):
     return run(["adb", "-s", serial, *args], timeout=timeout)
 
@@ -286,6 +305,8 @@ def check_tablet(t, peers):
     c, info = {}, {}
     host, pkg, serial = t["host"], t["package"], t["host"] + ":5555"
     status = peers.get(host, "")
+    if status and status != "Connected":
+        status = wake_peer(host)  # lazy connections: Idle until used
     c["netbird"] = (status == "Connected", status or "not a peer of this monitor")
     if not c["netbird"][0]:
         return c, info
@@ -385,9 +406,13 @@ class Monitor:
         deadline = STARTED + BOOT_WAIT_S
         while time.time() < deadline:
             peers, _, _ = netbird_status()
-            if all(peers.get(t["host"]) == "Connected" for t in self.tablets):
+            waiting = [t["host"] for t in self.tablets if peers.get(t["host"]) != "Connected"]
+            if not waiting:
                 return
-            time.sleep(20)
+            for host in waiting:
+                if peers.get(host):  # known peer, maybe Idle (lazy): wake it
+                    wake_peer(host, wait_s=5)
+            time.sleep(15)
 
     def start_checkin(self, kind):
         with self.lock:
