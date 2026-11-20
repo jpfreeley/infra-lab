@@ -32,3 +32,8 @@ output "netbird_account_id" {
   description = "The AWS Account ID of the dedicated NetBird account (ADR-037). Needed for infra/live/netbird/providers.tf's assume_role ARN after this account is created."
   value       = aws_organizations_account.netbird.id
 }
+
+output "sandbox_account_id" {
+  description = "The AWS Account ID of the general-purpose sandbox account (Sandbox OU)."
+  value       = aws_organizations_account.sandbox.id
+}
