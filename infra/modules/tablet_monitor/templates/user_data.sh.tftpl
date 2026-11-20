@@ -13,7 +13,17 @@ secret() {
     --query SecretString --output text
 }
 
-dnf install -y -q unzip jq
+# No dnf: on a t3.nano (0.5 GiB) "dnf install" was killed for lack of
+# memory on the first deploy (2026-11-20). Python, already on the image,
+# does the unzip and the JSON parsing instead. A 1 GiB swap file gives the
+# NetBird daemon, adb and the monitor some headroom.
+if [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=1024 status=none
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null
+  echo "/swapfile none swap defaults 0 0" >> /etc/fstab
+fi
+swapon -a
 
 # NetBird client, pinned and checksum-verified.
 curl -fsSL -o /tmp/netbird.tgz \
@@ -27,14 +37,14 @@ curl -fsSL -o /tmp/platform-tools.zip \
   "https://dl.google.com/android/repository/platform-tools_r${platform_tools_version}-linux.zip"
 echo "${platform_tools_sha256}  /tmp/platform-tools.zip" | sha256sum -c -
 rm -rf /opt/platform-tools
-unzip -q /tmp/platform-tools.zip -d /opt
+python3 -m zipfile -e /tmp/platform-tools.zip /opt
+chmod 755 /opt/platform-tools/adb
 ln -sf /opt/platform-tools/adb /usr/local/bin/adb
 rm -f /tmp/platform-tools.zip
 
 # ADB key pair the tablets already trust (ADR-038 section 4).
 install -d -m 700 /root/.android
-secret "${adb_key_secret_arn}" | jq -r .private > /root/.android/adbkey
-secret "${adb_key_secret_arn}" | jq -r .public > /root/.android/adbkey.pub
+secret "${adb_key_secret_arn}" | python3 -c 'import json,sys; d=json.load(sys.stdin); open("/root/.android/adbkey","w").write(d["private"]); open("/root/.android/adbkey.pub","w").write(d["public"])'
 chmod 600 /root/.android/adbkey /root/.android/adbkey.pub
 
 # Monitor program and its service.
