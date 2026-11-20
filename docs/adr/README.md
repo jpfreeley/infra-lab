@@ -52,4 +52,4 @@ Each ADR follows a lightweight format:
 | [035](035-paper-trading-runner.md) | Scheduled paper trading runner | Accepted | TBD |
 | [036](036-s3-tls-enforcement.md) | Require HTTPS on every managed S3 bucket | Accepted | TBD |
 | [037](037-netbird-server-dedicated-account.md) | Self-hosted NetBird server, dedicated account, lease teardown | Proposed | TBD |
-| [038](038-netbird-tablet-monitor.md) | Always-on tablet monitor on NetBird, business-hours uptime | Proposed | TBD |
+| [038](038-netbird-tablet-monitor.md) | Tablet monitor on NetBird, four daily check-ins | Proposed | TBD |

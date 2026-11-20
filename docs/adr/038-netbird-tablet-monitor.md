@@ -1,9 +1,15 @@
-# ADR-038: Always-On Tablet Monitor on NetBird, Business-Hours Uptime
+# ADR-038: Tablet Monitor on NetBird, Four Daily Check-Ins
 
 ## Status
 
 Proposed. Builds on ADR-037 (self-hosted NetBird server). Nothing is
 applied yet.
+
+Amended 2026-11-20, before any implementation: the first version kept the
+server and monitor up during business hours (10:00 to 23:00) with alerts
+within about 10 minutes. The operator chose instead to stay torn down to
+zero most of the day and come up four times a day for a check-in, trading
+detection time for cost. The sections below describe the check-in design.
 
 ## Context
 
@@ -21,7 +27,8 @@ broken until someone at the site notices. The operator wants:
 
 - A small status page ("network map") that shows every tablet and refreshes
   on its own.
-- A push notification (ntfy) when a tablet goes red.
+- A push notification (ntfy) when a tablet is red at a check-in, and
+  silence when every tablet is green.
 - Red to cover eight conditions: the tablet is offline on NetBird, ADB is
   unreachable, the kiosk app is not running, the kiosk app is not in the
   foreground, the tablet's printer is not available, the tablet's Google
@@ -32,8 +39,9 @@ broken until someone at the site notices. The operator wants:
 - A way to reboot a tablet remotely.
 - The checks to run without the operator's Mac (it sleeps, travels, and is
   off at night).
-- Coverage during business hours only: 10:00 to 23:00 America/New_York,
-  every day.
+- The stack torn down to zero most of the day, coming up four times a day
+  (06:00, 12:00, 18:00 and 00:00 America/New_York) for the tablets to check
+  in and for a status report.
 
 ### Constraints from ADR-037
 
@@ -61,24 +69,33 @@ That leaves a small EC2 instance.
 
 ## Decision
 
-### 1. Business-hours window on the existing lease
+### 1. Check-in windows on the existing lease
 
-`netbird-lease-teardown.yml` gains a recurring window next to the existing
-one-off lease. A new repo variable holds it:
+`netbird-lease-teardown.yml` gains recurring check-in windows next to the
+existing one-off lease. A new repo variable holds the check-in times:
 
 ```text
-NETBIRD_HOURS = "10:00-23:00 America/New_York"
+NETBIRD_CHECKINS = "06:00,12:00,18:00,00:00 America/New_York"
 ```
 
-The stack is "wanted up" when either the one-off lease
+Each check-in opens a window from 40 minutes before the stated time to 15
+minutes after it. The stack is "wanted up" when either the one-off lease
 (`NETBIRD_KEEP_UP_FROM/UNTIL`, unchanged) is active or the current time is
-inside the window. To absorb the cold start, the workflow treats the window
-as opening 20 minutes early (09:40 local), so the server and the tablets'
-reconnects are done by 10:00. The window closes at 23:00, and the next
-15-minute check tears down. An empty or unset variable disables the window,
-which returns ADR-037's behavior exactly.
+inside any window. The 40 minutes cover the worst case before the report:
+up to 15 minutes until the next lease check notices the window (the
+workflow runs every 15 minutes), about 6.5 minutes of cold start, and up to
+about 8 minutes of client reconnect backoff. The 15 minutes after give the
+monitor's report time to finish; the next lease check after that tears
+down. Each check-in therefore keeps the stack up for about an hour. An
+empty or unset variable disables check-ins, which returns ADR-037's
+behavior exactly.
 
-The window is evaluated with Python's `zoneinfo`, so daylight saving time
+Exact-time triggers (four EventBridge cron schedules at 40 minutes before
+each check-in) would cut each window to about 45 minutes. They were not
+chosen: the saving is about $1 a month, and the existing 15-minute clock
+keeps one trigger path instead of two.
+
+The windows are evaluated with Python's `zoneinfo`, so daylight saving time
 moves with the local clock and no cron expression has to be rewritten twice
 a year. EventBridge Scheduler stays the primary clock and the GitHub cron
 the fallback, as in ADR-037; neither needs to change, because both only
@@ -87,10 +104,10 @@ dispatch the workflow, and the workflow owns the decision.
 The workflow also starts and stops the monitor instance (section 2) on the
 same decision, after the server is up and before it is torn down.
 
-`netbird.sh status` shows the window and whether it is open. `netbird.sh up`
-still works outside the window as a one-off lease, but outside the window
-it does not start the monitor: off-hours use is operator work, not
-something to alert on.
+`netbird.sh status` shows the check-in times and whether a window is open.
+`netbird.sh up` still works between check-ins as a one-off lease, but it
+does not start the monitor: ad hoc use is operator work, not something to
+report on.
 
 ### 2. Monitor host: one EC2 instance in the NetBird account
 
@@ -107,7 +124,7 @@ something to alert on.
   SCP change ships in its own PR in `infra/mgmt/org`.
 - IMDSv2 required, encrypted gp3 root volume (8 GiB), detailed monitoring
   off.
-- **Stopped outside business hours, not terminated.** NetBird's peer state
+- **Stopped between check-ins, not terminated.** NetBird's peer state
   and ADB's state live on the root volume, so a stop/start keeps the peer
   identity and its NetBird IP. A stopped instance costs only its EBS volume,
   and an auto-assigned public IPv4 is released while stopped, so it is not
@@ -157,7 +174,9 @@ blast radius ever matters more than setup effort.
 
 ### 5. Checks
 
-Every 5 minutes (systemd timer), for each tablet in the inventory:
+At each check-in the monitor runs the checks twice, 10 minutes before the
+stated time and at it (systemd timers with `OnCalendar=` in the check-in
+time zone), for each tablet in the inventory:
 
 | Check | Red when | How |
 | --- | --- | --- |
@@ -238,20 +257,21 @@ shows the gap matters.
 
 ### 6. Alerting
 
-- **Hysteresis.** A tablet turns red after two consecutive failing runs
-  (about 10 minutes). It turns green after one passing run. This rides out a
-  reboot (about 3 minutes end to end) and brief Wi-Fi drops.
-- **Grace period.** For the first 15 minutes after the monitor starts each
-  day, nothing alerts, because tablets rejoin NetBird with a backoff after
-  the overnight teardown.
-- ntfy alerts are sent on transitions only: green to red (the failed checks
-  in the message), and red to green (recovered). The topic is a random,
-  unguessable name stored in Secrets Manager, never in the repo.
-- **A daily "monitor up" message** goes out when the grace period ends, with
-  the count of green and red tablets. Its absence on a business day is the
-  signal that the monitor itself is broken. That is a cheap dead-man's
-  switch with no extra infrastructure. A real one (an external heartbeat
-  check) is a follow-up.
+- **Red only, no all-clear.** At the stated check-in time the monitor sends
+  one ntfy message if any tablet is red, listing each red tablet and its
+  failed checks. When every tablet is green it sends nothing. The topic is
+  a random, unguessable name stored in Secrets Manager, never in the repo.
+- **Two runs per check-in.** A tablet is red only when both runs (10 minutes
+  apart) fail the same check. A tablet that is still rejoining after the
+  bring-up, or rebooting, passes on the second run and does not alert.
+- **Known gap: silence is ambiguous.** Because a green check-in sends
+  nothing, a monitor that fails to start, or a lease workflow that never
+  brings the stack up, looks the same as four green tablets. The status page
+  shows the last check-in time when it is up, but it is up only during a
+  window. An external heartbeat (for example, the lease workflow raising a
+  GitHub Actions failure when a window passes with no report recorded) is a
+  follow-up if a silent failure ever happens. The operator chose fewer
+  messages over this coverage.
 
 ### 7. Status page
 
@@ -260,10 +280,10 @@ shows the gap matters.
   NetBird interface address only, so the page is reachable only from inside
   the overlay (section 3), and only from the operator's group.
 - The page draws a simple map: the server and the monitor in the middle,
-  one node per tablet, colored green, red or gray (unknown/outside hours),
-  with each check's result, the last check time, and the last few
-  transitions. It reloads itself every 60 seconds; the data refreshes every
-  5 minutes.
+  one node per tablet, colored green, red or gray (unknown), with each
+  check's result, the last check time, and the results of the last few
+  check-ins. It reloads itself every 60 seconds. It is reachable only while
+  the monitor is up: during a check-in window, or never between them.
 - **Each tablet that is online on NetBird gets a copy button** for the
   command that opens it in `scrcpy` from the operator's Mac:
 
@@ -300,11 +320,11 @@ shows the gap matters.
     is not the monitor's NetBird IP or NetBird DNS name.
   - **Mistakes.** The button asks for confirmation, naming the tablet. Each
     tablet can be rebooted at most once every 10 minutes.
-  - **Expected red.** A reboot pauses that tablet's alerts for 10 minutes
-    (a reboot and ADB recovery took about 3 minutes in testing). It sends
-    an ntfy message when the reboot is requested, so every reboot leaves
-    a record, and the usual recovery message follows when the tablet is
-    green again.
+  - **Expected red.** A reboot that lands between the two runs of a
+    check-in would otherwise fail the second run, so a rebooted tablet's
+    result is held as unknown for 10 minutes (a reboot and ADB recovery
+    took about 3 minutes in testing). A reboot also sends an ntfy message,
+    so every reboot leaves a record.
 
   **The limit.** A remote reboot needs a working ADB session. A tablet whose
   ADB is unreachable, or that is offline on NetBird, cannot be rebooted from
@@ -327,10 +347,11 @@ tablet is a secret update plus a monitor restart, not a code change.
 
 ### Positive
 
-- Problems surface within about 10 minutes during business hours, without
-  the operator's Mac.
-- The server's cost falls from 24/7 to 13 hours a day, and the off-hours
-  teardown keeps working exactly as ADR-037 designed.
+- Tablet problems are found four times a day without the operator's Mac.
+- The stack stays torn down about 20 hours a day, and ADR-037's teardown
+  keeps working exactly as designed between check-ins.
+- Every tablet gets four guaranteed rejoin windows a day, so a tablet that
+  rebooted overnight is back on NetBird by the next check-in.
 - No new tablet-side setup: the monitor reuses the existing ADB trust and
   the existing on-device recovery.
 - The page is private by construction (overlay only, operator's group only).
@@ -339,8 +360,11 @@ tablet is a secret update plus a monitor restart, not a code change.
 
 ### Negative
 
-- A new always-running component (during business hours) that can break
-  silently. The daily "monitor up" message only partly covers that.
+- Detection is slow: a tablet that fails just after a check-in is not
+  reported for up to about 6 hours.
+- A green check-in sends nothing, so a broken monitor is silent (section 6).
+- The status page, the copy buttons and remote reboot are available only
+  during a check-in window, or after the operator starts a one-off lease.
 - The operator's ADB key is now on two hosts.
 - The page is no longer read-only: the reboot endpoint is a state-changing
   action without a login, protected by a page token, an `Origin` check and
@@ -355,23 +379,24 @@ tablet is a secret update plus a monitor restart, not a code change.
 
 ### Cost
 
-us-east-1 on-demand prices, 13 hours a day (09:40 to 23:00, rounded up):
+us-east-1 on-demand prices, about 4 hours a day (four windows of about an
+hour each):
 
 | Item | Monthly |
 | --- | --- |
-| NetBird server (NLB + Fargate), about $30/month at 24/7 | about $16 |
-| Monitor: t4g.nano, 13 h/day | about $1.70 |
-| Monitor: public IPv4, 13 h/day | about $2 |
+| NetBird server (NLB + Fargate), about $30/month at 24/7 | about $5 |
+| Monitor: t4g.nano, 4 h/day | about $0.50 |
+| Monitor: public IPv4, 4 h/day | about $0.60 |
 | Monitor: 8 GiB gp3 | about $0.65 |
 | Secrets Manager: 4 new secrets (setup key, ADB key, ntfy topic, inventory) | about $1.60 |
-| **Total** | **about $22** |
+| **Total** | **about $8.50** |
 
 ## Implementation Order
 
 1. This ADR.
-2. Business-hours window in `netbird-lease-teardown.yml`, plus the
-   `netbird.sh status` display. Useful on its own: it gives tablets a
-   reliable rejoin window even before the monitor exists.
+2. Check-in windows in `netbird-lease-teardown.yml`, plus the
+   `netbird.sh status` display. Useful on its own: it gives tablets four
+   reliable rejoin windows a day even before the monitor exists.
 3. SCP change in `infra/mgmt/org`: allow `ssm`, `ssmmessages`,
    `ec2messages`.
 4. NetBird dashboard: `monitors` group, the two policies, a one-use setup
@@ -382,7 +407,7 @@ us-east-1 on-demand prices, 13 hours a day (09:40 to 23:00, rounded up):
    Apply, then verify each red condition by causing it on purpose (stop the
    kiosk app, bring another app to the front, disconnect NetBird on a
    tablet, unpair a printer).
-6. Lease workflow starts and stops the instance with the window.
+6. Lease workflow starts and stops the instance with the check-in windows.
 
 ## References
 
