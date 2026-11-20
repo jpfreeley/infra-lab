@@ -130,9 +130,14 @@ def netbird_status():
     rc, out = run(["netbird", "status", "--json"], timeout=15)
     if rc != 0:
         return {}, "", ""
-    d = json.loads(out)
-    peers = {p.get("netbirdIp", "").split("/")[0]: p.get("status", "") for p in d.get("peers", {}).get("details", [])}
-    return peers, d.get("netbirdIp", "").split("/")[0], d.get("fqdn", "")
+    try:
+        d = json.loads(out) or {}
+    except ValueError:
+        return {}, "", ""
+    # Before login (LoginFailed, NeedsLogin) peers and details are null.
+    details = (d.get("peers") or {}).get("details") or []
+    peers = {(p.get("netbirdIp") or "").split("/")[0]: p.get("status", "") for p in details}
+    return peers, (d.get("netbirdIp") or "").split("/")[0], d.get("fqdn") or ""
 
 
 def adb(serial, *args, timeout=20):
