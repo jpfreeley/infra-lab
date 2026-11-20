@@ -29,6 +29,6 @@ output "mempalace_account_id" {
 }
 
 output "netbird_account_id" {
-  description = "The AWS Account ID of the dedicated NetBird account (ADR-037). Needed for infra/live/netbird/providers.tf's assume_role ARN after this account is created."
+  description = "The AWS Account ID of the dedicated NetBird account (ADR-037). The NetBird stack itself was removed on 2026-11-20 (ADR-037, superseded); the account remains, empty."
   value       = aws_organizations_account.netbird.id
 }

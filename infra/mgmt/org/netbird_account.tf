@@ -34,7 +34,9 @@ resource "aws_organizations_account" "netbird" {
 
 ###############################################################################
 # NetBird Account SCP - Service Boundary
-# Only what infra/modules/netbird_server and infra/live/netbird use. Narrower
+# The NetBird stack was removed from this repo on 2026-11-20 (ADR-037,
+# superseded); the account is kept, empty. The list below is what that stack
+# used. Narrower
 # than the MemPalace SCP: no wafv2 (NLB front end, no WAF) and no events
 # (the lease-check schedule lives in the management account, ADR-037).
 # acm is listed because tls_mode "nlb" issues the certificate in this
