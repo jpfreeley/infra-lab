@@ -9,16 +9,28 @@ name: NetBird Lease Teardown
 # set by the local wrapper (netbird.sh up <duration>) or by hand:
 #   gh variable set NETBIRD_KEEP_UP_UNTIL --repo jpfreeley/infra-lab --body 2026-11-20T03:00:00Z
 #
-# Every run:
-#   NLB present, lease active        -> stay up
-#   NLB present, lease over or unset -> tear down (via netbird-toggle.yml),
+# A recurring business-hours window (ADR-038) can also keep the stack up.
+# It is one repo variable, "HH:MM-HH:MM <IANA zone>", for example:
+#
+#   NETBIRD_HOURS = "10:00-23:00 America/New_York"
+#
+# The window opens WINDOW_LEAD_MINUTES early (20) so the cold start (about
+# 6.5 minutes) and the clients' reconnect backoff are done by the stated
+# start time. It is evaluated with zoneinfo, so daylight saving time follows
+# the local clock. A start later than the end wraps past midnight. Empty,
+# unset or malformed means no window (ADR-037 behavior, unchanged); a
+# malformed value is reported as a warning annotation, never an error.
+#
+# "Wanted up" = lease active OR window open. Every run:
+#   NLB present, wanted up           -> stay up
+#   NLB present, not wanted up       -> tear down (via netbird-toggle.yml),
 #                                       except a lease-less NLB younger than
 #                                       60 minutes, so a manual
 #                                       `terraform apply` isn't destroyed
 #                                       out from under whoever ran it
-#   NLB absent,  lease active        -> bring up (self-healing, same idea as
+#   NLB absent,  wanted up           -> bring up (self-healing, same idea as
 #                                       the MemPalace protected-uptime window)
-#   NLB absent,  no active lease     -> nothing to do
+#   NLB absent,  not wanted up       -> nothing to do
 #
 # Why a lease and not traffic (ADR-037): every enrolled peer holds a
 # long-lived management stream open, so the server never looks idle, and
@@ -111,6 +123,8 @@ jobs:
         env:
           KEEP_UP_FROM: ${{ vars.NETBIRD_KEEP_UP_FROM }}
           KEEP_UP_UNTIL: ${{ vars.NETBIRD_KEEP_UP_UNTIL }}
+          HOURS: ${{ vars.NETBIRD_HOURS }}
+          WINDOW_LEAD_MINUTES: "20"
         run: |
           NOW_S=$(date -u +%s)
 
@@ -134,6 +148,39 @@ jobs:
           fi
           echo "Lease: $LEASE (from='${KEEP_UP_FROM:-}', until='${KEEP_UP_UNTIL:-}')"
 
+          # Business-hours window (ADR-038): prints open, closed, off or
+          # invalid.
+          WINDOW=$(python3 - <<'PY'
+          import datetime, os, re, zoneinfo
+          spec = os.environ.get("HOURS", "").strip()
+          if not spec:
+              print("off"); raise SystemExit
+          m = re.fullmatch(r"(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})\s+(\S+)", spec)
+          try:
+              tz = zoneinfo.ZoneInfo(m.group(5))
+              h1, m1, h2, m2 = (int(m.group(i)) for i in range(1, 5))
+              start = h1 * 60 + m1 - int(os.environ.get("WINDOW_LEAD_MINUTES", "0"))
+              end = h2 * 60 + m2
+              assert 0 <= h1 <= 23 and 0 <= h2 <= 24 and m1 < 60 and m2 < 60
+          except Exception:
+              print("invalid"); raise SystemExit
+          now = datetime.datetime.now(tz)
+          minute = now.hour * 60 + now.minute
+          start %= 1440
+          inside = (start <= minute < end) if start < end else (minute >= start or minute < end)
+          print("open" if inside else "closed")
+          PY
+          )
+          if [ "$WINDOW" = "invalid" ]; then
+            echo "::warning::NETBIRD_HOURS='$HOURS' is not 'HH:MM-HH:MM <IANA zone>'; ignoring it."
+          fi
+          echo "Window: $WINDOW (hours='${HOURS:-}', opens ${WINDOW_LEAD_MINUTES} min early)"
+
+          WANTED=false
+          if [ "$LEASE" = "active" ] || [ "$WINDOW" = "open" ]; then
+            WANTED=true
+          fi
+
           NLB_CREATED=$(aws elbv2 describe-load-balancers \
             --names infra-lab-netbird-nlb \
             --region us-east-1 \
@@ -142,11 +189,11 @@ jobs:
 
           if [ "$NLB_CREATED" = "None" ] || [ -z "$NLB_CREATED" ]; then
             echo "should_teardown=false" >> "$GITHUB_OUTPUT"
-            if [ "$LEASE" = "active" ]; then
-              echo "NLB absent but the lease is active: bringing the stack up."
+            if [ "$WANTED" = "true" ]; then
+              echo "NLB absent but the stack is wanted up (lease $LEASE, window $WINDOW): bringing it up."
               echo "should_bringup=true" >> "$GITHUB_OUTPUT"
             else
-              echo "NLB absent and no active lease: already down, nothing to do."
+              echo "NLB absent and not wanted up: already down, nothing to do."
               echo "should_bringup=false" >> "$GITHUB_OUTPUT"
             fi
             exit 0
@@ -154,8 +201,8 @@ jobs:
 
           echo "should_bringup=false" >> "$GITHUB_OUTPUT"
 
-          if [ "$LEASE" = "active" ]; then
-            echo "Lease active: staying up."
+          if [ "$WANTED" = "true" ]; then
+            echo "Wanted up (lease $LEASE, window $WINDOW): staying up."
             echo "should_teardown=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -169,7 +216,7 @@ jobs:
             fi
           fi
 
-          echo "NLB present and the lease is $LEASE: tearing down."
+          echo "NLB present, lease $LEASE, window $WINDOW: tearing down."
           echo "should_teardown=true" >> "$GITHUB_OUTPUT"
 
   teardown:
@@ -184,7 +231,7 @@ jobs:
       contents: read
 
   bring-up:
-    name: Bring up (lease active)
+    name: Bring up (lease active or window open)
     needs: check-lease
     if: needs.check-lease.outputs.should-bringup == 'true'
     uses: ./.github/workflows/netbird-toggle.yml
